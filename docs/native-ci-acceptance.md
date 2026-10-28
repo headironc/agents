@@ -1,5 +1,7 @@
 # Native CI acceptance
 
-This temporary PR tests native CI only. It intentionally adds a Linux failure to an existing repository regression. The Linux check must fail while the macOS check continues through the complete gate, exercising independent matrix results and required checks.
+The negative candidate [H1](https://github.com/headironc/agents/commit/cc36f49344e5e931ad3c06a2028cfc1272f683c8) added `Native CI acceptance: intentional Linux failure` in `tests/validation/check.test.ts`. The [negative run](https://github.com/headironc/agents/actions/runs/40699802716) recorded the expected Linux failure (42/43 checks passing) while macOS completed 43/43. Required checks blocked the ready PR.
 
-Do not merge this PR. After recording the failure, remove only the intentional test and verify the recovered candidate. Keep this note so the PR retains a diff, then close the PR after acceptance.
+Recovery candidate [H2](https://github.com/headironc/agents/commit/c472045566d361f72150c608bd36e1cac4274faa) removed that test. The [recovery run](https://github.com/headironc/agents/actions/runs/40703145714) completed 43/43 on both platforms. This note intentionally retains the PR's remaining diff; do not reintroduce the failing test.
+
+Never merge this PR. Before closing, record each phase's exact candidate and target baseline, complete Linux and macOS results, actual required-check states, and the current candidate's independent code and security review route, results and disposition of every finding. Close only after that acceptance is complete.
