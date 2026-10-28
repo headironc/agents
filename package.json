@@ -1,0 +1,32 @@
+{
+  "name": "agents",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:install": ".cache/agents-tools/bin/node scripts/build-install.ts",
+    "format": ".cache/agents-tools/bin/node node_modules/prettier/bin/prettier.cjs --prose-wrap never --write",
+    "format:check": ".cache/agents-tools/bin/node node_modules/prettier/bin/prettier.cjs --prose-wrap never --check"
+  },
+  "packageManager": "bun@1.4.2",
+  "engines": {
+    "node": "26.8.1"
+  },
+  "dependencies": {
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@openai/codex": "0.160.0",
+    "@types/node": "26.6.4",
+    "js-yaml": "5.4.2",
+    "markdownlint": "0.41.1",
+    "markdownlint-cli2": "0.23.3",
+    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-frontmatter": "2.0.1",
+    "mdast-util-gfm": "3.1.0",
+    "micromark": "4.0.3",
+    "micromark-extension-frontmatter": "2.0.0",
+    "micromark-extension-gfm": "3.0.0",
+    "prettier": "3.9.9",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,72 @@
+# - Read [executor](../../scripts/check.ts). Use tool `bash`.
+# - Read [executor](../../scripts/check.ts). Use tool `bun`.
+# - Read [executor](../../scripts/check.ts). Use tool `node`.
+# - Read [bootstrap](../../scripts/tool-bootstrap.sh). Use tool `pinned-tool-bootstrap`.
+# - Read [contract](../../delivery/policy/tool-contracts.md). Use tool `git`.
+# - Read [validator](../../scripts/skill-validator.py). Use tool `python`.
+name: checks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -euo pipefail {0}
+
+jobs:
+  repository:
+    name: repository (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify environment and candidate
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          RUNNER_PLATFORM: ${{ runner.os }}-${{ runner.arch }}
+        run: |
+          umask 077
+          for tool in bash git jq gh curl tar unzip zip python3; do
+            command -v "$tool" >/dev/null || { printf 'Missing prerequisite: %s\n' "$tool" >&2; exit 1; }
+          done
+          python3 -c 'import sys; assert sys.version_info >= (3, 9), "Python 3.9 or later is required"'
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          printf 'Runner: %s\nCheckout: %s\nPR head: %s\nPR base: %s\n' "$RUNNER_PLATFORM" "$CANDIDATE_SHA" "$PR_HEAD_SHA" "$PR_BASE_SHA"
+      - name: Prepare pinned tools
+        run: |
+          umask 077
+          bash scripts/install-tools.sh
+      - name: Install locked dependencies
+        run: |
+          umask 077
+          .cache/agents-tools/bin/bun install --frozen-lockfile --ignore-scripts
+      - name: Build installer
+        run: |
+          umask 077
+          .cache/agents-tools/bin/bun run build:install
+      - name: Check complete repository
+        run: |
+          umask 077
+          mkdir -p .cache/reports
+          bash scripts/check.sh all --report .cache/reports/check.json

@@ -1,0 +1,18 @@
+# How this repository checks links, in one place.
+#
+# Two runs read it: `check-docs.ts` over the repository form, and `check-refs.ts` over the tree laid
+# out in the published form. They ask different questions about different trees and must answer them
+# the same way, so the settings are shared rather than repeated at each call site.
+#
+# `check-refs.ts` passes this file with `-c` because it runs from a temporary directory, where
+# lychee would not find a config of its own.
+
+# No network. Both runs are about files this repository ships, and a gate that reaches the network
+# fails for reasons that have nothing to do with the change under test.
+offline = true
+
+# A link to a section that was renamed is as broken as a link to a file that moved, and neither
+# shows up when both ends move together.
+include_fragments = "anchor-only"
+
+no_progress = true

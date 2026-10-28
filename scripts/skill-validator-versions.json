@@ -1,0 +1,26 @@
+{
+  "verifiedAt": "2026-10-22",
+  "codex": {
+    "revision": "a9519cbcdd2d664530edb2469224ee03c1056799",
+    "url": "https://raw.githubusercontent.com/openai/codex/a9519cbcdd2d664530edb2469224ee03c1056799/codex-rs/skills/src/assets/samples/skill-creator/scripts/quick_validate.py",
+    "sha256": "1fd66498c219616fd9249eacdf16c458412ea9065a9d887fd716aeef03907762"
+  },
+  "codexLicense": {
+    "url": "https://raw.githubusercontent.com/openai/codex/a9519cbcdd2d664530edb2469224ee03c1056799/LICENSE",
+    "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
+  },
+  "claude": {
+    "revision": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+    "url": "https://raw.githubusercontent.com/anthropics/skills/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/skill-creator/scripts/quick_validate.py",
+    "sha256": "67cf5703402013936c8fb75ad6a1afecd8841d45cc5e606b634eb05825fde365"
+  },
+  "claudeLicense": {
+    "url": "https://raw.githubusercontent.com/anthropics/skills/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/skill-creator/LICENSE.txt",
+    "sha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362"
+  },
+  "pyyaml": {
+    "version": "6.0.1",
+    "url": "https://files.pythonhosted.org/packages/cd/e5/af35f7ea75cf72f2cd079c95ee16797de7cd71f29ea7c68ae5ce7be1eda0/PyYAML-6.0.1.tar.gz",
+    "sha256": "bfdf460b1736c775f2ba9f6a92bca30bc2095067b8a9d77876d1fad6cc3b4a43"
+  }
+}

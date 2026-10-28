@@ -1,0 +1,17 @@
+# Recommended capability configuration for Codex. Merge these into the config.toml the product
+# already reads; nothing in this repository writes to your configuration.
+#
+# Both settings are commented examples of options that support the delivered operation boundaries.
+# Installing this fragment does not enable either setting or change your personal configuration.
+# `workspace-write` confines writes to the directory being worked on. Measured through
+# `codex sandbox`, one condition changed per cell: a write inside it lands, the same write outside
+# it fails with "Read-only file system" and no file appears, the same write inside it fails under
+# `read-only` — so the first cell is this setting and not the absence of a sandbox — and a read
+# outside it succeeds. It bounds writing, not reading.
+#
+# `on-request` is the ask-to-continue shape, returning to the person before each outward step.
+# What recommends it is that the shape matches the operation boundary the shared rules already
+# state — not any overrun figure, and not a measurement of this setting, which this repository has
+# not made. Adopting either is yours to decide.
+# sandbox_mode = "workspace-write"
+# approval_policy = "on-request"

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# - Read [contract](../delivery/policy/tool-contracts.md). Use tool `git`.
+# - Read [executor](../scripts/check.ts). Use tool `node`.
+# - Read [executor](../scripts/check.ts). Use tool `bash`.
+set -euo pipefail
+repository_root=$(git --no-optional-locks rev-parse --show-toplevel) || exit 1
+node="$repository_root/.cache/agents-tools/bin/node"
+[[ -f $node && ! -L $node && -x $node && -f $repository_root/scripts/check.sh ]] || {
+  echo 'Missing hook prerequisites; run bash scripts/install-tools.sh' >&2
+  exit 1
+}
+for dependency in zod js-yaml markdownlint; do
+  [[ -f $repository_root/node_modules/$dependency/package.json ]] || {
+    echo 'Missing hook dependencies; run the documented frozen Bun install' >&2
+    exit 1
+  }
+done
+exec "$node" "$repository_root/scripts/pre-commit.ts"

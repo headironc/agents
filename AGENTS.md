@@ -1,0 +1,28 @@
+# Repository Instructions
+
+- Before repository work, read and apply [Codex rules](delivery/AGENTS.md), then [current delivery and maintenance navigation](README.md), the relevant [usage contracts](docs/usage.md), and [tooling contracts](docs/tooling.md).
+- Use README for current delivery status and locate the external `review-launch-status.json` current handoff through [README execution records](README.md#执行记录) for exact execution evidence; historical stage records remain in Git and the external evidence directory.
+- Load [Rust](delivery/policy/rust.md) or [SQL](delivery/policy/sql.md) preferences only under their stated adoption scope and the selected review contract's required sections.
+- Keep work within the authorized scope and branch. Reassess a design when implementation changes its agreed boundaries.
+- Use historical source as migration and recovery evidence, not as an implicit target design.
+- Preserve `.git`, history, other worktrees, unrelated changes, and external recovery and deployed snapshots.
+- Resolve tool references from their physical installed directories; apply [operation boundaries](delivery/AGENTS.md#operation-boundaries).
+- For this repository, use [tool contracts](delivery/policy/tool-contracts.md) and [writing conventions](delivery/policy/writing.md) from the delivery source. Run the repository copies of `scripts/check-prose.mjs` and `scripts/check-ids.mjs`.
+- Use `apply_patch` for manual edits and do not hand-edit bundled tools.
+- For new structured checks and installation logic, use TypeScript with the pinned Node runtime.
+- Keep the tool-download bootstrap in Bash; keep delivered tool bundles reproducible.
+- Preserve pinned upstream Python validators and adopted skill tools instead of rewriting them for language uniformity.
+- Validate shared skills with both pinned official product validators, and product-specific skills with their corresponding validator. Keep complete entrypoint coverage and failures in the unified gate; follow [the skill validation contract](docs/tooling.md#技能格式校验).
+- Reuse suitable syntax, link, type, and product-skill validators; write local checks only for repository-specific ownership, target completeness, or permission boundaries.
+- Do not build general Markdown, YAML, TypeScript, or Git parsers.
+- Read [tool prerequisites and validation](docs/tooling.md); prepare tools with `bash scripts/install-tools.sh` and locked dependencies with `.cache/agents-tools/bin/bun install --frozen-lockfile --ignore-scripts`.
+- Run `umask 077` followed by `bash scripts/check.sh all` for final source or executable-configuration validation, including rule behavior changes.
+- Use `bash scripts/check.sh docs` for documentation-only changes.
+- Keep applicable [behavior scenarios](tests/scenarios/rules.md) in sync with current rules and tools.
+- For this repository's review and merge, follow [the project contract](docs/review-gate.md), including its [rebuild-period override](docs/review-gate.md#重建期交付规则) for agents main. That override does not apply to other repositories or targets. Local implementation does not authorize remote setup, approval writes, or protection changes.
+- Distinguish static scenario checks from authorized actual model runs, local gates from GitHub CI, and design review from current implementation review.
+- When acceptance depends on Codex behavior, obtain model and material authorization and test the affected [scenarios](tests/scenarios/rules.md) in a real session. If that check cannot run, report behavior unverified; the no-model loader check does not prove behavior.
+- Keep substantive execution evidence and remaining limits in the existing task record; ordinary edits need no additional ledger.
+- Use [the usage guide](docs/usage.md) for delivered capabilities and snapshot transition limits.
+- Do not write a product's own configuration file. A capability the rules depend on is a delivery: publish the executable and the fragment that registers it, and let the Human merge that fragment once. Personal preference unrelated to a rule is not delivered at all.
+- Do not install personal configuration, operate remote services, commit, publish, approve, merge, or expand to another slice without authority for the exact actions and effects.

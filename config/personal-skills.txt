@@ -1,0 +1,18 @@
+# Delivered tool capabilities; generic development tasks need no workflow skill.
+# path<TAB>shared|codex|claude; nested paths are validation members, not install targets.
+figma-design-workflow	codex
+gh	shared
+project-guide	shared
+gh-identity	shared
+alibabacloud-find-skills	shared
+alibabacloud-sms-send-short-message	shared
+wechatide	shared
+wechatide/skills/automator	shared
+wechatide/skills/cloudbase-operator	shared
+wechatide/skills/compiler	shared
+wechatide/skills/debugger	shared
+wechatide/skills/initializer	shared
+wechatide/skills/installer	shared
+wechatide/skills/previewer	shared
+wechatide/skills/project-config	shared
+wechatide/skills/project-manager	shared

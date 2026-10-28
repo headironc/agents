@@ -1,0 +1,34 @@
+agents-tool-inventory-v1
+# kind<TAB>subject<TAB>scope<TAB>category<TAB>state<TAB>definition
+subject	agents-installer	core	platform-interface	active	defined
+subject	id-check	core	platform-interface	active	defined
+subject	prose-check	core	platform-interface	active	defined
+subject	ref-check	core	platform-interface	active	defined
+subject	aliyun-sms	core	cli	active	defined
+subject	wechatide	core	cli	active	defined
+subject	wechatide-call	core	platform-interface	active	defined
+subject	wechatide-install-check	core	platform-interface	active	defined
+subject	rg	core	cli	active	defined
+subject	jq	core	cli	active	defined
+subject	curl	core	cli	active	defined
+subject	git	core	version-control	active	defined
+subject	gh	core	cli	active	defined
+subject	github-api	core	service-interface	active	defined
+subject	gh-stack	core	cli	active	defined
+subject	openssh	core	transport	active	defined
+subject	node	core	runtime	active	defined
+subject	bun	core	cli	active	defined
+subject	bash	core	shell	active	defined
+subject	shellcheck	core	cli	active	defined
+subject	actionlint	core	cli	active	defined
+subject	zizmor	core	cli	active	defined
+subject	gitleaks	core	cli	active	defined
+subject	typescript	core	cli	active	defined
+subject	markdownlint-cli2	core	cli	active	defined
+subject	lychee	core	cli	active	defined
+subject	python	core	runtime	active	defined
+subject	skill-validation	core	cli	active	defined
+subject	codex-cli-loader	core	platform-interface	active	defined
+subject	codex-cli	core	cli	active	defined
+subject	claude-code	core	cli	active	defined
+subject	pinned-tool-bootstrap	core	platform-interface	active	defined

@@ -1,0 +1,39 @@
+# Recommended lint configuration for a project that adopts policy/rust.md. Merge into the
+# Cargo.toml it belongs with; nothing in this repository writes a consuming project's files.
+#
+# Every entry below was watched failing a violating crate on rustc 1.98.1 and its bundled Clippy,
+# against a control crate with the same code and no configuration. A deny that denies nothing is
+# the failure this repository keeps finding elsewhere: present, parsing, deciding nothing.
+
+[lints.rust]
+# rustc's own group: non_camel_case_types, non_snake_case, non_upper_case_globals. Warn by default,
+# so denying is what turns the case conventions into a build failure. Measured: three errors.
+nonstandard_style = "deny"
+# It does not reach macro names: `macro_rules! BadMacro` draws no diagnostic under it, so that half
+# of the case convention stays prose in policy/rust.md.
+
+[lints.clippy]
+# Style, warn by default. A public `len` is accompanied by `is_empty`. It decides nothing about
+# what a predicate is named; that stays with the author.
+len_without_is_empty = "deny"
+
+# Style, warn by default. `new` returns Self, and a type whose `new()` takes no argument also
+# implements Default.
+new_ret_no_self = "deny"
+new_without_default = "deny"
+
+# Restriction, allow by default, so these two add a rule rather than raising an existing warning.
+# They change what compiles, so a project that has not already adopted them decides before merging.
+unwrap_used = "deny"
+expect_used = "deny"
+
+# Deliberately absent: `upper_case_acronyms` and `wrong_self_convention`.
+#
+# The naming preferences would be the better half of this file if these two worked, and the audit
+# that asked for this configuration assumed they did. They did not fire on this toolchain — not on
+# `pub struct HTTP;`, and not on an `into_*` method taking `&self` — while `unwrap_used` fired on
+# the same file, so Clippy was running and the configuration was being read.
+#
+# Why they stayed quiet is not established here, so they are not shipped: an entry credited with
+# enforcement it does not perform leaves that rule owned by nobody while reading as covered. The
+# corresponding preferences stay prose in policy/rust.md. Re-measure before adding them back.

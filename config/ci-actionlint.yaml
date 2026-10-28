@@ -1,0 +1,2 @@
+# The frozen CI release owns overrides; candidate actionlint settings are not loaded.
+{}

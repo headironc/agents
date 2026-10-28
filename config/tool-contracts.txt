@@ -1,0 +1,34 @@
+agents-tool-contracts-v1
+# kind<TAB>subject<TAB>category<TAB>loading<TAB>owner<TAB>proof<TAB>value
+contract	agents-installer	platform-interface	conditional	scripts/install.ts	comment-subject	agents-installer
+contract	prose-check	platform-interface	conditional	scripts/check-prose.mjs	comment-subject	prose-check
+contract	id-check	platform-interface	conditional	scripts/check-ids.mjs	comment-subject	id-check
+contract	ref-check	platform-interface	conditional	scripts/check-refs.ts	comment-subject	ref-check
+contract	aliyun-sms	cli	conditional	delivery/skills/alibabacloud-sms-send-short-message/SKILL.md	contract-subject	aliyun-sms
+contract	wechatide	cli	conditional	delivery/skills/wechatide/references/cli.md	contract-subject	wechatide
+contract	wechatide-call	platform-interface	conditional	delivery/skills/wechatide/scripts/call.sh	comment-subject	wechatide-call
+contract	wechatide-install-check	platform-interface	conditional	delivery/skills/wechatide/skills/installer/scripts/check-install.mjs	comment-subject	wechatide-install-check
+contract	rg	cli	conditional	delivery/policy/tool-contracts.md	contract-subject	rg
+contract	jq	cli	conditional	delivery/policy/tool-contracts.md	contract-subject	jq
+contract	curl	cli	conditional	delivery/policy/tool-contracts.md	contract-subject	curl
+contract	git	version-control	conditional	delivery/policy/tool-contracts.md	contract-subject	git
+contract	gh	cli	conditional	delivery/skills/gh/SKILL.md	contract-subject	gh
+contract	github-api	service-interface	conditional	delivery/skills/gh/SKILL.md	contract-subject	github-api
+contract	gh-stack	cli	conditional	delivery/skills/gh/SKILL.md	contract-subject	gh-stack
+contract	openssh	transport	conditional	delivery/policy/tool-contracts.md	contract-subject	openssh
+contract	node	runtime	conditional	scripts/check.ts	comment-subject	node
+contract	bun	cli	conditional	scripts/check.ts	comment-subject	bun
+contract	bash	shell	conditional	scripts/check.ts	comment-subject	bash
+contract	shellcheck	cli	conditional	scripts/check.ts	comment-subject	shellcheck
+contract	actionlint	cli	conditional	scripts/check.ts	comment-subject	actionlint
+contract	zizmor	cli	conditional	scripts/check.ts	comment-subject	zizmor
+contract	gitleaks	cli	conditional	scripts/check.ts	comment-subject	gitleaks
+contract	typescript	cli	conditional	scripts/check.ts	comment-subject	typescript
+contract	markdownlint-cli2	cli	conditional	scripts/check-docs.ts	comment-subject	markdownlint-cli2
+contract	lychee	cli	conditional	scripts/check-docs.ts	comment-subject	lychee
+contract	python	runtime	conditional	scripts/skill-validator.py	comment-subject	python
+contract	skill-validation	cli	conditional	scripts/check-skills.ts	comment-subject	skill-validation
+contract	codex-cli-loader	platform-interface	conditional	scripts/check-codex-loader.ts	comment-subject	codex-cli-loader
+contract	codex-cli	cli	conditional	scripts/check-codex-loader.ts	comment-subject	codex-cli
+contract	claude-code	cli	conditional	delivery/policy/claude-code.md	contract-subject	claude-code
+contract	pinned-tool-bootstrap	platform-interface	conditional	scripts/tool-bootstrap.sh	comment-subject	pinned-tool-bootstrap
