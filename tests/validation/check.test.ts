@@ -162,6 +162,7 @@ const required = [
   ...Object.values(expectedTestPaths).flat(),
   ".github/CODEOWNERS",
   ".github/workflows/check.yml",
+  ".github/workflows/lock-pr.yml",
 ];
 function verifyStructure(directory: string): void {
   for (const file of required) {

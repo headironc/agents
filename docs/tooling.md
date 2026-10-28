@@ -135,7 +135,9 @@ bash scripts/check.sh all --report .cache/reports/check.json
 
 两个结果名称为 `repository (ubuntu-latest)` 和 `repository (macos-latest)`。每个平台完整准备工具、冻结安装依赖、构建安装器，再执行 `all --report .cache/reports/check.json`。每个写入步骤设置 `umask 077`，Bash 使用失败退出和 pipefail。矩阵关闭 fail-fast，一个平台失败不会取消另一个。每 job 超时 30 分钟，首片没有缓存。日志记录实际 runner 系统、架构、checkout SHA 和 PR head/base。
 
-工作流只声明 `contents: read`，在 GitHub 托管 runner 执行，不使用 secrets。并发按 workflow、事件和 PR 编号或 ref 分组，新运行取消同组旧运行。main push 按 ref 检查最新状态，不保证被后续 push 替代的历史提交完成检查。被取消的运行保留 cancelled 结论，不计为通过。关闭 PR 不新建运行，在途任务可自然结束。取消、失败、超时和等待平台批准均不是成功。合并冲突与 fork 批准等待也不构成已验收结果。
+检查工作流只声明 `contents: read`，在 GitHub 托管 runner 执行，不使用 secrets。并发按 workflow、事件和 PR 编号或 ref 分组，新运行取消同组旧运行。main push 按 ref 检查最新状态，不保证被后续 push 替代的历史提交完成检查。被取消的运行保留 cancelled 结论，不计为通过。关闭 PR 不新建源码检查，在途任务可自然结束。取消、失败、超时和等待平台批准均不是成功。合并冲突与 fork 批准等待也不构成已验收结果。
+
+[关闭后锁定](../.github/workflows/lock-pr.yml)独立监听 `pull_request_target: closed`，覆盖关闭和合并。它使用默认分支的 workflow，不 checkout 或执行候选代码。任务只声明 `pull-requests: write`，使用本次 `GITHUB_TOKEN` 调用 GitHub API，不使用 PAT 或仓库 secret。执行前读取原 PR，已重开或已锁定就跳过；写入后回读锁定状态。写入报错也先回读，不重发，未确认锁定则任务失败。同一 PR 的重复事件串行处理，不取消在途写入。PR 在读取和锁定之间被重开仍有竞争窗口，自动锁定也有事件处理延迟。owner 和合作者仍可评论；此入口不解锁重开的 PR，不归档或关闭 PR，也不限制 open PR 的外部评论。历史批量锁定属于单独的平台操作，不由该事件入口扫描补做。
 
 Actions 日志与 job 结论提供托管结果。JSON 报告仅供诊断，不是认证凭证；准备失败可能没有报告，job 仍失败。actionlint 检查工作流及内嵌 Shell，zizmor 检查权限等静态风险；项目回归用现有 js-yaml 解析事件、矩阵、权限和完整命令合同。它们不证明真实平台已执行。工作流注册、两平台运行和 required 配置均按[实例与证据边界](review-gate.md#实例与证据边界)验收，不沿用旧仓库结果。
 

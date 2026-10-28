@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { load } from "js-yaml";
@@ -14,6 +16,134 @@ const workflow = load(
     "utf8",
   ),
 ) as Record<string, any>;
+
+const lockWorkflow = load(
+  readFileSync(
+    path.join(repositoryRoot, ".github/workflows/lock-pr.yml"),
+    "utf8",
+  ),
+) as Record<string, any>;
+
+test("closed PR locking has no candidate execution or unrelated permissions", () => {
+  assert.deepEqual(lockWorkflow.on, {
+    pull_request_target: { types: ["closed"] },
+  });
+  assert.deepEqual(lockWorkflow.permissions, { "pull-requests": "write" });
+  assert.equal(lockWorkflow.concurrency["cancel-in-progress"], false);
+  assert.deepEqual(Object.keys(lockWorkflow.jobs), ["lock"]);
+  const job = lockWorkflow.jobs.lock;
+  assert.equal(job["runs-on"], "ubuntu-latest");
+  assert.equal(job["timeout-minutes"], 3);
+  assert.equal(job.steps.length, 1);
+  assert.equal(job.steps[0].uses, undefined);
+  assert.deepEqual(job.steps[0].env, {
+    GH_TOKEN: "${{ github.token }}",
+    REPOSITORY: "${{ github.repository }}",
+    PR_NUMBER: "${{ github.event.pull_request.number }}",
+  });
+});
+
+test("locking skips open or locked PRs and resolves failed writes without retrying", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "pr-lock-test-"));
+  try {
+    writeFileSync(
+      path.join(dir, "gh"),
+      `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const put = args.includes('PUT');
+fs.appendFileSync(process.env.LOCK_TEST_CALLS, (put ? 'PUT' : 'GET') + '\\n');
+if (put) process.exit(Number(process.env.LOCK_TEST_WRITE_EXIT));
+if (process.env.LOCK_TEST_READ_EXIT) process.exit(1);
+console.log(args.includes('.locked') ? process.env.LOCK_TEST_AFTER : process.env.LOCK_TEST_BEFORE);
+`,
+      { mode: 0o700 },
+    );
+    const cases = [
+      {
+        before: "open\tfalse",
+        after: "false",
+        write: "0",
+        status: 0,
+        calls: ["GET"],
+      },
+      {
+        before: "closed\ttrue",
+        after: "true",
+        write: "0",
+        status: 0,
+        calls: ["GET"],
+      },
+      {
+        before: "closed\tfalse",
+        after: "true",
+        write: "0",
+        status: 0,
+        calls: ["GET", "PUT", "GET"],
+      },
+      {
+        before: "closed\tfalse",
+        after: "true",
+        write: "1",
+        status: 0,
+        calls: ["GET", "PUT", "GET"],
+      },
+      {
+        before: "closed\tfalse",
+        after: "false",
+        write: "1",
+        status: 1,
+        calls: ["GET", "PUT", "GET"],
+      },
+      {
+        before: "closed\tfalse",
+        after: "true",
+        write: "0",
+        read: "1",
+        status: 1,
+        calls: ["GET"],
+      },
+    ];
+    for (const c of cases) {
+      const callsFile = path.join(dir, "calls");
+      writeFileSync(callsFile, "");
+      const result = spawnSync(
+        "bash",
+        [
+          "--noprofile",
+          "--norc",
+          "-euo",
+          "pipefail",
+          "-c",
+          lockWorkflow.jobs.lock.steps[0].run,
+        ],
+        {
+          encoding: "utf8",
+          timeout: 5000,
+          env: {
+            ...process.env,
+            PATH: dir + path.delimiter + process.env.PATH,
+            REPOSITORY: "fixture/repo",
+            PR_NUMBER: "7",
+            LOCK_TEST_CALLS: callsFile,
+            LOCK_TEST_BEFORE: c.before,
+            LOCK_TEST_AFTER: c.after,
+            LOCK_TEST_WRITE_EXIT: c.write,
+            LOCK_TEST_READ_EXIT: c.read ?? "",
+          },
+        },
+      );
+      assert.equal(result.error, undefined);
+      assert.equal(result.status, c.status, result.stderr);
+      assert.deepEqual(
+        readFileSync(callsFile, "utf8").trim().split("\n"),
+        c.calls,
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("native checks run for every selected PR event and main push", () => {
   assert.equal(workflow.name, "checks");
@@ -105,7 +235,10 @@ test("candidate execution uses only read permissions and a pinned credential-fre
 });
 
 test("the unified CI gate checks the real workflow, shell blocks and project regression", async () => {
-  assert.deepEqual(workflowPaths, [".github/workflows/check.yml"]);
+  assert.deepEqual(workflowPaths, [
+    ".github/workflows/check.yml",
+    ".github/workflows/lock-pr.yml",
+  ]);
   const specs = await checkSpecs(["ci"], "all");
   assert.ok(
     specs.some(
@@ -115,6 +248,7 @@ test("the unified CI gate checks the real workflow, shell blocks and project reg
   );
   const syntax = specs.find((spec) => spec.name === "actionlint")!;
   assert.ok(syntax.argv.includes(".github/workflows/check.yml"));
+  assert.ok(syntax.argv.includes(".github/workflows/lock-pr.yml"));
   assert.ok(syntax.argv.includes("-shellcheck"));
   assert.ok(specs.some((spec) => spec.name === "zizmor"));
 });
