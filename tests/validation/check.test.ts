@@ -994,3 +994,11 @@ test("schema refuses invented success with no coverage or missing observations",
     false,
   );
 });
+
+test("Native CI acceptance: intentional Linux failure", () => {
+  assert.notEqual(
+    process.platform,
+    "linux",
+    "Intentional validation failure; do not merge",
+  );
+});
