@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `AGENTS.md` | Codex 行为规则 | [规则入口](AGENTS.md) |
 | `policy/` | 任务组织、模型路线、会话、工作区、Goal 与协作收尾，以及 Rust、SQL、评审、写作、工具参考 | [任务与协作](policy/models.md)、[辅助调用](policy/claude-code.md)、[Rust](policy/rust.md)、[SQL](policy/sql.md)、[评审](policy/review.md)、[写作](policy/writing.md)、[工具](policy/tool-contracts.md) |
-| `tools/` | 可直接运行的检查器 | [工具契约](policy/tool-contracts.md)的对应小节 |
+| `tools/` | 文档检查器、任务临时目录执行与只读扫描 | [工具契约](policy/tool-contracts.md)的对应小节 |
 | `capability/` | 推荐的产品与项目配置 | [能力配置说明](capability/README.md) |
 | `skills/` | 完整技能目录 | 各目录中的 `SKILL.md` |
 

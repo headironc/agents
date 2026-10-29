@@ -127,6 +127,28 @@ security add-generic-password -U -s wechatide-mcp-token -a "$(id -un)" -w
 
 合并遵循目标项目的有效合同；agents main 的范围、检查、审查、授权和退出条件由[重建期规则](review-gate.md#重建期交付规则)拥有。其他目标按[通用合并准入规则](../delivery/policy/review.md#merge-admission)核各自已采用的流程及实际保护，不能借用本库例外或擅自降低既定条件。命名工作流的业务授权由 [gh 工作流合同](../delivery/skills/gh/references/workflow-authorization.md)约束。身份就绪与认证恢复由 gh-identity 负责。已采用的上游工具不为统一语言而改写。无实际调用方的历史脚本不自动恢复。实际服务、模型与个人安装分别取得授权并回读。
 
+## 任务临时目录与收尾
+
+[生命周期](../delivery/policy/models.md#task-temporary-directories)拥有任务临时资源的归属和收尾责任。[调用合同](../delivery/policy/tool-contracts.md#task-temp)拥有参数、清理边界及错误处理。入口随两端工具交付，不安装定时任务或个人配置。以下命令从仓库运行；安装后把工具路径换为产品根下的 `tools/task-temp.mjs`，并使用兼容 Node。
+
+```bash
+.cache/agents-tools/bin/node delivery/tools/task-temp.mjs run \
+  --owner task-example --purpose fixture-validation -- \
+  .cache/agents-tools/bin/node -e 'console.log(process.env.TASK_TEMP_DIR)'
+
+.cache/agents-tools/bin/node delivery/tools/task-temp.mjs scan --root /tmp
+.cache/agents-tools/bin/node delivery/tools/task-temp.mjs scan \
+  --root "${CODEX_HOME:-$HOME/.codex}/worktrees"
+```
+
+run 保持原工作目录，只清理本次分配的 scratch 及归属目录。前台命令须等待全部后代结束，并使用工具提供的临时路径。正常非零退出也清理；诊断原件先输出或写到目录之外。中断、Git 元数据、归属变化和检查失败留下路径及原因，任务收尾继续核实。扫描只列直接子目录和可读归属，无法判断会话是否结束或目录是否可删。历史目录不补标记、不删除。工具不接管已有测试工具的清理，也不代替客户端 worktree 退役。
+
+[工作区规则](../delivery/policy/models.md#workspaces)限制每个会话最多拥有一个源码实施 worktree。第二个独立实施工作树交给另一个获授权会话。恢复原绑定及测试内部自行创建并清除的 Git fixture 不计作新增实施工作树。这是代理行为约束；扫描工具不提供跨会话配额拦截。有限模型演练见[验证边界](#验证能说明什么)。
+
+触发入口在 [AGENTS.md](../delivery/AGENTS.md#working-together)，短任务同样按事件加载相关小节。开始或恢复实施时核已有工作区，客户端预建的 worktree 计入已有绑定。直接建临时目录或运行会生成目录的命令前，加载临时目录合同。命令退出时核清理结果；中断恢复时先核已知目录及原操作。报告完成、交接或归档前，由收尾章节核资源去向。普通进度回复不触发在用工作区退役。已读规则和未变绑定沿用，不逐轮重读或扫描整机。
+
+仓库源码和无模型加载检查不代表个人环境已生效。发布安装并回读后，新会话才能从对应安装入口读取候选规则。已有会话沿实际已加载版本核对。客户端在首轮之前创建目录的动作，无法由尚未加载的模型规则预先拦截。真实触发仍通过获授权的模型场景演练确认。
+
 ## 工具偏好
 
 [依赖规则](../delivery/AGENTS.md#code-preferences)要求先查看适合目标仓库的现成工具库，包括 npm 生态。它还要求核对已有依赖、维护证据、官方文档和实际契约。已有标准库或项目依赖能合适地提供能力时，优先复用它们。
@@ -182,7 +204,7 @@ bash scripts/install.sh status
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
 | Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
 | Claude 按需参考 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/policy/{writing,tool-contracts,review}.md` | 同一份 `delivery/policy/` 公共合同 |
-| Claude 工具 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/tools/<name>.mjs` | 同一份 `delivery/tools/` 文档检查器 |
+| Claude 工具 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
 | Claude 技能 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/<name>` | `delivery/skills/` 中归属为 `shared` 的完整顶层目录 |
 
 Codex 交付七个完整顶层技能包，十六个内容入口参与验证。Claude 接收其中六个共享包、十五个内容入口。Codex 专用的 `figma-design-workflow` 不交给 Claude，避免客户端递归编排自己。wechatide 的九个子入口由父入口按相对链接路由，不要求 Claude 自动发现所有内容入口。Claude 不接收 `CLAUDE.md`、`AGENTS.md`、模型政策、Rust/SQL 偏好或配置片段。推荐配置只交付给 Codex，合并到产品配置由本人完成。
@@ -232,6 +254,10 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 ## 验证能说明什么
 
 本节的既有实践来自内容来源的有界观察，不是新仓库实例的配置或验收结果。实际平台证据按[实例与证据边界](review-gate.md#实例与证据边界)重新绑定。
+
+2026-10-29 的临时资源演练使用 CLI 0.160.0，请求 `gpt-6.1-sol` 和 high。五个隔离会话读取候选规则与合成 fixture。模型在短任务中先加载临时目录规则，也核对了预建工作树。第二个工作树限制、中断恢复及完成交接也触发了相关规则。五项均观察到预期动作。命令退出时清理结果得到核对。第二个 checkout 未创建，未知原操作未重启。验收原件保留，交接未被冒称完成。
+
+预建目录使用真实 Git worktree 模拟，恢复和交接条件由合成记录提供。演练未验证桌面创建流程、真实进程崩溃或跨会话接任，也不证明所有后续运行必然遵守。请求模型及 effort 已记录，服务端实际身份未独立核实。命令、工具返回、最终回答、材料摘要及 fixture 收尾结果保留在该任务验收记录。个人安装未被这次演练更新。
 
 2026-10-23 在 dev 上通过当前网关运行 Claude Code 2.1.309，完成调用合同、使用说明和对应场景的有界编辑及原有文档检查。请求模型和响应标识均为 `deepseek-v4.1-flash`，请求 effort 为 low，CLI、子进程环境与临时 settings 对齐。实际使用 Read 和 Bash，通过 apply_patch 修改三个限定文件。进程退出码为 0，结果 `is_error` 为 false；负责人读取原始运行与差异后接纳。进程枚举曾被 dontAsk 拒绝，该限制保留在原始报告中。此记录只覆盖该次执行，不证明实际上游身份、服务端有效 effort、完整场景行为或现有客户端已加载新合同。
 

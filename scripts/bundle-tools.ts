@@ -16,6 +16,10 @@ import path from "node:path";
 
 export const bundledTools = [
   {
+    source: "scripts/task-temp.ts",
+    product: "delivery/tools/task-temp.mjs",
+  },
+  {
     source: "scripts/check-prose.mjs",
     product: "delivery/tools/check-prose.mjs",
   },
