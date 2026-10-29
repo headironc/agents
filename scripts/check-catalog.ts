@@ -1,5 +1,8 @@
 /** Required source, test groups and workflow entrypoints shared by checks and hook selection. */
-export const workflowPaths: readonly string[] = [".github/workflows/check.yml"];
+export const workflowPaths: readonly string[] = [
+  ".github/workflows/check.yml",
+  ".github/workflows/lock-pr.yml",
+];
 export const testPaths = {
   repository: [
     "tests/validation/check.test.ts",
