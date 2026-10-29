@@ -266,7 +266,7 @@ test("Codex loader rejects a model policy with no instruction entrypoint", (t) =
   assert.match(result.stderr, /instructions do not reference the model policy/);
 });
 
-test("Codex loader rejects missing workspace, scratch and closeout routes", (t) => {
+test("Codex loader rejects missing workspace, scratch, merge and closeout routes", (t) => {
   const f = fixtureRepository(t);
   const instructions = readFileSync(
     path.join(f.directory, "delivery/AGENTS.md"),
@@ -276,13 +276,15 @@ test("Codex loader rejects missing workspace, scratch and closeout routes", (t) 
     "workspaces",
     "task-temporary-directories",
     "task-completion-and-chat-archival",
+    "post-merge-cleanup",
   ]) {
+    const target =
+      section === "post-merge-cleanup"
+        ? "skills/gh/references/operations.md"
+        : "policy/models.md";
     f.put(
       "delivery/AGENTS.md",
-      instructions.replaceAll(
-        `](policy/models.md#${section})`,
-        "](policy/models.md)",
-      ),
+      instructions.replaceAll(`](${target}#${section})`, `](${target})`),
     );
     const result = spawnSync(
       process.execPath,
