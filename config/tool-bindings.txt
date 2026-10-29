@@ -1,4 +1,5 @@
 agents-tool-bindings-v1
+binding	delivery/policy/models.md	instructions	task-temp	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	bash	scripts/check.ts	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	bun	scripts/check.ts	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	node	scripts/check.ts	read-before-use	defined

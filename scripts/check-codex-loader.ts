@@ -107,6 +107,14 @@ export function checkCodexLoader(
     const modelPolicy = "policy/models.md";
     if (!instructions.includes(`](${modelPolicy})`))
       throw new Error("Codex instructions do not reference the model policy");
+    for (const section of [
+      "workspaces",
+      "task-temporary-directories",
+      "task-completion-and-chat-archival",
+    ]) {
+      if (!instructions.includes(`](${modelPolicy}#${section})`))
+        throw new Error(`Codex instructions lack lifecycle route: ${section}`);
+    }
     if (
       !readFileSync(path.join(codexHome, modelPolicy)).equals(
         readFileSync(path.join(root, "delivery", modelPolicy)),

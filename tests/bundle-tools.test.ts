@@ -114,6 +114,10 @@ const samples: Record<
     prepare?: (directory: string) => void;
   }
 > = {
+  "scripts/task-temp.ts": {
+    args: () => ["scan", "--root", "."],
+    status: 0,
+  },
   "scripts/check-prose.mjs": {
     args: () => ["sample.md"],
     status: 1,

@@ -48,6 +48,7 @@ const expectedTestPaths = {
     "tests/check-prose.test.mjs",
     "tests/check-ids.test.mjs",
     "tests/bundle-tools.test.ts",
+    "tests/task-temp.test.ts",
     "tests/validation/capability.test.ts",
     "tests/validation/refs.test.ts",
     "tests/installation/build.test.ts",
@@ -92,6 +93,7 @@ const required = [
     "check-prose.mjs",
     "check-ids.mjs",
     "bundle-tools.ts",
+    "task-temp.ts",
     "check-refs.ts",
     "check-codex-loader.ts",
   ].map((name) => `scripts/${name}`),
@@ -99,6 +101,7 @@ const required = [
   "delivery/AGENTS.md",
   "delivery/tools/check-prose.mjs",
   "delivery/tools/check-ids.mjs",
+  "delivery/tools/task-temp.mjs",
   ...["README.md", "codex.toml", "rust-lints.toml"].map(
     (name) => `delivery/capability/${name}`,
   ),
@@ -260,6 +263,43 @@ test("Codex loader rejects a model policy with no instruction entrypoint", (t) =
   assert.equal(result.error, undefined);
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.match(result.stderr, /instructions do not reference the model policy/);
+});
+
+test("Codex loader rejects missing workspace, scratch and closeout routes", (t) => {
+  const f = fixtureRepository(t);
+  const instructions = readFileSync(
+    path.join(f.directory, "delivery/AGENTS.md"),
+    "utf8",
+  );
+  for (const section of [
+    "workspaces",
+    "task-temporary-directories",
+    "task-completion-and-chat-archival",
+  ]) {
+    f.put(
+      "delivery/AGENTS.md",
+      instructions.replaceAll(
+        `](policy/models.md#${section})`,
+        "](policy/models.md)",
+      ),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [path.join(f.directory, "scripts/check-codex-loader.ts")],
+      {
+        cwd: f.directory,
+        env: f.environment,
+        encoding: "utf8",
+        timeout: 20_000,
+      },
+    );
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.ok(
+      result.stderr.includes(`lack lifecycle route: ${section}`),
+      result.stderr,
+    );
+  }
 });
 
 test("Codex loader failures retain exit details and a bounded diagnostic", () => {

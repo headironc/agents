@@ -19,6 +19,7 @@ const codexPolicies = ["rust", "sql", "models", "claude-code"];
 const tools: [string, string][] = [
   ["check-ids.mjs", "delivery/tools/check-ids.mjs"],
   ["check-prose.mjs", "delivery/tools/check-prose.mjs"],
+  ["task-temp.mjs", "delivery/tools/task-temp.mjs"],
 ];
 // Configuration the rules depend on, published so a consuming project and this machine can diff
 // their own against it. Every member is a recommendation: these files are merged by hand into

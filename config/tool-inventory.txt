@@ -4,6 +4,7 @@ subject	agents-installer	core	platform-interface	active	defined
 subject	id-check	core	platform-interface	active	defined
 subject	prose-check	core	platform-interface	active	defined
 subject	ref-check	core	platform-interface	active	defined
+subject	task-temp	core	platform-interface	active	defined
 subject	aliyun-sms	core	cli	active	defined
 subject	wechatide	core	cli	active	defined
 subject	wechatide-call	core	platform-interface	active	defined

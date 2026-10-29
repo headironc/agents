@@ -4,6 +4,7 @@ contract	agents-installer	platform-interface	conditional	scripts/install.ts	comm
 contract	prose-check	platform-interface	conditional	scripts/check-prose.mjs	comment-subject	prose-check
 contract	id-check	platform-interface	conditional	scripts/check-ids.mjs	comment-subject	id-check
 contract	ref-check	platform-interface	conditional	scripts/check-refs.ts	comment-subject	ref-check
+contract	task-temp	platform-interface	conditional	delivery/policy/tool-contracts.md	contract-subject	task-temp
 contract	aliyun-sms	cli	conditional	delivery/skills/alibabacloud-sms-send-short-message/SKILL.md	contract-subject	aliyun-sms
 contract	wechatide	cli	conditional	delivery/skills/wechatide/references/cli.md	contract-subject	wechatide
 contract	wechatide-call	platform-interface	conditional	delivery/skills/wechatide/scripts/call.sh	comment-subject	wechatide-call

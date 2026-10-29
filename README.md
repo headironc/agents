@@ -16,6 +16,7 @@
 | Figma 设计委派与看图验收 | [figma-design-workflow](delivery/skills/figma-design-workflow/SKILL.md) | Codex 专用；显式授权设计写入，动态使用 Figma 与 Design 插件；单页实测范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
 | 产品指令 | [交付目录](docs/usage.md#交付目录) | 直接维护与安装位置相同的源码布局 |
 | 文档检查器 | [工具契约](delivery/policy/tool-contracts.md) | 提示中文句长，阻塞混排空格及表格编号错误 |
+| 任务临时目录与遗留扫描 | [生命周期](delivery/policy/models.md#task-temporary-directories)、[调用入口](delivery/policy/tool-contracts.md#task-temp) | 前台命令使用私有 scratch 并收尾；遗留扫描只读，历史目录不自动删除 |
 | 推荐配置 | [配置说明](delivery/capability/README.md) | 提供片段，由使用者合并到自己的配置 |
 | GitHub 操作 | [gh](delivery/skills/gh/SKILL.md)、[gh-identity](delivery/skills/gh-identity/SKILL.md) | 分别负责调用与工作流合同、身份就绪 |
 | 项目导航与验证 | [project-guide](delivery/skills/project-guide/SKILL.md) | 共享技能；发现项目版本、权威资料与原生检查，报告实际证据；演练范围见[来源登记](docs/skill-sources.md#project-guide) |

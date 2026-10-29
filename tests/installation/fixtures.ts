@@ -55,7 +55,7 @@ export const policies = [
   "claude-code",
 ];
 export const claudePolicies = ["writing", "tool-contracts", "review"];
-export const tools = ["check-ids.mjs", "check-prose.mjs"];
+export const tools = ["check-ids.mjs", "check-prose.mjs", "task-temp.mjs"];
 // The capability category, written out here the way the installation target table names it.
 export const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],

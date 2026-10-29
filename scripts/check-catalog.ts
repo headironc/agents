@@ -15,6 +15,7 @@ export const testPaths = {
     "tests/check-prose.test.mjs",
     "tests/check-ids.test.mjs",
     "tests/bundle-tools.test.ts",
+    "tests/task-temp.test.ts",
     "tests/validation/capability.test.ts",
     "tests/validation/refs.test.ts",
     "tests/installation/build.test.ts",
@@ -59,6 +60,7 @@ export const requiredRepositoryPaths = [
     "check-prose.mjs",
     "check-ids.mjs",
     "bundle-tools.ts",
+    "task-temp.ts",
     "check-refs.ts",
     "check-codex-loader.ts",
   ].map((name) => `scripts/${name}`),
@@ -66,6 +68,7 @@ export const requiredRepositoryPaths = [
   "delivery/AGENTS.md",
   "delivery/tools/check-prose.mjs",
   "delivery/tools/check-ids.mjs",
+  "delivery/tools/task-temp.mjs",
   ...["README.md", "codex.toml", "rust-lints.toml"].map(
     (name) => `delivery/capability/${name}`,
   ),
