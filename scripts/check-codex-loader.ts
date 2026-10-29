@@ -115,6 +115,12 @@ export function checkCodexLoader(
       if (!instructions.includes(`](${modelPolicy}#${section})`))
         throw new Error(`Codex instructions lack lifecycle route: ${section}`);
     }
+    const mergeCleanup =
+      "skills/gh/references/operations.md#post-merge-cleanup";
+    if (!instructions.includes(`](${mergeCleanup})`))
+      throw new Error(
+        "Codex instructions lack lifecycle route: post-merge-cleanup",
+      );
     if (
       !readFileSync(path.join(codexHome, modelPolicy)).equals(
         readFileSync(path.join(root, "delivery", modelPolicy)),
