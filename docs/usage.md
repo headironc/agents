@@ -51,13 +51,9 @@ Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限�
 
 [project-config](../delivery/skills/wechatide/skills/project-config/SKILL.md) 读取并合并修改本地配置。它不启动 DevTools，也不登录或调用 CLI。项目 hooks 也不运行。字段与 private/common 规则由[配置参考](../delivery/skills/wechatide/skills/project-config/references/fields.md)持有。风险仍按修改语义判断。
 
-[initializer](../delivery/skills/wechatide/skills/initializer/SKILL.md) 只在 macOS 上工作。它查询状态、扫码登录、开关项目窗口。它还列出 AppID，读取运行时信息。明确要求时它才退出 DevTools。所有操作经[调用执行器](../delivery/skills/wechatide/scripts/call.sh)，按 [CLI 合同](../delivery/skills/wechatide/references/cli.md)完成首次状态检查。执行器只接受已交付操作和固定客户端名 `ClaudeCode`、`Codex`。MCP Token 从登录钥匙串读取。首次使用前，本人在 DevTools 中复制 MCP 配置。位置是「设置 → 安全」。再用交互命令保存其中的 Token，不经过对话：
+[initializer](../delivery/skills/wechatide/skills/initializer/SKILL.md) 只在 macOS 上工作。它查询状态、扫码登录、开关项目窗口。它还列出 AppID，读取运行时信息。明确要求时它才退出 DevTools。所有操作经[调用执行器](../delivery/skills/wechatide/scripts/call.sh)，按 [CLI 合同](../delivery/skills/wechatide/references/cli.md)完成首次状态检查。执行器只接受已交付操作和固定客户端名 `ClaudeCode`、`Codex`。当前合同适配 DevTools 2.02.2610302 的 skill-call 路线，技能版本为 0.3.15。执行器不读取钥匙串，也不传入 Token。既有钥匙串项保持原样。客户端授权仍由 DevTools 检查。
 
-```bash
-security add-generic-password -U -s wechatide-mcp-token -a "$(id -un)" -w
-```
-
-同一用户的进程可以读取该钥匙串项。CLI 运行期间 Token 也出现在其进程参数中。DevTools 要求 CLI 访问令牌时，本单元报告不支持。登录与客户端授权按[异步任务](../delivery/skills/wechatide/references/tasks.md)有界轮询。二维码出现不等于登录成功。
+DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现 `MCP_TOKEN_AUTH_ERROR` 则报告路线或兼容异常并停止。不索取、保存或注入 Token，也不回退认证、切换入口或自动升级应用。版本检查返回 `skip_check` 或 `agent_behind` 时也停止。版本相等不代表行为验收通过。登录与客户端授权按[异步任务](../delivery/skills/wechatide/references/tasks.md)有界轮询。二维码出现不等于登录成功。
 
 [compiler](../delivery/skills/wechatide/skills/compiler/SKILL.md) 打开指定页面、刷新模拟器、构建 npm。它也只读获取单个 WXML/WXSS 的编译摘要。开窗由 initializer 负责。触发成功不等于编译通过。单文件摘要只覆盖局部，且仅适用小程序页面。`build_npm` 会写本地产物，只在任务要求或失败指向缺少构建时执行。刷新后仍有异常，交给 debugger 取证。证据包括 console、network 和截图。
 
@@ -78,9 +74,9 @@ security add-generic-password -U -s wechatide-mcp-token -a "$(id -un)" -w
 
 一次确认不覆盖下一次。拒绝或确认超时即停。删除存储目录先列出前缀内容，再确认精确 `--cloud-path`。文档 update/delete 不发空 `--query`。部署有依赖时带 `--remote-npm-install`。同一 (MsgType, Event) 只绑一个云函数。subscribe 会替换原函数。事件名取自 `listSupportedEvents`。云托管的 `ensureContainerMode` 与 `setContainerCallback` 不交付。遇到这类请求，报告未交付。再指向 DevTools 云开发控制台。临时下载链接会过期，只在当前任务内使用。不要把它写进源码、文档、提交或记忆。部分成功原样保留返回结构。结果未知先用读操作核实，不重发。
 
-[installer](../delivery/skills/wechatide/skills/installer/SKILL.md) 只诊断本机安装。它不登记任何 DevTools 操作。因此它不走执行器，也不需要 MCP Token 与就绪检查。执行器报 `cli-unavailable` 或 `cli-unbound` 时才进。本人问是否装了开发者工具时也进。日常业务前不跑。`node SKILL_ROOT/skills/installer/scripts/check-install.mjs` 输出一个 JSON。`reason` 区分十二种结论。未安装、NW.js 版、缺运行时标记各一种。版本不可读、版本不可比、版本过低各一种。缺 CLI、CLI 自身 help 失败各一种。PATH 无命令、PATH 指向应用包外各一种。还有一种是被查目录兼容，但 PATH 指向另一个应用包。`executorCode` 说明它解释的是哪一条执行器拒绝，且只由 PATH 决定。PATH 上有应用包内的 CLI 时，即使结论失败也不带该字段。这时用 `pathInstallRoot` 指出真正会跑的安装。`remedy` 写本人要做什么，脚本自己从不做。版本门槛优先从已安装目录读取。读不到才用仓库记录值，并以 `minimumVersionSource: recorded` 声明可能落后上游。默认路径查不到时，先用 `--install-root` 复查再下结论。下载、安装、更新与补 PATH 软链都不在交付内。`cli_not_on_path` 报告可用绝对路径，并说明补 PATH 属本人的工作。不自建软链，也不因此重装。`cli_unbound` 先报告 PATH 上那个文件是什么，再由本人决定。要装要更新只给官方下载页。不拼链接，不替本人选渠道架构版本。
+[installer](../delivery/skills/wechatide/skills/installer/SKILL.md) 只诊断本机安装。它不登记任何 DevTools 操作。因此它不走执行器，也不需要客户端授权与就绪检查。执行器报 `cli-unavailable` 或 `cli-unbound` 时才进。本人问是否装了开发者工具时也进。日常业务前不跑。`node SKILL_ROOT/skills/installer/scripts/check-install.mjs` 输出一个 JSON。`reason` 区分十二种结论。未安装、NW.js 版、缺运行时标记各一种。版本不可读、版本不可比、版本过低各一种。缺 CLI、CLI 自身 help 失败各一种。PATH 无命令、PATH 指向应用包外各一种。还有一种是被查目录兼容，但 PATH 指向另一个应用包。`executorCode` 说明它解释的是哪一条执行器拒绝，且只由 PATH 决定。PATH 上有应用包内的 CLI 时，即使结论失败也不带该字段。这时用 `pathInstallRoot` 指出真正会跑的安装。`remedy` 写本人要做什么，脚本自己从不做。版本门槛优先从已安装目录读取。读不到才用仓库记录值，并以 `minimumVersionSource: recorded` 声明可能落后上游。默认路径查不到时，先用 `--install-root` 复查再下结论。下载、安装、更新与补 PATH 软链都不在交付内。`cli_not_on_path` 报告可用绝对路径，并说明补 PATH 属本人的工作。不自建软链，也不因此重装。`cli_unbound` 先报告 PATH 上那个文件是什么，再由本人决定。要装要更新只给官方下载页。不拼链接，不替本人选渠道架构版本。
 
-上游 skill 的每个 scene 现在都有已交付入口。未登记名称仍被执行器拒绝。包括 CLI 别名和两个废弃的 project_setting。它们的 pendingTask 保留身份，不查询也不重发。十个入口均为验证成员，安装成员只有顶层 wechatide。来源和边界见[来源记录](skill-sources.md#wechatide)。静态预期见九个场景小节：
+九个子入口保持原有能力范围。上游 0.3.15 新增的 simulator 入口及四个操作尚未交付。未登记名称仍被执行器拒绝。包括 CLI 别名和两个废弃的 project_setting。它们的 pendingTask 保留身份，不查询也不重发。十个入口均为验证成员，安装成员只有顶层 wechatide。来源和边界见[来源记录](skill-sources.md#wechatide)。静态预期见九个场景小节：
 
 - [本地配置](../tests/scenarios/rules.md#wechatide-顶层与本地配置)
 - [初始化](../tests/scenarios/rules.md#wechatide-devtools-初始化)

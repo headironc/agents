@@ -3,7 +3,7 @@ name: wechatide
 description: >-
   Route WeChat Mini Program and Mini Game work on macOS to delivered skills for project configuration, DevTools initialization, compilation, debugging, previews and trial uploads, project lists and snippets, page automation, cloud development, and installation diagnosis. Excludes ordinary source edits and non-WeChat tasks.
 metadata:
-  version: "0.3.11"
+  version: "0.3.15"
 ---
 
 # WeChat project routing

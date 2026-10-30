@@ -93,6 +93,27 @@ The original registry parses as JSON: 49 entries, 47 non-deprecated and two depr
 
 The exact initial proposal, scope confirmation, source identity, validation and review limits are retained under the existing rebuild evidence root's `r5-wechatide-20260916/` independent directory. It does not replace global current_handoff. [Static scenarios](../tests/scenarios/rules.md#wechatide-顶层与本地配置) describe expected routing; the repository tests cover actual membership, missing resources and product views. Neither establishes model behavior, live DevTools compatibility, independent implementation review or personal installation.
 
+### Wechatide 0.3.15 authentication compatibility
+
+The current delivery targets the skill-call authentication contract in macOS DevTools package 2.02.2610302, bundled skill 0.3.15, inspected on 2026-10-31 (UTC+8). It keeps the nine existing child entries and their operation boundaries. The dated 0.3.11 records below remain historical input and execution evidence; their keychain-token disposition is superseded by this section and the current [CLI contract](../delivery/skills/wechatide/references/cli.md).
+
+| Inspected input relative to the application's `Contents` | SHA-256 |
+| --- | --- |
+| `Resources/app.asar.unpacked/package.json` | `11f396b269350de6d24e9b98f3d1b0633eee398209c7f10f79462e27fc724dcd` |
+| `Resources/app.asar.unpacked/wechatide-skill/SKILL.md` | `2919747a406973e2d2dc32dc672af91ec48417ba01b8349eab0a5c24fc618e79` |
+| `Resources/app.asar.unpacked/wechatide-skill/references/environment-readiness.md` | `18e4205b2e37b0b2c319310002ef407ad3c7726e15ee8ed0047d40e7de036a78` |
+| `Resources/app.asar.unpacked/wechatide-skill/wechatide-tools/references/tools.yaml` | `e2af917ca9bddb7477e40bfc84dbe6367e211595fe30a632e68f041955eb258f` |
+| `Resources/app.asar.unpacked/wechatide-skill/skills/compiler/SKILL.md` | `6b6f01d26aeb683d0ddf88f1e2040263ff64f4429acec72fa198a2ff301e1f2d` |
+| `Resources/app.asar` member `js/025fe994efd40d9169da7bbeb2d84de5.js` | `0de706dae39c350ceb0358e4f04ae01b7fc4cd2783bccd424498ae8952cd620c` |
+
+The authentication module was read as archive bytes, never executed. `usesOptionalCliToken` selects non-browser skill-call, and `validateServicePortToken` separates that route from MCP-token authentication. With no configured CLI token, the CLI route permits tokenless calls. The status tool is exempt from token validation. Fixed client authorization remains required. The executor therefore no longer reads `id` or `security`, injects no `--token`, and leaves existing keychain items unchanged. CLI-token requirements and `CLI_TOKEN_AUTH_ERROR` remain unsupported stops. An `MCP_TOKEN_AUTH_ERROR`, including from older installations, stops as a route or compatibility failure; no credential storage, legacy bridge or automatic application upgrade is delivered.
+
+The CLI launcher, `skill-index.js` and `skill-outcome.js` match their earlier recorded hashes. Initializer, debugger, previewer, project-manager, automator, cloudbase-operator and installer entry hashes also match their recorded inputs. Project-config retains its field semantics. Compiler only adds a handoff to the new simulator entry. Its four operations, `simulator_get_device`, `simulator_set_device`, `simulator_set_darkmode` and `simulator_popup`, are excluded; the executor keeps its existing 47 business operation IDs plus `auth`. No manifest member, tool binding or general registry is added.
+
+The delivered version stays in `metadata.version`, now 0.3.15; upstream's top-level version layout is not copied. `agent_behind` and `skip_check` block dependent work, and `equal` establishes only the version relation. Upstream still supplies no verified license for adopted code. This change independently implements the inspected contract instead of copying its package or authentication code.
+
+Offline CLI fixtures cover tokenless calls, unavailable keychain access, fixed clients, the four excluded simulator operations, reserved options, JSON-file arguments, unchanged failure and pending output, and a single call on CLI/MCP authentication errors. Synthetic readiness output preserves token-required and version-blocking evidence; these tests do not prove a model's stop decisions. This compatibility slice adds no live business or model-session test. Any separately authorized post-install readiness result establishes only current readiness, not compilation, automation, preview or upload acceptance.
+
 ### Wechatide initializer inputs
 
 On 2026-09-18, the initializer inputs were read from the macOS DevTools installation `wechatwebdevtools.app`, package version 2.02.2609162 (Nightly, arm64). Its bundled `wechatide-skill` reports version 0.3.11 and its files are dated 2026-09-16. No license file is present in the bundled skill; original licensing terms remain unverified. Paths are relative to the application's `Contents` directory.
