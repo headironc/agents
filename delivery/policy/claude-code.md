@@ -2,7 +2,7 @@
 
 Contract subject: `claude-code`.
 
-本合同拥有 Claude Code 的公共调用、结果与日志规则。本机与开发主机的主动委派、模型及授权由[模型政策](models.md#claude-code-and-deepseek-delegation)定义。按任务选择只读、有界执行或显式设计模式。Figma 设计使用 [Figma 设计工作流](../skills/figma-design-workflow/SKILL.md)。先核对实际 CLI 版本、实际接收端点及有效参数。
+本合同拥有 Claude Code 的公共调用、结果与日志规则。本机与开发主机的主动委派、模型及授权由[模型政策](models.md#claude-code-and-deepseek-delegation)定义。仅在选用本客户端时，按任务选择只读、有界执行或显式设计模式。设计稿默认路线见[任务起点](models.md#task-start-and-execution-routing)，可编辑结果与视觉验收见[设计工作流](../skills/figma-design-workflow/SKILL.md)。先核对实际 CLI 版本、实际接收端点及有效参数。
 
 模型接口只允许 DeepSeek 官方与 OpenCode 官方服务。负责人在这两者中选择满足任务需要的路线，合适时复用当前配置，无须逐次请示。`https://api.deepseek.com/anthropic` 是 DeepSeek 官方 Anthropic 兼容端点。OpenCode 路线按其官方 API 文档核对实际地址。第三方转发或自建兼容地址不因使用同一模型名而进入允许范围。核对本次实际接收端点、凭据来源、模型和 effort，不显示密钥或鉴权头。客户端名及响应模型名不证明实际上游身份。材料、操作及更窄的用户限制继续适用。扩大接收方范围必须有用户明确决定。
 
@@ -22,7 +22,7 @@ Contract subject: `claude-code`.
 
 ## 显式设计模式
 
-用户已要求项目设计或迭代时，按[设计技能](../skills/figma-design-workflow/SKILL.md#bind-the-design-task)复用有效任务授权。负责人自行落实材料选择、既定服务商调用及目标和编辑范围。技术绑定不要求用户另批精确材料包或逐个节点。仅有只读辅助授权时，继续使用[只读模式](#只读辅助)。设计模式使用 `-p` 和 `--no-session-persistence`，按实际插件所需开放内置工具与 MCP。逐项列出本次所需工具和技能，排除无关操作。不复制历史全 Figma 通配许可作为默认值。
+本模式仅适用于用户有效指令选用 Claude Code 制作或迭代设计稿的任务。单纯的设计请求沿用[模型政策的设计路线](models.md#task-start-and-execution-routing)。选用本模式后，按[设计技能](../skills/figma-design-workflow/SKILL.md#bind-the-design-task)复用有效任务授权。负责人自行落实材料选择、既定服务商调用及目标和编辑范围。技术绑定不要求用户另批精确材料包或逐个节点。仅有只读辅助授权时，继续使用[只读模式](#只读辅助)。设计模式使用 `-p` 和 `--no-session-persistence`，按实际插件所需开放内置工具与 MCP。逐项列出本次所需工具和技能，排除无关操作。不复制历史全 Figma 通配许可作为默认值。
 
 ## 工具与权限
 
