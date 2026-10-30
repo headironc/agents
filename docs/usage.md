@@ -33,7 +33,7 @@
 
 将规范纳入项目时，保留实际采用章节及必需引用。Rust 的数据库错误章节引用 SQL 失败边界，不表示采用全部 SQL 命名偏好。迁入的项目规则在声明范围内由项目维护。个人偏好后续更新不自动覆盖项目决定。本仓库继续提供复用源，不自动迁移或安装到其他项目。
 
-[模型政策](../delivery/policy/models.md)拥有从任务组织到执行、验收及收尾的决策。[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)在执行安排前触发；普通短任务直接完成，已明确分工不反复重建。创建与续接的模型参数、默认覆盖条件及证据边界见[运行限制](../delivery/policy/models.md#runtime-limits)。[工作区章节](../delivery/policy/models.md#workspaces)先评估主工作区和有用 WIP，再决定复用或隔离。通用代码工具的绑定由[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)拥有。[Goal 章节](../delivery/policy/models.md#goals)规定适用条件、明确创建授权、内容语义及[实际接口限制](../delivery/policy/models.md#goal-tool-interfaces)。收尾章节规定证据保留及可恢复回收。默认映射只在模型政策维护。团队、CI 或托管审查强制采用时，沿用上述项目内版本化和单一所有者要求。项目入口注明采用范围、权威位置及覆盖项，保留政策所需的操作与审查引用。入口引用不等于正文已经加载，安装政策也不切换模型或修改客户端配置。
+[模型政策](../delivery/policy/models.md)拥有从任务组织到执行、验收及收尾的决策。[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)在执行安排前触发；普通短任务直接完成，已明确分工不反复重建。创建与续接的模型参数、默认覆盖条件及证据边界见[运行限制](../delivery/policy/models.md#runtime-limits)。[工作区章节](../delivery/policy/models.md#workspaces)规定新源码开发会话的独立 worktree 默认策略、受管优先及续作等例外。通用代码工具的绑定由[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)拥有。[Goal 章节](../delivery/policy/models.md#goals)规定适用条件、明确创建授权、内容语义及[实际接口限制](../delivery/policy/models.md#goal-tool-interfaces)。收尾章节规定证据保留及可恢复回收。默认映射只在模型政策维护。团队、CI 或托管审查强制采用时，沿用上述项目内版本化和单一所有者要求。项目入口注明采用范围、权威位置及覆盖项，保留政策所需的操作与审查引用。入口引用不等于正文已经加载，安装政策也不切换模型或修改客户端配置。
 
 [阶段职责](../delivery/policy/models.md#delegation-and-acceptance)拥有完整已授权目标的缺口核实。该处规定沿原负责人推进，及时补齐未承接责任。实施作者默认完成已授权的签名提交、推送、PR 和片内修复。设计者保留设计与实质验收。具体分工及能力受限时的承接也由该处规定。[工作区章节](../delivery/policy/models.md#workspaces)允许设计、实施和验收分阶段共用合适检出。交接保留唯一写者、稳定候选与客户端生命周期边界。角色变化不要求另造出版树，也不使未变输入的有效检查失效。这些默认职责不增加发布、合并或安装授权。
 
