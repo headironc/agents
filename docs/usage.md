@@ -33,13 +33,13 @@
 
 将规范纳入项目时，保留实际采用章节及必需引用。Rust 的数据库错误章节引用 SQL 失败边界，不表示采用全部 SQL 命名偏好。迁入的项目规则在声明范围内由项目维护。个人偏好后续更新不自动覆盖项目决定。本仓库继续提供复用源，不自动迁移或安装到其他项目。
 
-[模型政策](../delivery/policy/models.md)拥有从任务组织到执行、验收及收尾的决策。[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)在执行安排前触发；普通短任务直接完成，已明确分工不反复重建。创建与续接的模型参数、默认覆盖条件及证据边界见[运行限制](../delivery/policy/models.md#runtime-limits)。[工作区章节](../delivery/policy/models.md#workspaces)规定新源码开发会话的独立 worktree 默认策略、受管优先及续作等例外。通用代码工具的绑定由[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)拥有。[Goal 章节](../delivery/policy/models.md#goals)规定适用条件、明确创建授权、内容语义及[实际接口限制](../delivery/policy/models.md#goal-tool-interfaces)。收尾章节规定证据保留及可恢复回收。默认映射只在模型政策维护。团队、CI 或托管审查强制采用时，沿用上述项目内版本化和单一所有者要求。项目入口注明采用范围、权威位置及覆盖项，保留政策所需的操作与审查引用。入口引用不等于正文已经加载，安装政策也不切换模型或修改客户端配置。
+[模型政策](../delivery/policy/models.md)拥有从任务组织到执行、验收及收尾的决策。[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)在创建任务会话或安排执行前触发。普通短任务直接完成，已明确分工不反复重建。创建与续接的模型参数、默认覆盖条件及证据边界见[运行限制](../delivery/policy/models.md#runtime-limits)。[工作区章节](../delivery/policy/models.md#workspaces)规定新源码开发会话的独立 worktree 默认策略、受管优先及续作等例外。通用代码工具的绑定由[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)拥有。[Goal 章节](../delivery/policy/models.md#goals)规定适用条件、明确创建授权、内容语义及[实际接口限制](../delivery/policy/models.md#goal-tool-interfaces)。收尾章节规定证据保留及可恢复回收。默认映射只在模型政策维护。团队、CI 或托管审查强制采用时，沿用上述项目内版本化和单一所有者要求。项目入口注明采用范围、权威位置及覆盖项，保留政策所需的操作与审查引用。入口引用不等于正文已经加载，安装政策也不切换模型或修改客户端配置。
 
 [阶段职责](../delivery/policy/models.md#delegation-and-acceptance)拥有完整已授权目标的缺口核实。该处规定沿原负责人推进，及时补齐未承接责任。实施作者默认完成已授权的签名提交、推送、PR 和片内修复。设计者保留设计与实质验收。具体分工及能力受限时的承接也由该处规定。[工作区章节](../delivery/policy/models.md#workspaces)允许设计、实施和验收分阶段共用合适检出。交接保留唯一写者、稳定候选与客户端生命周期边界。角色变化不要求另造出版树，也不使未变输入的有效检查失效。这些默认职责不增加发布、合并或安装授权。
 
 Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限定为 DeepSeek 官方和 OpenCode 官方服务。负责人在允许范围内自行选择或复用可用路线，不逐次请示。实际接收端点、凭据来源、模型与 effort 按本次调用核对。兼容协议或同名模型不构成第三方接收方许可。保留任务的材料、操作边界及更窄的明确限制。
 
-任务拆解时评估客户端能交付的完整结果。适任且授权、工具就绪时实际派发，不默认由负责人完成全部执行。范围涵盖分析、设计、实现、文档、测试和修复。负责人先完成必要的业务、授权、事务与恢复判断，确认实现边界与设计。授权路线可用时，把适任的完整实现连同相关测试、文档和修复一并委派。整体任务复杂，或负责人保留关键判断和验收责任，都不是收回全部实现的理由。交付操作按阶段分配，不因委派客户端能力受限就全部回交负责人。能力、工具或拆分同一职责的成本不适当时，适用模型政策保留的兜底路线。负责人自行选择任务、模型与 effort，必要时接回；不设比例或机械必调。调用前按任务选择只读、有界执行或设计模式。执行绑定实际宿主、工作区、候选及允许操作，遵守唯一写者或隔离写区要求。已交付内容是规则与合同；CLI、账号与服务由使用者提供。本仓库不安装客户端或修改个人配置，也未将这条路线接入 CI 或项目审查关卡。实际演练与静态检查的区别见[验证边界](#验证能说明什么)。
+任务拆解时评估客户端能交付的完整结果。适任且授权、工具就绪时实际派发，不默认由负责人完成全部执行。范围涵盖分析、设计、实现、文档、测试和修复；设计稿采用[设计专用路线](../delivery/policy/models.md#task-start-and-execution-routing)。负责人先完成必要的业务、授权、事务与恢复判断，确认实现边界与设计。授权路线可用时，把适任的完整实现连同相关测试、文档和修复一并委派。整体任务复杂，或负责人保留关键判断和验收责任，都不是收回全部实现的理由。交付操作按阶段分配，不因委派客户端能力受限就全部回交负责人。能力、工具或拆分同一职责的成本不适当时，适用模型政策保留的兜底路线。负责人自行选择任务、模型与 effort，必要时接回；不设比例或机械必调。调用前按任务选择只读、有界执行或显式选用的设计模式。执行绑定实际宿主、工作区、候选及允许操作，遵守唯一写者或隔离写区要求。已交付内容是规则与合同；CLI、账号与服务由使用者提供。本仓库不安装客户端或修改个人配置，也未将这条路线接入 CI 或项目审查关卡。实际演练与静态检查的区别见[验证边界](#验证能说明什么)。
 
 这种分层依据 [Codex 指令发现文档](https://developers.openai.com/codex/guides/agents-md)。Codex 分层加载全局与项目入口，普通政策文件由入口按需引用。[Astra 指令建议](https://developers.openai.com/api/docs/guides/latest-model#instruction-following)强调处理含混或冲突的文件指令。这里据此明确采用范围、规则归属与切片停止点。它们是本仓库的工作约定，不是模型自动保证的行为。
 
@@ -211,7 +211,7 @@ bash scripts/install.sh status
 | Claude 工具 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
 | Claude 技能 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/<name>` | `delivery/skills/` 中归属为 `shared` 的完整顶层目录 |
 
-Codex 交付七个完整顶层技能包，十六个内容入口参与验证。Claude 接收其中六个共享包、十五个内容入口。Codex 专用的 `figma-design-workflow` 不交给 Claude，避免客户端递归编排自己。wechatide 的九个子入口由父入口按相对链接路由，不要求 Claude 自动发现所有内容入口。Claude 不接收 `CLAUDE.md`、`AGENTS.md`、模型政策、Rust/SQL 偏好或配置片段。推荐配置只交付给 Codex，合并到产品配置由本人完成。
+Codex 交付七个完整顶层技能包，十六个内容入口参与验证。Claude 接收其中六个共享包、十五个内容入口。`figma-design-workflow` 依赖 Codex 的模型路线与负责人验收，仅交付给 Codex。wechatide 的九个子入口由父入口按相对链接路由，不要求 Claude 自动发现所有内容入口。Claude 不接收 `CLAUDE.md`、`AGENTS.md`、模型政策、Rust/SQL 偏好或配置片段。推荐配置只交付给 Codex，合并到产品配置由本人完成。
 
 部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录物理根、变量来源和祖先身份。两个产品根相同或互相包含时拒绝。产品根与源码、部署记录、备份或审阅副本重叠时同样拒绝。公开目标不得覆盖私有候选或恢复运行副本。
 
@@ -269,13 +269,13 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 
 2026-10-23 在 dev 上通过当前网关运行 Claude Code 2.1.309，完成调用合同、使用说明和对应场景的有界编辑及原有文档检查。请求模型和响应标识均为 `deepseek-v4.1-flash`，请求 effort 为 low，CLI、子进程环境与临时 settings 对齐。实际使用 Read 和 Bash，通过 apply_patch 修改三个限定文件。进程退出码为 0，结果 `is_error` 为 false；负责人读取原始运行与差异后接纳。进程枚举曾被 dontAsk 拒绝，该限制保留在原始报告中。此记录只覆盖该次执行，不证明实际上游身份、服务端有效 effort、完整场景行为或现有客户端已加载新合同。
 
-[Figma 设计工作流](../delivery/skills/figma-design-workflow/SKILL.md)从已授权设计实践提炼。它绑定材料、服务商、目标和写入范围，并动态加载 Figma 与 Design 技能。主代理看实际预览验收。设计专用 Max Effort 偏好与普通执行分别适用。CLI 参数与权限由[公共调用合同](../delivery/policy/claude-code.md)持有。
+[设计工作流](../delivery/skills/figma-design-workflow/SKILL.md)从已授权设计实践提炼。当前模型与 effort 由[模型政策](../delivery/policy/models.md#current-defaults)维护。技能绑定材料、目标、可编辑结果与真实像素验收。Figma 按需使用。选用 Claude Code 或 Design 插件时，再适用对应合同。负责人亲自核对实际预览。请求模型、客户端设置与实际运行身份分别报告。
 
 来源实践使用 Claude Code 请求 DeepSeek；历史成功调用请求 effort 为 low，响应标识为 `deepseek-flash`。日志包含实际 `design:design-critique` 调用与 PNG 读取，评审也曾误读颜色、图片类型和文字布局。主代理核实后筛选修正。这些历史观察不证明独立审查或服务端有效档位。来源范围见[技能来源](skill-sources.md#figma-design-workflow)。
 
 2026-10-28 的一次合成协调页演练通过官方 OpenCode Go 请求 DeepSeek 和 `max`。实际调用了 Figma 与 Design 技能，生成原生可编辑稿。长标题经真实替换、检查后还原。Terra 与主责读取同版完整画面。辅助发现由主责核实、回交修复，再核对最终节点与持久预览。Design critique 记录为制作模型的自查。
 
-该次演练保留了 MCP 绑定失败与组件技能前置遗漏。后续修复和核验不把早期偏差改写为合规。服务端有效 effort 与 Terra 服务端身份仍缺独立证据。实测仅覆盖一个静态桌面页，不证明交互、跨尺寸、其他业务稿或场景全集。静态检查与无模型加载也不能代替这些实际行为验证。
+该次演练保留了 MCP 绑定失败与组件技能前置遗漏。后续修复和核验不把早期偏差改写为合规。服务端有效 effort 与 Terra 服务端身份仍缺独立证据。实测仅覆盖一个静态桌面页，不证明交互、跨尺寸、其他业务稿或场景全集。上述历史调用也不验证当前 Codex 设计路线。静态检查与无模型加载不能代替实际行为验证。
 
 [工具门禁](tooling.md#选择检查)会将非忽略的新 Markdown 文件纳入显式检查集合。它检查机器路径、格式、本地链接和锚点。`all` 还运行源码检查、契约绑定、技能成员、工具打包新鲜度、发布形态引用、固定产品验证器、隔离安装回归及无模型 Codex 加载检查。加载检查确认隔离候选的指令和技能目录进入 CLI 输入。它也核对模型政策入口及隔离文件的字节一致性。这不证明模型读取了按需正文、实际切换模型或遵循规则，也不证明个人安装已加载。语义遗漏仍须依据场景和适用审查核对。
 

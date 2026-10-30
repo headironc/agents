@@ -9,11 +9,11 @@
 | 能力 | 入口 | 使用边界 |
 | --- | --- | --- |
 | Codex 规则与专业偏好 | [Codex 规则](delivery/AGENTS.md)、[写作规范](delivery/policy/writing.md)、[Rust](delivery/policy/rust.md)、[SQL](delivery/policy/sql.md) | 专业偏好由项目明确采用 |
-| 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 组织执行前按需选择模型与路线，再绑定会话、工作区及适用 Goal，进入执行与验收；普通短任务直接完成，实际经验见[验证边界](docs/usage.md#验证能说明什么) |
+| 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 创建任务会话或组织执行前选择模型与路线，再绑定会话、工作区及适用 Goal，进入执行与验收；普通短任务直接完成，实际经验见[验证边界](docs/usage.md#验证能说明什么) |
 | 总协调启动提示词 | [通用模板与 Nucleus 使用约定](docs/prompts/coordinator.md) | 明确启用后，总协调派发、跟进和接纳，负责人实施与验证；普通文档，不安装，也不自动继承持续交付或合并授权 |
 | 本机协作提醒 | [使用与恢复](docs/usage.md#本机协作提醒) | 本机可选配置，独立于源码交付；启用状态与授权按实际环境核对 |
-| Claude Code 与 DeepSeek 主动委派 | [分工与授权](delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](delivery/policy/claude-code.md) | 主动委派适任且已授权的完整分析、设计、编辑、测试或修复结果；负责人判断与验收，不设调用比例；未接入 CI 或审查关卡 |
-| Figma 设计委派与看图验收 | [figma-design-workflow](delivery/skills/figma-design-workflow/SKILL.md) | Codex 专用；显式授权设计写入，动态使用 Figma 与 Design 插件；单页实测范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
+| Claude Code 与 DeepSeek 主动委派 | [分工与授权](delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](delivery/policy/claude-code.md) | 主动委派适任且已授权的完整结果；设计稿另走设计路线；负责人判断与验收，不设调用比例；未接入 CI 或审查关卡 |
+| 设计稿与看图验收 | [figma-design-workflow](delivery/skills/figma-design-workflow/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Codex 专用；Figma 按需使用，保留可编辑结果与真实像素验收；历史实测范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
 | 产品指令 | [交付目录](docs/usage.md#交付目录) | 直接维护与安装位置相同的源码布局 |
 | 文档检查器 | [工具契约](delivery/policy/tool-contracts.md) | 提示中文句长，阻塞混排空格及表格编号错误 |
 | 任务临时目录与遗留扫描 | [生命周期](delivery/policy/models.md#task-temporary-directories)、[调用入口](delivery/policy/tool-contracts.md#task-temp) | 前台命令使用私有 scratch 并收尾；遗留扫描只读，历史目录不自动删除 |
