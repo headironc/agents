@@ -119,7 +119,7 @@ security add-generic-password -U -s wechatide-mcp-token -a "$(id -un)" -w
 
 当前成员与产品归属以[清单](../config/personal-skills.txt)为准。旧流程技能只保留历史来源，不继续安装。写作和工具参考属于公共 `policy/` 路径的成员。安装来源与限制见[安装快照过渡](#既有安装快照过渡)。
 
-[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及自动审查授权。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。自动审查按实际提供方核验。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)只负责 `headironc` 的身份就绪与认证恢复。`cladiron[bot]` 与其固定 provider 已于 2026-09-18 退役。GitHub App 凭据能力与安装状态见[安装快照过渡](#既有安装快照过渡)。
+[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权。常规提供方与 Cubic 额度不足时的替代由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。选定方按[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式 `@` 请求。已有有效覆盖或请求时复用；不要依赖 PR 事件自动触发。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)只负责 `headironc` 的身份就绪与认证恢复。`cladiron[bot]` 与其固定 provider 已于 2026-09-18 退役。GitHub App 凭据能力与安装状态见[安装快照过渡](#既有安装快照过渡)。
 
 ## 规则与技能维护
 
