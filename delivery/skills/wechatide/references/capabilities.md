@@ -28,7 +28,7 @@ If existing context contains a pendingTask, preserve it as [pending tasks](tasks
 
 ## Operations outside this delivery
 
-Every scene of the upstream skill now has a delivered entry. The executor refuses any operation that is not a registered ID, including the MCP bridge, the CLI's own aliases and the deprecated project_setting operations.
+The nine entries above are the delivered subset of bundled skill 0.3.15. Its new simulator entry and four additional simulator operations are not delivered. The executor's existing operation list is unchanged; it refuses all unlisted operations, including that simulator subset, the MCP bridge, the CLI's own aliases and the deprecated project_setting operations.
 
 Installer diagnoses an installation but delivers none of upstream's installation actions: downloading a package, running an installer, updating DevTools and repairing PATH or links remain the Human's, and no entry performs them. Upstream's channel selection, package resolution and PATH-repair modules are recorded as inputs in the source record and are not adopted.
 

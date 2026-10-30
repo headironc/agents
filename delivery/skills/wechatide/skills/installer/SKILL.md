@@ -1,39 +1,20 @@
 ---
 name: installer
 description: >-
-  Diagnose why WeChat DevTools cannot be reached on macOS: report whether it is
-  installed, whether its runtime and version are compatible, and whether the
-  wechatide CLI is on PATH and bound to the application bundle, so the Human
-  knows what to fix. Not downloading, installing, updating or repairing PATH,
-  and not a DevTools operation of its own.
+  Diagnose why WeChat DevTools cannot be reached on macOS: report whether it is installed, whether its runtime and version are compatible, and whether the wechatide CLI is on PATH and bound to the application bundle, so the Human knows what to fix. Not downloading, installing, updating or repairing PATH, and not a DevTools operation of its own.
 ---
 
 # Installation diagnosis
 
-Read the [handoff contract](../../references/capabilities.md) and the
-[CLI contract](../../references/cli.md) before the first check.
-Use this entry directly or receive it from the router.
-Read the [installation check](scripts/check-install.mjs).
-Use tool `wechatide-install-check` for the diagnosis below; it is the only
-executable this entry runs.
+Read the [handoff contract](../../references/capabilities.md) and the [CLI contract](../../references/cli.md) before the first check. Use this entry directly or receive it from the router. Read the [installation check](scripts/check-install.mjs). Use tool `wechatide-install-check` for the diagnosis below; it is the only executable this entry runs.
 
-This entry registers no DevTools operation, so it does not use the call
-executor and needs neither the MCP token nor a readiness check. It answers one
-question: why can the executor not reach the CLI, and what would fix it. It
-reports; the Human acts.
+This entry registers no DevTools operation, so it does not use the call executor and needs no client authorization or readiness check. It answers one question: why can the executor not reach the CLI, and what would fix it. It reports; the Human acts.
 
 ## When to use it
 
-Enter here when the [call executor](../../scripts/call.sh) refused with
-`cli-unavailable` or `cli-unbound`, or when the user asks whether DevTools is
-installed or why `wechatide` cannot be found. Do not run the check as a routine
-step before ordinary DevTools work: the readiness check in the CLI contract
-already covers a working installation, and a successful operation proves more
-than this diagnosis would.
+Enter here when the [call executor](../../scripts/call.sh) refused with `cli-unavailable` or `cli-unbound`, or when the user asks whether DevTools is installed or why `wechatide` cannot be found. Do not run the check as a routine step before ordinary DevTools work: the readiness check in the CLI contract already covers a working installation, and a successful operation proves more than this diagnosis would.
 
-A `versionRelation` of `agent_behind` is not an installation problem. It means
-the repository skill needs updating and reinstalling, which initializer's
-readiness handling already reports.
+A `versionRelation` of `agent_behind` is not an installation problem. It means the repository skill needs updating and reinstalling, which initializer's readiness handling already reports.
 
 ## The check
 
@@ -44,14 +25,9 @@ node SKILL_ROOT/skills/installer/scripts/check-install.mjs
 node SKILL_ROOT/skills/installer/scripts/check-install.mjs --install-root PATH
 ```
 
-It prints one JSON object and exits 0, or prints
-`wechatide-install-check: MESSAGE` on stderr and exits 1 for a bad option. It
-reads the filesystem and runs the resolved CLI's local help. It installs
-nothing, downloads nothing, and changes no PATH entry, link or file.
+It prints one JSON object and exits 0, or prints `wechatide-install-check: MESSAGE` on stderr and exits 1 for a bad option. It reads the filesystem and runs the resolved CLI's local help. It installs nothing, downloads nothing, and changes no PATH entry, link or file.
 
-`--install-root` inspects a non-default location. Pass it before concluding
-anything from `not_installed`, because this delivery only knows the default
-`/Applications/wechatwebdevtools.app`.
+`--install-root` inspects a non-default location. Pass it before concluding anything from `not_installed`, because this delivery only knows the default `/Applications/wechatwebdevtools.app`.
 
 | Field | Meaning |
 | --- | --- |
@@ -67,9 +43,7 @@ anything from `not_installed`, because this delivery only knows the default
 | `pathInstallRoot` | The bundle that PATH command belongs to, present on any result where it differs from the inspected one |
 | `remedy` | What the Human would do; never a step this entry takes |
 
-`minimumVersionSource: recorded` means the installation carried no threshold to
-read, so the repository's value applied and may be behind upstream's. Say so
-when a version verdict rests on it.
+`minimumVersionSource: recorded` means the installation carried no threshold to read, so the repository's value applied and may be behind upstream's. Say so when a version verdict rests on it.
 
 ## Reasons
 
@@ -90,36 +64,17 @@ when a version verdict rests on it.
 
 ## What this entry does not do
 
-Downloading an installer, running one, updating DevTools and repairing PATH are
-not delivered here, and no operation of this delivery performs them. Report the
-diagnosis and what would fix it, then stop.
+Downloading an installer, running one, updating DevTools and repairing PATH are not delivered here, and no operation of this delivery performs them. Report the diagnosis and what would fix it, then stop.
 
-For `cli_not_on_path`, name the working absolute `command` and say that putting
-it on PATH is installation work the Human owns. Do not create the link, edit a
-shell profile, or suggest reinstalling: the installation is already compatible,
-and reinstalling to fix a missing link is the loop upstream warns against.
+For `cli_not_on_path`, name the working absolute `command` and say that putting it on PATH is installation work the Human owns. Do not create the link, edit a shell profile, or suggest reinstalling: the installation is already compatible, and reinstalling to fix a missing link is the loop upstream warns against.
 
-For `cli_other_install`, do not report the inspected installation as usable. The
-runtime and version were read from `installRoot`, while the executor runs
-whatever PATH resolves to, so a compatible verdict there would describe a
-bundle the call will not use. The call may well succeed, against the other
-installation. Report both paths and re-run with `--install-root` set to
-`pathInstallRoot` to judge the one that would actually run.
+For `cli_other_install`, do not report the inspected installation as usable. The runtime and version were read from `installRoot`, while the executor runs whatever PATH resolves to, so a compatible verdict there would describe a bundle the call will not use. The call may well succeed, against the other installation. Report both paths and re-run with `--install-root` set to `pathInstallRoot` to judge the one that would actually run.
 
-For `cli_unbound`, report which file `wechatide` currently resolves to before
-anything replaces it. Something already owns that name, and this entry does not
-know whether it is a stale link, a wrapper or an unrelated program. The Human
-decides what PATH should point at.
+For `cli_unbound`, report which file `wechatide` currently resolves to before anything replaces it. Something already owns that name, and this entry does not know whether it is a stale link, a wrapper or an unrelated program. The Human decides what PATH should point at.
 
-For `not_installed`, `nw_runtime_incompatible` or `version_too_old`, say that a
-download or update is needed and that this delivery does not perform it. Name
-the official download page rather than constructing a package URL, and do not
-choose a channel, architecture or version on the user's behalf. Version
-selection, package resolution and the compatibility-repair rules live upstream
-and are not adopted here.
+For `not_installed`, `nw_runtime_incompatible` or `version_too_old`, say that a download or update is needed and that this delivery does not perform it. Name the official download page rather than constructing a package URL, and do not choose a channel, architecture or version on the user's behalf. Version selection, package resolution and the compatibility-repair rules live upstream and are not adopted here.
 
-Never write into the DevTools application directory, and never copy an
-installed skill back into it.
+Never write into the DevTools application directory, and never copy an installed skill back into it.
 
 ## Failures
 
@@ -135,11 +90,4 @@ installed skill back into it.
 
 ## Return
 
-Return the exact inspected root, `compatible` with its `reason`, the installed
-and minimum versions with the threshold's source, what `wechatide` resolves to,
-which executor refusal the result explains, and what the Human would do next.
-State plainly that nothing was installed, downloaded, linked or changed.
-Hand off only to delivered entries in the capability index: once the
-installation is compatible, readiness, login, windows and AppIDs belong to
-initializer, and every business operation to its own entry through the call
-executor.
+Return the exact inspected root, `compatible` with its `reason`, the installed and minimum versions with the threshold's source, what `wechatide` resolves to, which executor refusal the result explains, and what the Human would do next. State plainly that nothing was installed, downloaded, linked or changed. Hand off only to delivered entries in the capability index: once the installation is compatible, readiness, login, windows and AppIDs belong to initializer, and every business operation to its own entry through the call executor.
