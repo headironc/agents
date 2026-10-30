@@ -27,7 +27,7 @@
 
 ### 规则放置与实施范围
 
-[实施切片规则](../delivery/AGENTS.md#implementation-slices)规定单次实施边界。整体架构的认可不授权实施全部阶段。“开始”与“继续”指向当前明确提出的切片。片内持续完成，片后报告并等待选择。验收预期见[小切片场景](../tests/scenarios/rules.md#小切片实施)。
+[实施切片规则](../delivery/AGENTS.md#implementation-slices)规定单次实施边界。整体架构的认可不授权实施全部阶段。默认“开始”与“继续”指向当前明确提出的切片。后续选片按[持续交付边界](../delivery/AGENTS.md#continuing-delivery)核对原授权：有效批次内继续，未覆盖时等待选择。每片仍独立完整交付，发布、合并和部署各自核权。验收预期见[小切片场景](../tests/scenarios/rules.md#小切片实施)。
 
 [代码偏好](../delivery/AGENTS.md#code-preferences)区分个人偏好与项目规范。复用的个人 Rust、SQL 偏好保留在交付 `policy/`。项目按需明确采用，入口不复制全文。团队强制规则、业务不变量和验证命令由消费仓库拥有。团队、CI 或托管审查必需的规范必须纳入项目版本控制。项目 AGENTS.md 明确适用范围和权威文件位置，避免依赖作者的个人主目录。
 
@@ -35,7 +35,7 @@
 
 [模型政策](../delivery/policy/models.md)拥有从任务组织到执行、验收及收尾的决策。[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)在执行安排前触发；普通短任务直接完成，已明确分工不反复重建。创建与续接的模型参数、默认覆盖条件及证据边界见[运行限制](../delivery/policy/models.md#runtime-limits)。[工作区章节](../delivery/policy/models.md#workspaces)先评估主工作区和有用 WIP，再决定复用或隔离。通用代码工具的绑定由[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)拥有。[Goal 章节](../delivery/policy/models.md#goals)规定适用条件、明确创建授权、内容语义及[实际接口限制](../delivery/policy/models.md#goal-tool-interfaces)。收尾章节规定证据保留及可恢复回收。默认映射只在模型政策维护。团队、CI 或托管审查强制采用时，沿用上述项目内版本化和单一所有者要求。项目入口注明采用范围、权威位置及覆盖项，保留政策所需的操作与审查引用。入口引用不等于正文已经加载，安装政策也不切换模型或修改客户端配置。
 
-[阶段职责](../delivery/policy/models.md#delegation-and-acceptance)默认由实施作者完成已授权的签名提交、推送、PR 和片内修复。设计者保留设计与实质验收；具体分工和能力受限时的执行承接也由该处规定。[工作区章节](../delivery/policy/models.md#workspaces)允许设计、实施和验收分阶段共用合适检出，保留唯一写者、稳定候选与客户端生命周期边界。角色变化不要求另造出版树，也不使未变输入的有效检查失效。这些默认职责不增加发布、合并或安装授权。
+[阶段职责](../delivery/policy/models.md#delegation-and-acceptance)拥有完整已授权目标的缺口核实。该处规定沿原负责人推进，及时补齐未承接责任。实施作者默认完成已授权的签名提交、推送、PR 和片内修复。设计者保留设计与实质验收。具体分工及能力受限时的承接也由该处规定。[工作区章节](../delivery/policy/models.md#workspaces)允许设计、实施和验收分阶段共用合适检出。交接保留唯一写者、稳定候选与客户端生命周期边界。角色变化不要求另造出版树，也不使未变输入的有效检查失效。这些默认职责不增加发布、合并或安装授权。
 
 Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限定为 DeepSeek 官方和 OpenCode 官方服务。负责人在允许范围内自行选择或复用可用路线，不逐次请示。实际接收端点、凭据来源、模型与 effort 按本次调用核对。兼容协议或同名模型不构成第三方接收方许可。保留任务的材料、操作边界及更窄的明确限制。
 
