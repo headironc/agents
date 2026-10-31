@@ -6,6 +6,12 @@ Contract subject: `claude-code`.
 
 模型接口只允许 DeepSeek 官方与 OpenCode 官方服务。负责人在这两者中选择满足任务需要的路线，合适时复用当前配置，无须逐次请示。`https://api.deepseek.com/anthropic` 是 DeepSeek 官方 Anthropic 兼容端点。OpenCode 路线按其官方 API 文档核对实际地址。第三方转发或自建兼容地址不因使用同一模型名而进入允许范围。核对本次实际接收端点、凭据来源、模型和 effort，不显示密钥或鉴权头。客户端名及响应模型名不证明实际上游身份。材料、操作及更窄的用户限制继续适用。扩大接收方范围必须有用户明确决定。
 
+按实际服务解析模型名。[DeepSeek 的 Anthropic 兼容映射](https://api-docs.deepseek.com/guides/anthropic_api/)把 `claude-opus*` 映射到 `deepseek-v4-pro`。其他 `claude*` 别名映射到 Flash。这是兼容行为，不构成 V4 Pro 的选用建议或账号可用证明。不要把这种调用报告成 Anthropic Opus 或 Sonnet。优先使用本路线支持的明确 DeepSeek 标识，并核实际返回及计费模型。Antigravity 中选择 Claude 家族，不授权把其标识直接套入另一接收服务。
+
+当前 V4.1 Flash 在 [DeepSeek 官方 API](https://api-docs.deepseek.com/quick_start/pricing/) 使用 `deepseek-flash`。[OpenCode Go 目录](https://opencode.ai/v2/docs/console/go)将其列为 `deepseek-v4.1-flash`。按实际服务和协议解析，不跨路线照搬。
+
+[DeepSeek 推理档位](https://api-docs.deepseek.com/guides/thinking_mode/)的规范值为 `low`、`high`、`max`；`medium` 和 `xhigh` 映射为 `high`。核对所选服务及客户端实际支持和传递的值。客户端接受参数，不证明服务端有效档位。
+
 ## 只读辅助
 
 只读分析使用 print 模式 `-p`。材料已完整提供且无需工具时，以 `--tools ""` 禁用内置工具。需要读取源文件时，只开放适用的读取工具。没有 MCP 需要时，使用 `--strict-mcp-config` 且不传入 server 配置；需要 MCP 时核对只读工具及实际服务器集合。另用 `--no-session-persistence` 避免保存会话历史。核对有效输入中没有额外工具或未授权材料。验证所需的临时写入按[检查规则](review.md#checks)限定命令与输出位置，不授权修改被审查源码。
