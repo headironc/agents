@@ -13,6 +13,7 @@
 | 维护产品指令 | [交付目录](#交付目录)、[Codex 规则](../delivery/AGENTS.md)、[产品场景](../tests/scenarios/adapters.md) | 直接维护交付目录的唯一规则源 |
 | 组织执行、选择模型路线、安排会话与 Goal，或协作、接续和收尾 | [任务起点](../delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](../delivery/policy/models.md)、[模型场景](../tests/scenarios/rules.md#模型选择与接续) | 由 Codex 规则入口按需加载；衔接需求与授权、工作区选择与绑定、Goal、自主执行、结果接纳及收尾，实际经验见[验证边界](#验证能说明什么) |
 | 使用 Claude Code 经官方接口主动委派 | [分工与授权](../delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](../delivery/policy/claude-code.md) | 仅使用 DeepSeek 官方或 OpenCode 官方 API，主动交付适任完整工作；保留任务边界及结果验收，不增加逐次审批 |
+| 选用 Antigravity CLI | [触发条件](../delivery/policy/models.md#antigravity-cli-delegation)、[调用合同](../delivery/policy/antigravity.md) | 复用有效路线与材料授权，核账号和调用方式受支持；不因安装、任务类型或其他客户端失败自动调用 |
 | 项目明确采用 Rust 偏好 | [Rust 偏好](../delivery/policy/rust.md)与[代码偏好](../delivery/AGENTS.md#code-preferences) | 依项目明确采用的范围读取 |
 | 项目明确采用 SQL 偏好 | [SQL 偏好](../delivery/policy/sql.md)与[代码偏好](../delivery/AGENTS.md#code-preferences) | 按项目采用范围加载 SQL correctness 及其错误处理引用；PostgreSQL 约定仅适用于该数据库，表名遵循[表与模式命名偏好](../delivery/policy/sql.md#tables-and-schemas) |
 | 协同设计数据模型 | [代码偏好](../delivery/AGENTS.md#code-preferences)、[SQL 建模偏好](../delivery/policy/sql.md#data-modeling) | 先恢复整体流程与已定职责，再围绕实际未决选择细化；不设固定逐表审批，具体拆分、应用 ID 和类型取值由所属项目记录 |
@@ -44,6 +45,14 @@ Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限�
 这种分层依据 [Codex 指令发现文档](https://developers.openai.com/codex/guides/agents-md)。Codex 分层加载全局与项目入口，普通政策文件由入口按需引用。[Astra 指令建议](https://developers.openai.com/api/docs/guides/latest-model#instruction-following)强调处理含混或冲突的文件指令。这里据此明确采用范围、规则归属与切片停止点。它们是本仓库的工作约定，不是模型自动保证的行为。
 
 自己的已授权开发仓库沿用同一任务范围和宿主权限规则。正常读写、命令和测试不因交给 Claude Code 而增加单独审批或强制沙箱要求。实际出现材料或执行边界问题时，按[调用合同](../delivery/policy/claude-code.md#有界执行)处理受影响的调用。
+
+## Antigravity CLI
+
+[模型政策](../delivery/policy/models.md#antigravity-cli-delegation)拥有选用条件，[调用合同](../delivery/policy/antigravity.md)拥有参数、权限、结果和恢复。有效选择与授权成立后，绑定完整任务再调用。复用同范围持续授权及未变输入的有效结果，不设每项任务必调或逐次索批。
+
+账号和调用方式须符合当前官方支持范围。消费计划不支持第三方编码代理嵌套调用 `agy`。DeepSeek、OpenCode 或 Codex 模型选择不扩大接收方授权。CLI 版本、模型与 effort、单次设置、自动加载材料和有效权限均按本次核对。工具拒绝、软拒绝或不完整报告保留为具体缺口，不靠退出 0 接纳。
+
+交付成员只有规则与手工合同，不安装 CLI、登录、配置账号或启动服务。帮助输出和静态场景不证明当前模型行为。真实演练另核模型、材料、账号及调用方式，按[验证边界](#验证能说明什么)报告。
 
 ## 微信项目配置、DevTools 初始化、编译、诊断、预览、项目列表、自动化、云开发与安装诊断
 
