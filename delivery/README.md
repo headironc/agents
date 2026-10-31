@@ -14,6 +14,8 @@
 
 [任务起点](policy/models.md#task-start-and-execution-routing)在创建任务会话或组织执行前触发。该处衔接需求、授权、模型路线、会话、工作区及适用 Goal。普通短任务留在当前会话。复杂调查与关键判断、已定设计下的完整实现、界面操作及设计稿各有适用路线。模型偏好不扩大权限；Goal 创建另核明确授权及全文回读。首次组织或关键输入变化时读取相关小节，复用未变规则和证据。
 
+[本机开发](policy/models.md#local-development)统一执行位置，保留前后端、设计和验收职责。[Desktop 能力核对](policy/models.md#desktop-capabilities)优先复用已有工具及未变证据。某执行者缺入口时，安排有对应本机能力的阶段执行者。依赖与平台缺口沿工作区及检查规则处理，不回退 dev 开发。
+
 [模型选择](policy/models.md#current-defaults)分别维护 Codex 职责映射与[外部路线模型偏好](policy/models.md#route-model-preferences)。按任务需要选择获准路线及适任模型，核实际标识、effort 和可用能力。持续选择按原始采用范围复用。创建接口的模型和档位字段分别判断，不因默认值存在就省略已允许参数。
 
 [Claude Code 与 DeepSeek](policy/models.md#claude-code-and-deepseek-delegation) 的分工从任务拆解时主动评估。适任且授权、工具就绪的完整结果，应实际交给客户端执行。设计稿采用[设计专用路线](policy/models.md#task-start-and-execution-routing)。负责人绑定单一结果与写区，并验收实际产物；不设调用比例或逐项审批。[调用合同](policy/claude-code.md)区分只读、有界执行和选用本客户端后的显式设计模式。客户端由使用者提供，安装规则不启用模型或扩大权限。

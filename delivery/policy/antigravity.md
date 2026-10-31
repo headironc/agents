@@ -2,7 +2,7 @@
 
 Contract subject: `antigravity-cli`.
 
-本合同约束 `agy` 的调用、材料、权限与结果。触发条件由[模型政策](models.md#antigravity-cli-delegation)拥有。选用路线后再读取本合同，不因文档或可执行文件存在就启动模型。
+本合同约束 `agy` 的调用、材料、权限与结果。触发条件由[模型政策](models.md#antigravity-cli-delegation)拥有。开发执行遵循[仅本机开发](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。选用路线后再读取本合同，不因文档或可执行文件存在就启动模型。
 
 ## 路线与账号就绪
 

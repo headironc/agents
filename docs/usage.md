@@ -50,6 +50,21 @@ Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限�
 
 自己的已授权开发仓库沿用同一任务范围和宿主权限规则。正常读写、命令和测试不因交给 Claude Code 而增加单独审批或强制沙箱要求。实际出现材料或执行边界问题时，按[调用合同](../delivery/policy/claude-code.md#有界执行)处理受影响的调用。
 
+## 本机开发与 Desktop 工具
+
+[模型政策](../delivery/policy/models.md#local-development)拥有开发执行位置。[Desktop 能力核对](../delivery/policy/models.md#desktop-capabilities)拥有工具选择、证据复用和局部缺口处理。[官方环境说明](https://learn.chatgpt.com/docs/environments/modes)区分 Local、Worktree 和 Cloud。Local 与 Worktree 均在本机执行。实际宿主和工作区仍按本次绑定核实。
+
+| 能力 | 选择路径 | 核对要点 |
+| --- | --- | --- |
+| 源码、构建、调试和测试 | 当前本地命令入口或集成终端，使用项目原生命令 | 本机目录、固定工具链、候选、原运行句柄及实际输出 |
+| 项目与隔离写区 | Desktop 项目和受管 worktree 入口 | 本机项目、实际附件、工作树依赖与唯一写者 |
+| 会话协作 | 当前客户端的创建、读取、消息和等待入口 | 原始授权、角色、阶段执行者、汇报目标与结果接纳 |
+| 浏览器和桌面验证 | Desktop 浏览器、桌面操作或适任专用工具 | 真实运行的本机页面、可读画面、同版候选及已获准目标 |
+| 连接器与专业能力 | 先用适任连接器或 API，再按技能选择本机工具 | 实际执行者的入口、连接状态、必要材料及允许操作 |
+| 平台专属验收 | 项目支持的本机原生环境、已获准的本机 VM 或容器、已有 CI 或对应客户端 | 实际开发设备、准确候选和运行，保留未覆盖的平台与业务行为 |
+
+[官方本地环境说明](https://learn.chatgpt.com/docs/environments/local-environment)提醒，工作树可能缺少未提交到 Git 的依赖和文件。[浏览器文档](https://learn.chatgpt.com/docs/browser)区分 Desktop 与 CLI 的入口。[插件文档](https://learn.chatgpt.com/docs/plugins)另列适用客户端、连接和权限条件。某执行者缺少入口时，按政策安排对应阶段，不判定整个本机缺能力。上表用于选择路径，不是已安装、已登录或行为验收的快照。
+
 ## Antigravity CLI
 
 [模型政策](../delivery/policy/models.md#antigravity-cli-delegation)拥有选用条件，[调用合同](../delivery/policy/antigravity.md)拥有参数、权限、结果和恢复。有效选择与授权成立后，绑定完整任务再调用。复用同范围持续授权及未变输入的有效结果，不设每项任务必调或逐次索批。
