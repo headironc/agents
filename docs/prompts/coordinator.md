@@ -56,7 +56,7 @@
 
 每项委派绑定一个结果、验收、排除项和允许操作。同时写清 host、路径、分支、基线、候选及写范围。阶段职责沿[委派政策](../../delivery/policy/models.md#delegation-and-acceptance)分配。作者默认负责已授权的签名提交、推送、PR 和片内修复；设计验收职责不默认转成代作者提交。发布与合并仅分配已有授权的责任。新增或转移职责由接收者明确接受，同一负责人继续原职责无需再次确认。
 
-开发执行位置采用[仅本机开发](../../delivery/policy/models.md#local-development)。工作区选择、绑定、唯一写者与回收遵循适用模型政策。设计、实施和验收可分阶段共用合适本机检出。阶段交接保留实际候选、WIP 和原操作句柄；只读验收不争用写入归属。Desktop 的工具和委派阶段按[能力核对](../../delivery/policy/models.md#desktop-capabilities)选择。验收依赖不足时，按[工作区规则](../../delivery/policy/models.md#workspaces)确定本机准备或已有 CI 路径，不恢复 dev 开发。
+开发执行位置采用[仅本机开发](../../delivery/policy/models.md#local-development)。沿项目支持的本机原生环境执行，不假定已有 VM 或容器。不可信输入的运行按[共用执行边界](../../delivery/policy/tool-contracts.md#不可信输入的执行)处理；本机缺隔离时，由负责人安排静态准备或已有且适用的隔离 CI。工作区选择、绑定、唯一写者与回收遵循适用模型政策。设计、实施和验收可分阶段共用合适本机检出。阶段交接保留实际候选、WIP 和原操作句柄；只读验收不争用写入归属。Desktop 的工具和委派阶段按[能力核对](../../delivery/policy/models.md#desktop-capabilities)选择。验收依赖不足时，按[工作区规则](../../delivery/policy/models.md#workspaces)确定本机准备或已有 CI 路径，不恢复 dev 开发。
 
 ### 切片、验收与交付
 

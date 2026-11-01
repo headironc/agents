@@ -54,6 +54,8 @@ Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限�
 
 [模型政策](../delivery/policy/models.md#local-development)拥有开发执行位置。[Desktop 能力核对](../delivery/policy/models.md#desktop-capabilities)拥有工具选择、证据复用和局部缺口处理。[官方环境说明](https://learn.chatgpt.com/docs/environments/modes)区分 Local、Worktree 和 Cloud。Local 与 Worktree 均在本机执行。实际宿主和工作区仍按本次绑定核实。
 
+本机开发沿项目支持的原生环境，不以 VM 或容器为前提。[共用执行合同](../delivery/policy/tool-contracts.md#不可信输入的执行)区分已授权可信输入与来源尚未可信的代码。后者先静态读取，只在已验证边界的环境执行。本机缺少该边界时沿已有且适用的隔离 CI，保留准确候选、实际运行及未运行项。worktree 或 `workspace-write` 不单独证明敏感文件读取已隔离。
+
 | 能力 | 选择路径 | 核对要点 |
 | --- | --- | --- |
 | 源码、构建、调试和测试 | 当前本地命令入口或集成终端，使用项目原生命令 | 本机目录、固定工具链、候选、原运行句柄及实际输出 |
@@ -61,7 +63,7 @@ Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限�
 | 会话协作 | 当前客户端的创建、读取、消息和等待入口 | 原始授权、角色、阶段执行者、汇报目标与结果接纳 |
 | 浏览器和桌面验证 | Desktop 浏览器、桌面操作或适任专用工具 | 真实运行的本机页面、可读画面、同版候选及已获准目标 |
 | 连接器与专业能力 | 先用适任连接器或 API，再按技能选择本机工具 | 实际执行者的入口、连接状态、必要材料及允许操作 |
-| 平台专属验收 | 项目支持的本机原生环境、已获准的本机 VM 或容器、已有 CI 或对应客户端 | 实际开发设备、准确候选和运行，保留未覆盖的平台与业务行为 |
+| 平台专属验收 | 项目支持的本机原生环境、已有且适用的 CI 或对应客户端 | 实际开发设备、执行边界、准确候选和运行，保留未覆盖的平台与业务行为；其他环境只沿已核实能力与授权选择 |
 
 [官方本地环境说明](https://learn.chatgpt.com/docs/environments/local-environment)提醒，工作树可能缺少未提交到 Git 的依赖和文件。[浏览器文档](https://learn.chatgpt.com/docs/browser)区分 Desktop 与 CLI 的入口。[插件文档](https://learn.chatgpt.com/docs/plugins)另列适用客户端、连接和权限条件。某执行者缺少入口时，按政策安排对应阶段，不判定整个本机缺能力。上表用于选择路径，不是已安装、已登录或行为验收的快照。
 
@@ -143,7 +145,7 @@ DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现
 
 当前成员与产品归属以[清单](../config/personal-skills.txt)为准。旧流程技能只保留历史来源，不继续安装。写作和工具参考属于公共 `policy/` 路径的成员。安装来源与限制见[安装快照过渡](#既有安装快照过渡)。
 
-[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权。先适用[依赖更新免 AI 审查规则](../delivery/policy/review.md#dependency-updates)，保留适用检查和合并边界。仍需 AI 审查时，常规提供方与 Cubic 额度不足时的替代由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。选定方按[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式 `@` 请求。已有有效覆盖或请求时复用；不要依赖 PR 事件自动触发。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)只负责 `headironc` 的身份就绪与认证恢复。`cladiron[bot]` 与其固定 provider 已于 2026-09-18 退役。GitHub App 凭据能力与安装状态见[安装快照过渡](#既有安装快照过渡)。
+[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权。先核实[受限的依赖更新豁免](../delivery/policy/review.md#dependency-updates)，保留适用检查和合并边界。可信自动化提交的低风险清单／锁文件更新经机械核验后适用例外。人工更新、主版本升级、兼容代码及资格未知项走正常审查。仍需 AI 审查时，常规提供方与 Cubic 额度不足时的替代由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。选定方按[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式 `@` 请求。已有有效覆盖或请求时复用；不要依赖 PR 事件自动触发。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)只负责 `headironc` 的身份就绪与认证恢复。`cladiron[bot]` 与其固定 provider 已于 2026-09-18 退役。GitHub App 凭据能力与安装状态见[安装快照过渡](#既有安装快照过渡)。
 
 ## 规则与技能维护
 
