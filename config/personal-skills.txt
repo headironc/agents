@@ -1,11 +1,12 @@
 # Delivered tool capabilities; generic development tasks need no workflow skill.
-# path<TAB>shared|codex|claude; nested paths are validation members, not install targets.
+# path<TAB>product list; shared retains its original Codex/Claude scope.
+# Nested paths are validation members, not install targets.
 figma-design-workflow	codex
-gh	shared
-project-guide	shared
-gh-identity	shared
-alibabacloud-find-skills	shared
-alibabacloud-sms-send-short-message	shared
+gh	codex,claude,antigravity
+project-guide	codex,claude,antigravity
+gh-identity	codex,claude,antigravity
+alibabacloud-find-skills	codex,claude,antigravity
+alibabacloud-sms-send-short-message	codex,claude,antigravity
 wechatide	shared
 wechatide/skills/automator	shared
 wechatide/skills/cloudbase-operator	shared

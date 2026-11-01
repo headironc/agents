@@ -1,9 +1,18 @@
 // Contract subject: `skill-validation`.
 // Validate each product's skills with its pinned upstream validator in a private directory.
+// Antigravity uses only `agy plugin validate --strict --json`, never model, login or installation commands.
+// Temporary HOME and an allowlisted environment keep validation separate from personal configuration.
 // - Read [validator](skill-validator.py). Use tool `python`.
 // - Read [executor](check.ts). Use tool `node`.
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -37,7 +46,7 @@ function run(
   });
   if (result.error || result.status !== 0 || result.signal) {
     throw new Error(
-      `Skill validator failed (${(result.error as NodeJS.ErrnoException | undefined)?.code ?? result.signal ?? result.status}): ${result.stderr?.slice(-1500) ?? ""}`,
+      `Skill validator failed (${(result.error as NodeJS.ErrnoException | undefined)?.code ?? result.signal ?? result.status}): ${result.stderr?.slice(-1500) ?? ""}${result.stdout?.slice(-2500) ?? ""}`,
     );
   }
   return result.stdout;
@@ -76,6 +85,46 @@ export function validateSkills(
     mkdtempSync(path.join(os.tmpdir(), "agents-skill-validation-")),
   );
   try {
+    if (product === "antigravity") {
+      const plugin = path.join(temporary, "plugin");
+      mkdirSync(path.join(plugin, "skills"), { recursive: true });
+      writeFileSync(
+        path.join(plugin, "plugin.json"),
+        JSON.stringify({ name: "agents-validation" }),
+      );
+      const names = new Set<string>();
+      for (const directory of directories) {
+        const name = path.basename(directory);
+        if (names.has(name))
+          throw new Error(`Duplicate Antigravity validation entry: ${name}`);
+        names.add(name);
+        cpSync(directory, path.join(plugin, "skills", name), {
+          recursive: true,
+        });
+      }
+      const result = run(
+        path.join(toolsRoot, ".cache/agents-tools/bin/agy"),
+        ["plugin", "validate", "--strict", "--json", plugin],
+        temporary,
+        temporary,
+      );
+      const report = z
+        .object({
+          components: z.object({ skills: z.number().int().nonnegative() }),
+          findings: z.array(
+            z.object({ severity: z.enum(["note", "warning", "error"]) }),
+          ),
+        })
+        .parse(JSON.parse(result));
+      if (
+        report.components.skills !== directories.length ||
+        report.findings.some((finding) => finding.severity !== "note")
+      )
+        throw new Error(
+          "Incomplete or unsuccessful Antigravity validation coverage",
+        );
+      return;
+    }
     const result = z
       .strictObject({
         product: z.literal(product),
@@ -113,7 +162,7 @@ export function validateSkillProduct(
   const entries = selectSkillEntries(readSkillEntries(directory), product);
   if (entries.length === 0)
     throw new Error(`Empty ${product} validation selection`);
-  validatorInputs(toolsRoot);
+  if (product !== "antigravity") validatorInputs(toolsRoot);
   validateSkills(
     product,
     entries.map((entry) => path.join(directory, "delivery/skills", entry.path)),
@@ -127,7 +176,7 @@ export function skillCheckNames(entries: SkillEntry[]): string[] {
     (product) => selectSkillEntries(entries, product).length,
   );
   return [
-    `Skill membership: ${entries.length === 0 ? "NOT_DELIVERED" : "DELIVERED"}; Codex ${counts[0]}, Claude ${counts[1]}`,
+    `Skill membership: ${entries.length === 0 ? "NOT_DELIVERED" : "DELIVERED"}; Codex ${counts[0]}, Claude ${counts[1]}, Antigravity ${counts[2]}`,
     ...products.flatMap((product, index) =>
       counts[index] ? [skillValidationName(entries, product)] : [],
     ),
@@ -138,7 +187,7 @@ export function skillValidationName(
   entries: SkillEntry[],
   product: Product,
 ): string {
-  return `${product === "codex" ? "Codex" : "Claude"} skill validation: ${selectSkillEntries(entries, product).length} entries`;
+  return `${{ codex: "Codex", claude: "Claude", antigravity: "Antigravity" }[product]} skill validation: ${selectSkillEntries(entries, product).length} entries`;
 }
 
 if (
@@ -156,7 +205,7 @@ if (
     ) {
       process.exitCode = 2;
       throw new Error(
-        "Usage: node scripts/check-skills.ts membership DIGEST | codex | claude",
+        "Usage: node scripts/check-skills.ts membership DIGEST | codex | claude | antigravity",
       );
     }
     if (mode === "membership") {

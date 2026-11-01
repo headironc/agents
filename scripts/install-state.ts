@@ -193,6 +193,7 @@ export function attempt<T>(
 export function inspectRoots(
   environment: NodeJS.ProcessEnv,
   gaps: Gap[],
+  includeAntigravity = false,
 ): { roots: InstallRoots; unusable: RootName[] } | undefined {
   const home = environment.HOME ?? "";
   if (!isNormalizedAbsolute(home)) {
@@ -259,6 +260,15 @@ export function inspectRoots(
       home: root("home", home, "HOME"),
       codex: select("codex", "CODEX_HOME", path.join(home, ".codex")),
       claude: select("claude", "CLAUDE_CONFIG_DIR", path.join(home, ".claude")),
+      ...(includeAntigravity
+        ? {
+            antigravity: root(
+              "antigravity",
+              path.join(home, ".gemini/antigravity-cli"),
+              null,
+            ),
+          }
+        : {}),
       state,
       deploy: root("deploy", path.join(state.path, "agents/deploy"), null),
       backup: select(
@@ -279,8 +289,9 @@ export function inspectRoots(
 export function resolveInstallRoots(
   environment: NodeJS.ProcessEnv,
   gaps: Gap[],
+  includeAntigravity = false,
 ): InstallRoots | undefined {
-  const inspected = inspectRoots(environment, gaps);
+  const inspected = inspectRoots(environment, gaps, includeAntigravity);
   return inspected && !inspected.unusable.length ? inspected.roots : undefined;
 }
 

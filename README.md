@@ -1,6 +1,6 @@
 # Agents
 
-本仓库维护可复用的代理规则、技能和配套工具。共享 Skills 从一个源码位置交付到 Codex 与 Claude Code。Codex 另接收规则入口和专属政策；Claude 只接收 Skills 及必要依赖。PR 模型审查由仓库外的提供方执行；本地与原生 CI 复用完整检查入口。技能成员以[技能清单](config/personal-skills.txt)为准，源码交付不代表个人环境已经启用。
+本仓库维护可复用的代理规则、技能和配套工具。Skills 从一个源码位置按产品交付。默认安装 Codex 与 Claude Code；显式选入 Antigravity CLI 后增加其通用技能。Codex 另接收规则入口和专属政策；其余两端接收所选 Skills 及必要依赖。PR 模型审查由仓库外的提供方执行；本地与原生 CI 复用完整检查入口。技能成员以[技能清单](config/personal-skills.txt)为准，源码交付不代表个人环境已经启用。
 
 ## 当前能力
 
@@ -24,7 +24,7 @@
 | 原生 CI 与交付 | [运行合同](docs/tooling.md#ci-与审查边界)、[实例与证据边界](docs/review-gate.md#实例与证据边界) | 两平台复用完整检查；实际配置、运行与独立审查分别绑定实例验证 |
 | 阿里云技能发现与短信 | [技能发现](delivery/skills/alibabacloud-find-skills/SKILL.md)、[短信](delivery/skills/alibabacloud-sms-send-short-message/SKILL.md) | 发现、安装及发送遵循各自授权 |
 | 微信开发者工具 | [wechatide](delivery/skills/wechatide/SKILL.md) | 九个子入口已交付；实际 DevTools 操作限 macOS |
-| 安装与恢复 | [安装合同](docs/usage.md#双端安装) | 一份计划绑定两个产品根，分别复制受检内容；状态目录保存计划、回执与备份 |
+| 安装与恢复 | [安装合同](docs/usage.md#双端安装) | 默认双端，显式选入 Antigravity CLI 后生成三端计划；分别复制受检内容并支持回读与恢复 |
 
 规则拥有行为要求，技能拥有完整能力单元。项目决定采用范围及检查参数。工具打包器负责生成可执行产物，安装器负责目标绑定及恢复。安装后的使用入口见随交付发布的 [README.md](delivery/README.md)。
 

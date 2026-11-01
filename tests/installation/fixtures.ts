@@ -21,7 +21,7 @@ import path from "node:path";
 import type { TestContext } from "node:test";
 import { CheckReportSchema } from "../../scripts/check-report.ts";
 import { InstallPlanSchema } from "../../scripts/install-records.ts";
-import type { InstallPlanV5 } from "../../scripts/install-records.ts";
+import type { InstallPlan } from "../../scripts/install-records.ts";
 import { listSourcePaths, readSourceIdentity } from "../../scripts/source.ts";
 import { fixtureEnvironment, repositoryRoot } from "../validation/fixtures.ts";
 
@@ -280,7 +280,7 @@ export function installFixture(
     exists(deploy)
       ? readdirSync(deploy).filter((name) => /^[0-9]{8}T/.test(name))
       : [];
-  const readPlan = (file: string): InstallPlanV5 =>
+  const readPlan = (file: string): InstallPlan =>
     InstallPlanSchema.parse(JSON.parse(readFileSync(file, "utf8")));
   const gaps = (result: {
     status: number | null;

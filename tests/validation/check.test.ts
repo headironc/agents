@@ -515,7 +515,7 @@ test("a missing required capability names the path before planning or executing 
   assert.equal(result.report!.source, null);
 });
 
-test("repository and all gates register both official product validators", async () => {
+test("repository and all gates register each official product validator", async () => {
   for (const groups of [
     ["repository"],
     ["repository", "ci", "docs"],
@@ -524,6 +524,7 @@ test("repository and all gates register both official product validators", async
     for (const [product, name] of [
       ["codex", "Codex skill validation: 16 entries"],
       ["claude", "Claude skill validation: 15 entries"],
+      ["antigravity", "Antigravity skill validation: 5 entries"],
     ]) {
       const selected = specs.filter((spec) => spec.name === name);
       assert.equal(selected.length, 1);
@@ -532,7 +533,11 @@ test("repository and all gates register both official product validators", async
         "scripts/check-skills.ts",
         product,
       ]);
-      assert.ok(selected[0]!.tools.includes("python3"));
+      assert.ok(
+        selected[0]!.tools.includes(
+          product === "antigravity" ? "agy" : "python3",
+        ),
+      );
     }
   }
 });

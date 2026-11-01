@@ -7,11 +7,14 @@ import { readSourceEntries } from "./source.ts";
 // Require delivered tool capabilities and their intended products.
 const requiredSkills = [
   { path: "figma-design-workflow", target: "codex" },
-  { path: "gh", target: "shared" },
-  { path: "project-guide", target: "shared" },
-  { path: "gh-identity", target: "shared" },
-  { path: "alibabacloud-find-skills", target: "shared" },
-  { path: "alibabacloud-sms-send-short-message", target: "shared" },
+  { path: "gh", target: "codex,claude,antigravity" },
+  { path: "project-guide", target: "codex,claude,antigravity" },
+  { path: "gh-identity", target: "codex,claude,antigravity" },
+  { path: "alibabacloud-find-skills", target: "codex,claude,antigravity" },
+  {
+    path: "alibabacloud-sms-send-short-message",
+    target: "codex,claude,antigravity",
+  },
   { path: "wechatide", target: "shared" },
   { path: "wechatide/skills/automator", target: "shared" },
   { path: "wechatide/skills/cloudbase-operator", target: "shared" },
@@ -30,7 +33,18 @@ const EntrySchema = z
       .regex(
         /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/skills\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/,
       ),
-    z.enum(["shared", "codex", "claude"]),
+    z.string().refine((value) => {
+      if (value === "shared") return true;
+      const selected = value.split(",");
+      const allowed = ["codex", "claude", "antigravity"];
+      return (
+        selected.length > 0 &&
+        new Set(selected).size === selected.length &&
+        selected.every((product) => allowed.includes(product)) &&
+        allowed.filter((product) => selected.includes(product)).join(",") ===
+          value
+      );
+    }, "Expected an ordered, unique product list"),
   ])
   .transform(([skillPath, target]) => ({
     path: skillPath,
@@ -46,11 +60,15 @@ const FrontmatterSchema = z.looseObject({
 /** Select a product's delivered entries after common membership validation. */
 export function selectSkillEntries(
   entries: SkillEntry[],
-  product: "codex" | "claude",
+  product: "codex" | "claude" | "antigravity",
 ): SkillEntry[] {
-  return entries.filter(
-    (entry) => entry.target === "shared" || entry.target === product,
-  );
+  return entries.filter((entry) => skillProducts(entry).includes(product));
+}
+
+export function skillProducts(entry: Pick<SkillEntry, "target">): string[] {
+  return entry.target === "shared"
+    ? ["codex", "claude"]
+    : entry.target.split(",");
 }
 
 /** Enumerate all candidate skill assets, including ignored files; reject links and special files. */
@@ -102,7 +120,8 @@ export function readSkillEntries(root: string): SkillEntry[] {
   for (const required of requiredSkills) {
     const entry = byPath.get(required.path);
     if (!entry) throw new Error(`Required skill is missing: ${required.path}`);
-    if (entry.target !== required.target)
+    const expected = skillProducts(required);
+    if (skillProducts(entry).join(",") !== expected.join(","))
       throw new Error(`Required skill product differs: ${required.path}`);
   }
   const files = listSkillFiles(root);
@@ -120,7 +139,7 @@ export function readSkillEntries(root: string): SkillEntry[] {
     throw new Error("Skill assets have no delivered entrypoint");
   for (const entry of entries) {
     const top = byPath.get(entry.topLevel);
-    if (!top || entry.target !== top.target)
+    if (!top || skillProducts(entry).join(",") !== skillProducts(top).join(","))
       throw new Error(
         `Nested skill product disagrees with its top-level owner: ${entry.path}`,
       );

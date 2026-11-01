@@ -24,14 +24,24 @@ test("design orchestration stays Codex-only while shared skills reach both valid
   assert.equal(entries.length, 16);
   assert.equal(
     entries.find((entry) => entry.path === "project-guide")?.target,
-    "shared",
+    "codex,claude,antigravity",
   );
   assert.ok(
-    entries.every(
-      (entry) => entry.target === "shared" || entry.target === "codex",
+    entries.every((entry) =>
+      ["shared", "codex", "codex,claude,antigravity"].includes(entry.target),
     ),
   );
   assert.deepEqual(selectSkillEntries(entries, "codex"), entries);
+  assert.deepEqual(
+    selectSkillEntries(entries, "antigravity").map((entry) => entry.path),
+    [
+      "alibabacloud-find-skills",
+      "alibabacloud-sms-send-short-message",
+      "gh",
+      "gh-identity",
+      "project-guide",
+    ],
+  );
   assert.deepEqual(
     selectSkillEntries(entries, "claude"),
     entries.filter((entry) => entry.path !== "figma-design-workflow"),
@@ -45,10 +55,48 @@ test("design orchestration stays Codex-only while shared skills reach both valid
     ["codex"],
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 16, Claude 15",
+    "Skill membership: DELIVERED; Codex 16, Claude 15, Antigravity 5",
     "Codex skill validation: 16 entries",
     "Claude skill validation: 15 entries",
+    "Antigravity skill validation: 5 entries",
   ]);
+});
+
+test("legacy shared stays dual-product and malformed product sets fail closed", (t) => {
+  const f = fixtureRepository(t);
+  f.put("delivery/skills/probe/SKILL.md", skill("probe"));
+  f.putSkillManifest("probe\tshared\n");
+  assert.ok(
+    !selectSkillEntries(readSkillEntries(f.directory), "antigravity").some(
+      (entry) => entry.path === "probe",
+    ),
+  );
+  f.putSkillManifest("probe\tantigravity\n");
+  const entries = readSkillEntries(f.directory);
+  assert.ok(
+    selectSkillEntries(entries, "antigravity").some(
+      (entry) => entry.path === "probe",
+    ),
+  );
+  assert.ok(
+    !selectSkillEntries(entries, "codex").some(
+      (entry) => entry.path === "probe",
+    ),
+  );
+  for (const target of [
+    "",
+    "unknown",
+    "codex,codex",
+    "claude,codex",
+    "shared,antigravity",
+    "codex, antigravity",
+  ]) {
+    f.putSkillManifest(`probe\t${target}\n`);
+    assert.throws(
+      () => readSkillEntries(f.directory),
+      /Invalid skill manifest/,
+    );
+  }
 });
 
 test("nested members belong to their top-level skill and do not add install targets", (t) => {
@@ -71,9 +119,10 @@ test("nested members belong to their top-level skill and do not add install targ
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 19, Claude 17",
+    "Skill membership: DELIVERED; Codex 19, Claude 17, Antigravity 5",
     "Codex skill validation: 19 entries",
     "Claude skill validation: 17 entries",
+    "Antigravity skill validation: 5 entries",
   ]);
 });
 
@@ -164,7 +213,7 @@ test("project-guide cannot disappear or lose either product", (t) => {
   );
   f.put(
     "config/personal-skills.txt",
-    manifest.replace("project-guide\tshared\n", ""),
+    manifest.replace("project-guide\tcodex,claude,antigravity\n", ""),
   );
   rmSync(path.join(f.directory, "delivery/skills/project-guide"), {
     recursive: true,
@@ -178,7 +227,7 @@ test("project-guide cannot disappear or lose either product", (t) => {
     f.put(
       "config/personal-skills.txt",
       manifest.replace(
-        "project-guide\tshared\n",
+        "project-guide\tcodex,claude,antigravity\n",
         `project-guide\t${product}\n`,
       ),
     );

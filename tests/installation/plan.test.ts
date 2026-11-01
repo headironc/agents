@@ -73,6 +73,95 @@ function installDistinctProducts(
     assert.equal(lstatSync(target, { throwIfNoEntry: false }), undefined);
 }
 
+test("Antigravity is explicit and V6 contains only its five compatible skills and dependencies", (t) => {
+  const f = installFixture(t);
+  const initial = f.planned().plan;
+  assert.equal(initial.version, 5);
+  assert.equal(initial.roots.antigravity, undefined);
+  const unsupportedUpgrade = { ...initial, version: 6 };
+  const { sha256: initialDigest, ...upgradedBody } = unsupportedUpgrade;
+  assert.equal(initialDigest.length, 64);
+  assert.equal(
+    InstallPlanSchema.safeParse({
+      ...upgradedBody,
+      sha256: canonicalDigest(upgradedBody),
+    }).success,
+    false,
+  );
+  assert.ok(
+    initial.targets.every((target) => target.product !== "antigravity"),
+  );
+  const { plan } = f.planned(["--include-product", "antigravity"]);
+  const root = path.join(f.home, ".gemini/antigravity-cli");
+  assert.equal(plan.version, 6);
+  assert.equal(plan.roots.antigravity?.path, root);
+  const { sha256: planDigest, ...v6Body } = plan;
+  assert.equal(planDigest.length, 64);
+  const downgraded = { ...v6Body, version: 5 };
+  assert.equal(
+    InstallPlanSchema.safeParse({
+      ...downgraded,
+      sha256: canonicalDigest(downgraded),
+    }).success,
+    false,
+  );
+  const selected = plan.targets.filter(
+    (target) => target.product === "antigravity",
+  );
+  assert.deepEqual(
+    selected.map((target) => target.key).sort(),
+    [
+      "antigravity:alibabacloud-find-skills",
+      "antigravity:alibabacloud-sms-send-short-message",
+      "antigravity:gh",
+      "antigravity:gh-identity",
+      "antigravity:policy/review.md",
+      "antigravity:policy/tool-contracts.md",
+      "antigravity:policy/writing.md",
+      "antigravity:project-guide",
+      "antigravity:tools/check-ids.mjs",
+      "antigravity:tools/check-prose.mjs",
+      "antigravity:tools/task-temp.mjs",
+    ].sort(),
+  );
+  assert.ok(selected.every((target) => target.path.startsWith(`${root}/`)));
+  assert.equal(f.plan(["--include-product", "unknown"]).status, 2);
+  assert.equal(
+    f.plan([
+      "--include-product",
+      "antigravity",
+      "--include-product",
+      "antigravity",
+    ]).status,
+    2,
+  );
+});
+
+test("Antigravity collisions and adoption gaps refuse the complete plan before target writes", (t) => {
+  const f = installFixture(t);
+  const root = path.join(f.home, ".gemini/antigravity-cli");
+  mkdirSync(path.join(root, "skills/gh"), { recursive: true });
+  writeFileSync(path.join(root, "skills/gh/SKILL.md"), "existing skill\n");
+  const extra = ["--include-product", "antigravity"];
+  assert.ok(f.gaps(f.plan(extra)).some((gap) => gap.key === "antigravity:gh"));
+  const { plan } = f.planned([...extra, "--adopt", "antigravity:gh"]);
+  assert.equal(
+    plan.targets.find((target) => target.key === "antigravity:gh")?.adopted,
+    true,
+  );
+  assert.ok(
+    f
+      .gaps(
+        f.plan([...extra, "--adopt", "antigravity:gh"], { CODEX_HOME: root }),
+      )
+      .some((gap) => gap.code === "path-collision"),
+  );
+  assert.equal(
+    lstatSync(path.join(f.home, ".codex/AGENTS.md"), { throwIfNoEntry: false }),
+    undefined,
+  );
+});
+
 test("a plan binds both products to independent roots and shared source", (t) => {
   const f = installFixture(t);
   const { plan } = f.planned();

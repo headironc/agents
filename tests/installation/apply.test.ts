@@ -24,7 +24,7 @@ import {
 } from "../../scripts/install-apply.ts";
 import { readCurrentInstallation } from "../../scripts/install-current.ts";
 import { InstallReceiptSchema } from "../../scripts/install-records.ts";
-import type { InstallReceiptV5 } from "../../scripts/install-records.ts";
+import type { InstallReceipt } from "../../scripts/install-records.ts";
 import {
   machineIdentity,
   readTargetState,
@@ -46,7 +46,7 @@ function outcome(result: {
   };
 }
 
-function readReceipt(file: string): InstallReceiptV5 {
+function readReceipt(file: string): InstallReceipt {
   return InstallReceiptSchema.parse(JSON.parse(readFileSync(file, "utf8")));
 }
 
@@ -59,6 +59,131 @@ function refusal(action: () => unknown) {
   }
   return assert.fail("Expected installation to be refused");
 }
+
+test("V6 applies, reads back and restores Antigravity without touching App settings or unlisted skills", (t) => {
+  const f = installFixture(t, { realRuntime: true });
+  const root = path.join(f.home, ".gemini/antigravity-cli");
+  const existing = path.join(root, "skills/gh");
+  mkdirSync(existing, { recursive: true });
+  writeFileSync(path.join(existing, "SKILL.md"), "original\n");
+  writeFileSync(path.join(root, "skills/unmanaged"), "retained\n");
+  const app = path.join(f.home, ".gemini/config");
+  mkdirSync(app, { recursive: true });
+  writeFileSync(path.join(app, "settings.json"), "personal\n");
+  const { plan, review } = f.planned([
+    "--include-product",
+    "antigravity",
+    "--adopt",
+    "antigravity:gh",
+  ]);
+  assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
+  assert.equal(readReceipt(plan.run.receipt).version, 6);
+  for (const target of plan.targets)
+    assert.deepEqual(
+      readTargetState(target.path),
+      readTargetState(target.source),
+    );
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+  assert.equal(outcome(f.cli(["status"])).status, "installed");
+  assert.equal(existsSync(path.join(root, "AGENTS.md")), false);
+  assert.equal(
+    outcome(f.cli(["rollback", "--receipt", plan.run.receipt])).status,
+    "rolled-back",
+  );
+  assert.equal(
+    readFileSync(path.join(existing, "SKILL.md"), "utf8"),
+    "original\n",
+  );
+  assert.equal(
+    readFileSync(path.join(root, "skills/unmanaged"), "utf8"),
+    "retained\n",
+  );
+  assert.equal(
+    readFileSync(path.join(app, "settings.json"), "utf8"),
+    "personal\n",
+  );
+});
+
+test("a late Antigravity failure restores all three products", (t) => {
+  const f = installFixture(t);
+  const directory = path.join(f.home, ".gemini/antigravity-cli/skills");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(path.join(directory, "unmanaged"), "keep\n");
+  const { plan, review } = f.planned(["--include-product", "antigravity"]);
+  chmodSync(directory, 0o500);
+  try {
+    const result = applyInstallPlan(review, { HOME: f.home });
+    assert.equal(result.status, "failed-rolled-back", JSON.stringify(result));
+    assert.ok(result.steps.restored > 0);
+  } finally {
+    chmodSync(directory, 0o700);
+  }
+  for (const target of plan.targets)
+    assert.equal(existsSync(target.path), false, target.path);
+  assert.equal(
+    readFileSync(path.join(directory, "unmanaged"), "utf8"),
+    "keep\n",
+  );
+  assert.equal(
+    verifyInstallation(plan.run.receipt, { HOME: f.home }).verified,
+    true,
+  );
+});
+
+test("V6 rollback retains third-party Antigravity changes and restores other products", (t) => {
+  const f = installFixture(t, { realRuntime: true });
+  const { plan, review } = f.planned(["--include-product", "antigravity"]);
+  outcome(f.cli(["apply", "--plan", review]));
+  const target = path.join(
+    f.home,
+    ".gemini/antigravity-cli/skills/gh/SKILL.md",
+  );
+  writeFileSync(target, "third-party change\n");
+  const result = rollbackInstallation(plan.run.receipt, { HOME: f.home });
+  assert.equal(result.status, "rollback-incomplete");
+  assert.equal(readFileSync(target, "utf8"), "third-party change\n");
+  for (const member of plan.targets.filter(
+    (member) => member.product !== "antigravity",
+  ))
+    assert.equal(existsSync(member.path), false);
+});
+
+for (const product of ["codex", "claude", "antigravity"] as const)
+  test(`status preserves a recorded ${product} root identity failure even when installed bytes match`, (t) => {
+    const f = installFixture(t);
+    const root = path.join(
+      f.home,
+      product === "antigravity" ? ".gemini/antigravity-cli" : `.${product}`,
+    );
+    mkdirSync(root, { recursive: true });
+    const { plan, review } = f.planned(["--include-product", "antigravity"]);
+    assert.equal(
+      applyInstallPlan(review, { HOME: f.home }).status,
+      "installed",
+    );
+    const moved = path.join(f.home, `original-${product}-root`);
+    renameSync(root, moved);
+    cpSync(moved, root, { recursive: true });
+    const verified = verifyInstallation(plan.run.receipt, { HOME: f.home });
+    assert.equal(verified.verified, false);
+    assert.ok(
+      verified.problems.some(
+        (problem) =>
+          problem.code === "root-anchor-changed" && problem.root === product,
+      ),
+    );
+    const current = readCurrentInstallation({ HOME: f.home });
+    assert.equal(current.status, "indeterminate");
+    assert.ok(
+      current.problems.some(
+        (problem) =>
+          problem.code === "root-anchor-changed" && problem.root === product,
+      ),
+    );
+  });
 
 test("a real runtime installs files and directories directly, then rolls back", (t) => {
   const f = installFixture(t, { realRuntime: true });
@@ -215,7 +340,7 @@ test("rollback refuses receipt bindings changed after installation", (t) => {
   const adoptedOrder = plan.targets.find(
     (target) => target.path === adopted,
   )!.order;
-  const cases: [string, (receipt: InstallReceiptV5) => void, string][] = [
+  const cases: [string, (receipt: InstallReceipt) => void, string][] = [
     [
       "runtime",
       (receipt) => {

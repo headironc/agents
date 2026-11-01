@@ -20,6 +20,29 @@ import { fixtureRepository, repositoryRoot } from "./fixtures.ts";
 const skill = (name: string) =>
   `---\nname: ${name}\ndescription: Validate a synthetic supplied input.\n---\n\n# ${name}\n\nRead the input.\n`;
 
+test("official Antigravity validator checks skills without installation or source changes", (t) => {
+  const f = fixtureRepository(t);
+  const directory = path.join(f.directory, "delivery/skills/probe");
+  const file = "delivery/skills/probe/SKILL.md";
+  f.put(file, skill("probe"));
+  validateSkills("antigravity", [directory]);
+  assert.equal(
+    readFileSync(path.join(f.directory, file), "utf8"),
+    skill("probe"),
+  );
+  f.put(file, "# Missing frontmatter\n");
+  assert.throws(
+    () => validateSkills("antigravity", [directory]),
+    /Skill validator failed/,
+  );
+  f.put(file, skill("other-name"));
+  assert.throws(
+    () => validateSkills("antigravity", [directory]),
+    /Skill validator failed/,
+  );
+  assert.throws(() => validateSkills("antigravity", []), /Empty/);
+});
+
 for (const product of ["codex", "claude"] as const)
   test(`pinned ${product} validator accepts a valid skill and rejects an unsupported field`, (t) => {
     const f = fixtureRepository(t);

@@ -68,7 +68,7 @@ prepare_pinned_tool() (
       *.zip) listing=$(unzip -Z1 "$archive") ;;
     esac
     # Only stream the selected member. No archive path is extracted to disk.
-    member=$(printf '%s\n' "$listing" | awk -v name="$name" '
+    member=$(printf '%s\n' "$listing" | awk -v name="$(if [[ $name == agy ]]; then printf antigravity; else printf '%s' "$name"; fi)" '
       /^\// || /(^|\/)\.\.($|\/)/ || /^-/ { bad = 1 }
       { n = split($0, parts, "/"); if (parts[n] == name) { count++; member = $0 } }
       END { if (bad || count != 1) exit 1; print member }
