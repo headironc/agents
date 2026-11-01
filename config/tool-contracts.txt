@@ -32,4 +32,5 @@ contract	skill-validation	cli	conditional	scripts/check-skills.ts	comment-subjec
 contract	codex-cli-loader	platform-interface	conditional	scripts/check-codex-loader.ts	comment-subject	codex-cli-loader
 contract	codex-cli	cli	conditional	scripts/check-codex-loader.ts	comment-subject	codex-cli
 contract	claude-code	cli	conditional	delivery/policy/claude-code.md	contract-subject	claude-code
+contract	antigravity-cli	cli	conditional	delivery/policy/antigravity.md	contract-subject	antigravity-cli
 contract	pinned-tool-bootstrap	platform-interface	conditional	scripts/tool-bootstrap.sh	comment-subject	pinned-tool-bootstrap

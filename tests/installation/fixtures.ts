@@ -53,6 +53,7 @@ export const policies = [
   "sql",
   "models",
   "claude-code",
+  "antigravity",
 ];
 export const claudePolicies = ["writing", "tool-contracts", "review"];
 export const tools = ["check-ids.mjs", "check-prose.mjs", "task-temp.mjs"];

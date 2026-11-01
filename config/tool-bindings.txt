@@ -56,6 +56,8 @@ binding	delivery/policy/tool-contracts.md	instructions	git	delivery/policy/tool-
 binding	delivery/policy/tool-contracts.md	instructions	openssh	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	delivery/policy/claude-code.md	instructions	claude-code	delivery/policy/claude-code.md	read-before-use	defined
 binding	delivery/policy/models.md	instructions	claude-code	delivery/policy/claude-code.md	read-before-use	defined
+binding	delivery/policy/antigravity.md	instructions	antigravity-cli	delivery/policy/antigravity.md	read-before-use	defined
+binding	delivery/policy/models.md	instructions	antigravity-cli	delivery/policy/antigravity.md	read-before-use	defined
 binding	delivery/skills/figma-design-workflow/SKILL.md	skill	claude-code	delivery/policy/claude-code.md	read-before-use	defined
 binding	delivery/skills/gh/SKILL.md	skill	gh	delivery/skills/gh/SKILL.md	read-before-use	defined
 binding	delivery/skills/gh/SKILL.md	skill	github-api	delivery/skills/gh/SKILL.md	read-before-use	defined
