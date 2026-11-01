@@ -22,8 +22,8 @@ import os from "node:os";
 import path from "node:path";
 import { InstallPlanSchema, InstallReceiptSchema } from "./install-records.ts";
 import type {
-  InstallPlanV5,
-  InstallReceiptV5,
+  InstallPlan,
+  InstallReceipt,
   InstallTarget,
   TargetState,
 } from "./install-records.ts";
@@ -57,8 +57,8 @@ export class InstallRefused extends Error {
   }
 }
 
-type Runtime = InstallReceiptV5["runtime"];
-type Step = InstallReceiptV5["steps"][number];
+type Runtime = InstallReceipt["runtime"];
+type Step = InstallReceipt["steps"][number];
 const refuse = (code: string, file?: string): never => {
   throw new InstallRefused([{ code, ...(file ? { path: file } : {}) }]);
 };
@@ -96,7 +96,8 @@ function readRecord(
     typeof value === "object" &&
     value !== null &&
     "version" in value &&
-    value.version !== 5
+    value.version !== 5 &&
+    value.version !== 6
   ) {
     throw new RecordVersionError(`Unsupported ${code} version: ${physical}`);
   }
@@ -115,7 +116,7 @@ function readPersistentPlan(file: string): Buffer {
   return refuse("persistent-plan-missing", file);
 }
 
-export function loadPlanForApply(file: string): InstallPlanV5 {
+export function loadPlanForApply(file: string): InstallPlan {
   const given = readRecord(file, "plan");
   const parsed = InstallPlanSchema.safeParse(given.value);
   if (!parsed.success) return refuse("plan-invalid", given.physical);
@@ -125,8 +126,8 @@ export function loadPlanForApply(file: string): InstallPlanV5 {
 }
 
 export function loadReceipt(file: string): {
-  receipt: InstallReceiptV5;
-  plan: InstallPlanV5;
+  receipt: InstallReceipt;
+  plan: InstallPlan;
 } {
   const record = readRecord(file, "receipt");
   const parsed = InstallReceiptSchema.safeParse(record.value);
@@ -137,7 +138,7 @@ export function loadReceipt(file: string): {
     path.join(receipt.run.directory, "deployment-receipt.json")
   )
     refuse("receipt-location-mismatch", record.physical);
-  let plan: InstallPlanV5;
+  let plan: InstallPlan;
   try {
     plan = InstallPlanSchema.parse(
       JSON.parse(readPersistentPlan(receipt.plan.path).toString("utf8")),
@@ -147,6 +148,7 @@ export function loadReceipt(file: string): {
     return refuse("persistent-plan-invalid", receipt.plan.path);
   }
   if (
+    plan.version !== receipt.version ||
     plan.sha256 !== receipt.plan.sha256 ||
     plan.run.id !== receipt.run.id ||
     plan.run.receipt !== record.physical
@@ -200,7 +202,7 @@ export function loadReceipt(file: string): {
   return { receipt, plan };
 }
 
-export function runtimeOf(plan: InstallPlanV5): Runtime {
+export function runtimeOf(plan: InstallPlan): Runtime {
   const file = (role: string) =>
     plan.runtime.files.find((item) => item.role === role)!;
   return {
@@ -237,7 +239,7 @@ export const hostFacts = (): HostFacts => ({
  * the hostname is informational because a rename must not strand the run.
  */
 export function sameHost(
-  host: InstallPlanV5["host"],
+  host: InstallPlan["host"],
   current: HostFacts,
 ): boolean {
   return (
@@ -249,7 +251,7 @@ export function sameHost(
 }
 
 function checkHost(
-  plan: InstallPlanV5,
+  plan: InstallPlan,
   environment: NodeJS.ProcessEnv,
   problems: Gap[],
 ): void {
@@ -259,15 +261,25 @@ function checkHost(
   // Per root. One unusable variable used to abandon the whole resolution, and with it the comparison
   // for every other root — a root that had genuinely moved went unreported whenever an unrelated
   // one could not be parsed. Each root that resolved is compared, and says which it was.
-  const inspected = inspectRoots(environment, problems);
+  const inspected = inspectRoots(
+    environment,
+    problems,
+    plan.roots.antigravity !== undefined,
+  );
   for (const [name, root] of Object.entries(inspected?.roots ?? {})) {
+    if (!root) continue;
     const recorded = plan.roots[name as RootName];
-    if (root.path !== recorded.path || root.variable !== recorded.variable)
+    if (
+      !recorded ||
+      root.path !== recorded.path ||
+      root.variable !== recorded.variable
+    )
       problems.push({ code: "roots-changed", root: name as RootName });
   }
   // Named, like every other root problem: a reader that rests on some roots and not others weighs
   // this one by which root it belongs to.
   for (const [name, root] of Object.entries(plan.roots)) {
+    if (!root) continue;
     const gap = {
       code: "root-anchor-changed",
       path: root.anchor.path,
@@ -302,7 +314,7 @@ function checkHost(
 
 /** Installed content must stay exact; rollback does not depend on it. */
 function checkRunContents(
-  plan: InstallPlanV5,
+  plan: InstallPlan,
   problems: Gap[],
   source = false,
 ): void {
@@ -341,7 +353,7 @@ function checkRunContents(
 }
 
 /** Apply refuses unless every target and missing parent still matches the frozen plan. */
-function checkTargets(plan: InstallPlanV5, problems: Gap[]): void {
+function checkTargets(plan: InstallPlan, problems: Gap[]): void {
   const uid = process.getuid!();
   const missing = new Set<string>();
   for (const target of plan.targets) {
@@ -367,7 +379,7 @@ function holdsInstalled(state: TargetState, target: InstallTarget): boolean {
   return sameState(state, target.installed);
 }
 
-function checkInstalled(plan: InstallPlanV5): Gap[] {
+function checkInstalled(plan: InstallPlan): Gap[] {
   const problems: Gap[] = [];
   for (const target of plan.targets) {
     const current = attempt(
@@ -383,7 +395,7 @@ function checkInstalled(plan: InstallPlanV5): Gap[] {
 }
 
 /** Coordinates installer commands only; it cannot stop other programs from writing personal configuration. */
-function acquireLock(plan: InstallPlanV5, command: string): () => void {
+function acquireLock(plan: InstallPlan, command: string): () => void {
   const lock = path.join(plan.roots.deploy.path, ".install.lock");
   try {
     mkdirSync(lock, { mode: 0o700 });
@@ -455,7 +467,7 @@ function writeNewFile(file: string, bytes: Buffer, mode: number): void {
   }
 }
 
-function writeReceipt(file: string, receipt: InstallReceiptV5): void {
+function writeReceipt(file: string, receipt: InstallReceipt): void {
   receipt.updatedAt = new Date().toISOString();
   const bytes = Buffer.from(
     JSON.stringify(InstallReceiptSchema.parse(receipt), null, 2) + "\n",
@@ -654,8 +666,8 @@ function restoreTarget(
 
 /** Reverse-order conditional recovery shared by failed applies, interrupted runs and rollback. */
 function restoreChanges(
-  plan: InstallPlanV5,
-  receipt: InstallReceiptV5,
+  plan: InstallPlan,
+  receipt: InstallReceipt,
   record: () => void,
 ): void {
   for (const step of [...receipt.steps].reverse()) {
@@ -699,8 +711,8 @@ function restoreChanges(
  * never removed and are reported for manual review instead.
  */
 function recoveryIncomplete(
-  plan: InstallPlanV5,
-  receipt: InstallReceiptV5,
+  plan: InstallPlan,
+  receipt: InstallReceipt,
 ): boolean {
   for (const target of plan.targets) {
     try {
@@ -752,12 +764,10 @@ function recoveryIncomplete(
   );
 }
 
-function summarize(plan: InstallPlanV5, receipt: InstallReceiptV5) {
+function summarize(plan: InstallPlan, receipt: InstallReceipt) {
   const steps = (phase: Step["phase"]) =>
     receipt.steps.filter((step) => step.phase === phase).length;
-  const directories = (
-    phase: InstallReceiptV5["directories"][number]["phase"],
-  ) =>
+  const directories = (phase: InstallReceipt["directories"][number]["phase"]) =>
     receipt.directories.filter((directory) => directory.phase === phase).length;
   return {
     status: receipt.status,
@@ -812,8 +822,8 @@ export function applyInstallPlan(
     checkTargets(plan, problems);
     if (problems.length) throw new InstallRefused(problems);
     const now = new Date().toISOString();
-    const receipt: InstallReceiptV5 = {
-      version: 5,
+    const receipt: InstallReceipt = {
+      version: plan.version,
       plan: { path: plan.run.plan, sha256: plan.sha256 },
       run: { id: plan.run.id, directory: plan.run.directory },
       runtime: runtimeOf(plan),
@@ -829,7 +839,7 @@ export function applyInstallPlan(
     record();
     try {
       for (const directory of plan.newDirectories) {
-        const entry: InstallReceiptV5["directories"][number] = {
+        const entry: InstallReceipt["directories"][number] = {
           path: directory,
           phase: "pending",
         };

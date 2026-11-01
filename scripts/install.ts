@@ -40,8 +40,8 @@ import {
   runtimeFiles,
 } from "./install-records.ts";
 import type {
-  InstallPlanV5,
-  InstallReceiptV5,
+  InstallPlan,
+  InstallReceipt,
   InstallRoots,
   InstallTarget,
   RuntimeRecord,
@@ -75,7 +75,7 @@ import type { SourceEntry } from "./source.ts";
 
 const closureCheck = "Installer build closure";
 const usage = [
-  "Usage: install.sh plan --source DIR --report FILE --output PLAN [--adopt KEY]...",
+  "Usage: install.sh plan --source DIR --report FILE --output PLAN [--adopt KEY]... [--include-product antigravity]",
   "       install.sh apply --plan PLAN",
   "       install.sh verify --receipt RECEIPT",
   "       install.sh rollback --receipt RECEIPT",
@@ -98,6 +98,7 @@ type PlanArguments = {
   report: string;
   output: string;
   adopt: string[];
+  includeAntigravity: boolean;
 };
 
 export function parsePlanArguments(args: string[]): PlanArguments {
@@ -108,14 +109,23 @@ export function parsePlanArguments(args: string[]): PlanArguments {
   };
   const values = new Map<string, string>();
   const adopt: string[] = [];
+  let includeAntigravity = false;
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]!;
     const value = args[index + 1];
-    if (name !== "--adopt" && !Object.hasOwn(options, name))
+    if (
+      name !== "--adopt" &&
+      name !== "--include-product" &&
+      !Object.hasOwn(options, name)
+    )
       throw new UsageError(`Unknown argument: ${name}`);
     if (value === undefined || value === "" || value.startsWith("--"))
       throw new UsageError(`Missing value: ${name}`);
-    if (name === "--adopt") {
+    if (name === "--include-product") {
+      if (value !== "antigravity" || includeAntigravity)
+        throw new UsageError(`Invalid or repeated product: ${value}`);
+      includeAntigravity = true;
+    } else if (name === "--adopt") {
       if (!adoptKeyPattern.test(value) || adopt.includes(value))
         throw new UsageError(`Invalid or repeated adopted name: ${value}`);
       adopt.push(value);
@@ -133,6 +143,7 @@ export function parsePlanArguments(args: string[]): PlanArguments {
     report: resolved("report"),
     output: resolved("output"),
     adopt: adopt.sort(bytewise),
+    includeAntigravity,
   };
 }
 
@@ -278,6 +289,8 @@ function deriveTargets(
 ): TargetDraft[] {
   const drafts: TargetDraft[] = [];
   for (const member of publicMembers(entries)) {
+    const root = roots[member.product];
+    if (!root) continue;
     // A skill's key is its top-level name; a fixed document's key is its published relative path.
     const key =
       member.category === "skill"
@@ -288,7 +301,7 @@ function deriveTargets(
       category: member.category,
       product: member.product,
       key: `${member.product}:${key}`,
-      path: path.join(roots[member.product].path, member.relative),
+      path: path.join(root.path, member.relative),
       source: path.join(snapshot, member.source),
       relativeSource: member.source,
     });
@@ -429,14 +442,16 @@ function inspectUnlisted(
         ? readdirSync(directory).sort(bytewise)
         : [],
     ) ?? [];
-  for (const product of ["codex", "claude"] as const) {
+  for (const product of ["codex", "claude", "antigravity"] as const) {
+    const root = roots[product];
+    if (!root) continue;
     const layout = publicMembers(entries, product);
     const members = new Set(
       layout
         .filter((member) => member.category === "skill")
         .map((member) => path.basename(member.relative)),
     );
-    const skillDirectory = path.join(roots[product].path, "skills");
+    const skillDirectory = path.join(root.path, "skills");
     for (const name of list(skillDirectory))
       if (!members.has(name)) report(path.join(skillDirectory, name));
     // A published name may carry a directory, and a directory on the way to one is walked rather
@@ -448,7 +463,7 @@ function inspectUnlisted(
         if (name.includes("/"))
           directories.add(name.slice(0, name.lastIndexOf("/")));
       for (const directory of [...directories].sort(bytewise)) {
-        const where = path.join(roots[product].path, relative, directory);
+        const where = path.join(root.path, relative, directory);
         for (const name of list(where)) {
           const member = directory ? `${directory}/${name}` : name;
           if (!names.includes(member) && !directories.has(member))
@@ -607,7 +622,7 @@ export function planInstallation(
       : attempt(gaps, { code: "source-manifest-invalid", path: source }, () =>
           readSkillEntries(source),
         );
-  const roots = resolveInstallRoots(environment, gaps);
+  const roots = resolveInstallRoots(environment, gaps, args.includeAntigravity);
   const report = readReport(args.report, gaps);
   if (!source || !entries || !roots || !report) throw new PlanBlocked(gaps);
   block();
@@ -794,7 +809,7 @@ export function planInstallation(
       report.report.platform,
     );
     const body = {
-      version: 5,
+      version: args.includeAntigravity ? 6 : 5,
       createdAt,
       run,
       review: args.output,
@@ -872,7 +887,7 @@ export function planInstallation(
  * when both its executing Node and its own bundle are the exact bound files.
  */
 function runFromRuntime(
-  runtime: InstallReceiptV5["runtime"],
+  runtime: InstallReceipt["runtime"],
   argv: string[],
 ): number | undefined {
   const problems: { code: string; path: string }[] = [];
@@ -930,7 +945,7 @@ type InstallationStatus = {
 
 /** How the checkout a deployment was taken from has moved since. */
 function comparedWith(
-  plan: InstallPlanV5,
+  plan: InstallPlan,
 ): NonNullable<InstallationStatus["repository"]> {
   try {
     const head = git(plan.checkout.directory, ["rev-parse", "HEAD"]).trim();

@@ -22,6 +22,7 @@ function fixture(
   t: TestContext,
   format: "tar.gz" | "tar.xz" | "zip" | "binary",
   version = "1.2.3",
+  memberName = "sample",
 ) {
   const directory = realpathSync(
     mkdtempSync(path.join(os.tmpdir(), "agents-bootstrap-")),
@@ -29,20 +30,20 @@ function fixture(
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(path.join(directory, "bin"));
   mkdirSync(path.join(directory, "payload"));
-  const executable = path.join(directory, "payload/sample");
+  const executable = path.join(directory, "payload", memberName);
   writeFileSync(executable, `#!/bin/sh\nprintf '%s\\n' '${version}'\n`, {
     mode: 0o755,
   });
   const archive = path.join(directory, `sample.${format}`);
   if (format === "binary") writeFileSync(archive, readFileSync(executable));
   else if (format === "zip")
-    execFileSync("zip", ["-q", archive, "sample"], {
+    execFileSync("zip", ["-q", archive, memberName], {
       cwd: path.join(directory, "payload"),
     });
   else
     execFileSync(
       "tar",
-      [format === "tar.gz" ? "-czf" : "-cJf", archive, "sample"],
+      [format === "tar.gz" ? "-czf" : "-cJf", archive, memberName],
       { cwd: path.join(directory, "payload") },
     );
   const digest = createHash("sha256")
@@ -92,6 +93,18 @@ function fixture(
   }
   return { directory, archive, digest, cache, prepare };
 }
+
+test("agy bootstrap selects the official antigravity member without running installation", (t) => {
+  const state = fixture(t, "tar.gz", "1.2.3", "antigravity");
+  const result = state.prepare({ name: "agy" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    execFileSync(result.stdout.trim(), ["--version"], {
+      encoding: "utf8",
+    }).trim(),
+    "1.2.3",
+  );
+});
 
 for (const format of ["tar.gz", "tar.xz", "zip", "binary"] as const) {
   test(`${format} prepares a verified executable from cold and validated warm cache`, (t) => {

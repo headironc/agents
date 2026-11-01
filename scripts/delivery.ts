@@ -10,7 +10,7 @@ export const memberCategories = [
   "skill",
 ] as const;
 
-export const products = ["codex", "claude"] as const;
+export const products = ["codex", "claude", "antigravity"] as const;
 export type Product = (typeof products)[number];
 const sharedPolicies = ["writing", "tool-contracts", "review"];
 const codexPolicies = ["rust", "sql", "models", "claude-code", "antigravity"];

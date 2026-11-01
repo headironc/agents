@@ -12,7 +12,7 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { loadReceipt, verifyInstallation } from "./install-apply.ts";
-import type { InstallPlanV5, InstallReceiptV5 } from "./install-records.ts";
+import type { InstallPlan, InstallReceipt } from "./install-records.ts";
 import { runIdPattern } from "./install-records.ts";
 import type { Gap } from "./install-state.ts";
 import {
@@ -24,7 +24,7 @@ import {
 
 export type CurrentInstallation = {
   status: "installed" | "indeterminate" | "none";
-  run?: { receipt: InstallReceiptV5; plan: InstallPlanV5 } | undefined;
+  run?: { receipt: InstallReceipt; plan: InstallPlan } | undefined;
   interrupted: string[];
   unreadable: string[];
   // Structured, and left that way: the string form a reader sees belongs to the command.
@@ -45,7 +45,7 @@ const settledStates = new Set([
 ]);
 
 type Deployments = {
-  candidate?: { receipt: InstallReceiptV5; plan: InstallPlanV5 } | undefined;
+  candidate?: { receipt: InstallReceipt; plan: InstallPlan } | undefined;
   interrupted: { id: string; at: string }[];
   unreadable: string[];
 };
@@ -196,12 +196,13 @@ export function readCurrentInstallation(
       // It is kept as stated defence, not as a case anything here decides.
       if (verification.status !== candidate.receipt.status)
         throw new Error("the record changed while it was being read");
-      // A problem about resolving a root decides only for the roots this answer rests on. One about
-      // what is installed — a root that moved, the host, the candidate digest, the runtime files,
-      // the targets — always decides, because every one of those is where the deployment lives.
+      // Unusable current root settings need not invalidate a recorded installation. An anchor
+      // mismatch is different: verification read the recorded filesystem identity, so that failure
+      // always decides even when the replacement contains identical installed bytes.
       problems = verification.problems.filter(
         (problem) =>
           !isRootResolution(problem) ||
+          problem.code === "root-anchor-changed" ||
           problem.root === "deploy" ||
           problem.root === "state",
       );

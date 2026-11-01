@@ -24,7 +24,7 @@ const absolutePath = z
 
 /** Adoption names one product's target, never both copies of a shared member. */
 export const adoptKeyPattern =
-  /^(?:codex|claude):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|rust-lints\.toml))$/;
+  /^(?:codex|claude|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|rust-lints\.toml))$/;
 const adoptKey = z.string().regex(adoptKeyPattern);
 
 /** Build outputs and host tool files copied into each persistent runtime. */
@@ -78,6 +78,7 @@ export const InstallRootsSchema = z.strictObject({
   home: RootSchema,
   codex: RootSchema,
   claude: RootSchema,
+  antigravity: RootSchema.optional(),
   state: RootSchema,
   deploy: RootSchema,
   backup: RootSchema,
@@ -137,7 +138,7 @@ const runId = z.string().regex(runIdPattern);
 
 export const InstallPlanSchema = z
   .strictObject({
-    version: z.literal(5),
+    version: z.union([z.literal(5), z.literal(6)]),
     createdAt: z.iso.datetime({ precision: 3 }),
     run: z.strictObject({
       id: runId,
@@ -184,6 +185,8 @@ export const InstallPlanSchema = z
     const issue = (message: string) =>
       context.addIssue({ code: "custom", message });
     const { sha256, ...body } = plan;
+    if ((plan.version === 6) !== (plan.roots.antigravity !== undefined))
+      issue("Only V6 plans include an Antigravity root");
     if (canonicalDigest(body) !== sha256) issue("Plan digest mismatch");
     for (const collision of installPathCollisions(plan))
       issue(`Installation paths overlap: ${collision}`);
@@ -251,10 +254,11 @@ export const InstallPlanSchema = z
         !target.key.startsWith(`${target.product}:`) ||
         !member ||
         target.path !==
-          path.join(plan.roots[target.product].path, member.relative) ||
+          path.join(plan.roots[target.product]?.path ?? "", member.relative) ||
         target.source !== path.join(plan.run.source, member.source) ||
         target.kind !== (target.category === "skill" ? "directory" : "file") ||
-        !inside(plan.roots[target.product].path, target.path)
+        !plan.roots[target.product] ||
+        !inside(plan.roots[target.product]!.path, target.path)
       )
         issue(`Target ${index} must match its product's delivery member`);
       if (
@@ -279,7 +283,7 @@ export const InstallPlanSchema = z
       if (!plan.targets.some((target) => target.adopted && target.key === key))
         issue(`Unused adopted key: ${key}`);
   });
-export type InstallPlanV5 = z.infer<typeof InstallPlanSchema>;
+export type InstallPlan = z.infer<typeof InstallPlanSchema>;
 
 /** Public roots must be disjoint and must not contain or sit inside recovery/source storage. */
 export function installPathCollisions(
@@ -306,7 +310,9 @@ export function installPathCollisions(
     };
     return contains(left, right) || contains(right, left);
   };
-  const roots = products.map((product) => plan.roots[product].path);
+  const roots = products.flatMap((product) =>
+    plan.roots[product] ? [plan.roots[product]!.path] : [],
+  );
   const protectedPaths = [
     plan.roots.deploy.path,
     plan.roots.backup.path,
@@ -315,13 +321,15 @@ export function installPathCollisions(
   ];
   const privateRun = path.dirname(plan.run.source);
   const collisions: string[] = [];
-  if (overlaps(roots[0]!, roots[1]!)) collisions.push(plan.roots.claude.path);
+  for (let index = 0; index < roots.length; index++)
+    for (const other of roots.slice(index + 1))
+      if (overlaps(roots[index]!, other)) collisions.push(other);
   for (const root of roots)
     if (protectedPaths.some((other) => overlaps(root, other)))
       collisions.push(root);
   if (
     protectedPaths.some((other) => overlaps(privateRun, other)) ||
-    overlaps(plan.roots.claude.path, privateRun)
+    roots.slice(1).some((root) => overlaps(root, privateRun))
   )
     collisions.push(privateRun);
   for (const target of plan.targets)
@@ -344,7 +352,7 @@ function sameTarget(left: TargetState, right: TargetState): boolean {
  */
 export const InstallReceiptSchema = z
   .strictObject({
-    version: z.literal(5),
+    version: z.union([z.literal(5), z.literal(6)]),
     plan: z.strictObject({ path: absolutePath, sha256: digest }),
     run: z.strictObject({ id: runId, directory: absolutePath }),
     // The persistent recovery command is `<node> <installer> rollback --receipt <receipt>`.
@@ -411,4 +419,4 @@ export const InstallReceiptSchema = z
         message: "Steps must follow plan order",
       });
   });
-export type InstallReceiptV5 = z.infer<typeof InstallReceiptSchema>;
+export type InstallReceipt = z.infer<typeof InstallReceiptSchema>;

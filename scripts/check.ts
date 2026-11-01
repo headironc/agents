@@ -212,17 +212,17 @@ export async function checkSpecs(
       ],
       ["node", "js-yaml"],
     );
-    for (const product of ["codex", "claude"] as const)
+    for (const product of ["codex", "claude", "antigravity"] as const)
       if (selectSkillEntries(entries, product).length)
         add(
           skillValidationName(entries, product),
           [process.execPath, "scripts/check-skills.ts", product],
-          ["node", "python3"],
+          product === "antigravity" ? ["node", "agy"] : ["node", "python3"],
         );
     add(
       "Pinned skill validator CLI regression",
       [process.execPath, "scripts/check-tests.ts", ...testPaths.validators],
-      ["node", "python3"],
+      ["node", "python3", "agy"],
     );
   }
   if (groups.includes("ci")) {

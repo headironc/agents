@@ -22,13 +22,13 @@ manifest="$repository_root/scripts/tool-versions.json"
 cache_root="$repository_root/.cache/agents-tools"
 prepare_validators=false
 if [[ $# == 0 ]]; then
-  set -- node bun shellcheck actionlint zizmor lychee gitleaks
+  set -- node bun shellcheck actionlint zizmor lychee gitleaks agy
   prepare_validators=true
 fi
 
 # Validate every selector and manifest entry before any download or cache write.
 for name in "$@"; do
-  case "$name" in node|bun|shellcheck|actionlint|zizmor|lychee|gitleaks) ;;
+  case "$name" in node|bun|shellcheck|actionlint|zizmor|lychee|gitleaks|agy) ;;
     *) printf 'Unsupported tool selector: %s\n' "$name" >&2; exit 2 ;;
   esac
   jq -e --arg name "$name" --arg platform "$platform" '

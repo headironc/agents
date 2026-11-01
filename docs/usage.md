@@ -1,6 +1,6 @@
 # 交付与使用指南
 
-本仓库为 Codex 与 Claude Code 交付共享 Skills 及必要依赖。Codex 另接收指令、模型选择政策和 Rust/SQL 偏好。本地验证入口覆盖两端交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
+本仓库默认向 Codex 与 Claude Code 交付 Skills 及必要依赖。显式选入时增加 Antigravity CLI 的通用技能。Codex 另接收指令、模型选择政策和 Rust/SQL 偏好。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
 
 按任务查阅：[阅读与采用](#阅读与采用)列出文档入口，[交付目录](#交付目录)说明源码布局。[双端安装](#双端安装)给出计划、应用与恢复步骤，[验证能说明什么](#验证能说明什么)列出证据边界。各技能的使用说明见本页对应章节。
 
@@ -73,7 +73,7 @@ Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限�
 
 账号和调用方式须符合当前官方支持范围。消费计划不支持第三方编码代理嵌套调用 `agy`。DeepSeek、OpenCode 或 Codex 模型选择不扩大接收方授权。CLI 版本、模型与 effort、单次设置、自动加载材料和有效权限均按本次核对。工具拒绝、软拒绝或不完整报告保留为具体缺口，不靠退出 0 接纳。
 
-交付成员只有规则与手工合同，不安装 CLI、登录、配置账号或启动服务。帮助输出和静态场景不证明当前模型行为。真实演练另核模型、材料、账号及调用方式，按[验证边界](#验证能说明什么)报告。
+Codex 的调用路线交付规则与手工合同。Antigravity CLI 自身另有可选的[通用技能安装目标](#安装目标与接管)，采用独立 CLI 根；它不继承 Codex 模型路线。仓库开发门禁使用私有缓存中的官方校验器，不安装个人 CLI、登录、配置账号或启动服务。帮助输出、格式校验和静态场景不证明当前模型行为。真实演练另核模型、材料、账号及调用方式，按[验证边界](#验证能说明什么)报告。
 
 ## 微信项目配置、DevTools 初始化、编译、诊断、预览、项目列表、自动化、云开发与安装诊断
 
@@ -122,7 +122,7 @@ DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现
 
 ## 阿里云技能发现
 
-[alibabacloud-find-skills](../delivery/skills/alibabacloud-find-skills/SKILL.md) 已交付。产品归属登记为 `shared`。它适用于明确的阿里云技能发现请求，或已确认的能力缺口。已有匹配能力时直接使用。不要从普通阿里云关键词启动发现。
+[alibabacloud-find-skills](../delivery/skills/alibabacloud-find-skills/SKILL.md) 已交付给 Codex、Claude 与 Antigravity CLI。它适用于明确的阿里云技能发现请求，或已确认的能力缺口。已有匹配能力时直接使用。不要从普通阿里云关键词启动发现。
 
 入口负责需求拆分、搜索选择、互补技能和结果交接。[HTTP 参考](../delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md)拥有请求形式。[验证参考](../delivery/skills/alibabacloud-find-skills/references/verification-method.md)拥有响应和分页判据。[安装参考](../delivery/skills/alibabacloud-find-skills/references/installation.md)区分下载、安装与后续使用。[示例](../delivery/skills/alibabacloud-find-skills/references/search-examples.md)仅说明选择方法。来源、原件摘要和退役依据见[来源记录](skill-sources.md#alibabacloud-find-skills)。
 
@@ -130,7 +130,7 @@ DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现
 
 ## 交付目录
 
-[delivery](../delivery/README.md) 是共享源码根，内部相对引用在两端部署后保持不变。交付模块明确选择每个产品的成员。`AGENTS.md` 是直接维护的 Codex 规则入口，按需正文由 `policy/` 中各文件拥有。工具由 `scripts/bundle-tools.ts` 生成到同一目录。安装器按清单复制文件与完整顶层技能目录，安装后的副本独立于备份和快照。修改交付内容后运行完整门禁，分别检查仓库引用、交付目录引用和隔离安装行为。
+[delivery](../delivery/README.md) 是共享源码根，内部相对引用在各产品部署后保持不变。交付模块明确选择每个产品的成员。`AGENTS.md` 是直接维护的 Codex 规则入口，按需正文由 `policy/` 中各文件拥有。工具由 `scripts/bundle-tools.ts` 生成到同一目录。安装器按清单复制文件与完整顶层技能目录，安装后的副本独立于备份和快照。修改交付内容后运行完整门禁，分别检查仓库引用、交付目录引用和隔离安装行为。
 
 ## 日常开发与工具操作
 
@@ -157,7 +157,7 @@ DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现
 
 ## 任务临时目录与收尾
 
-[生命周期](../delivery/policy/models.md#task-temporary-directories)拥有任务临时资源的归属和收尾责任。[调用合同](../delivery/policy/tool-contracts.md#task-temp)拥有参数、清理边界及错误处理。入口随两端工具交付，不安装定时任务或个人配置。以下命令从仓库运行；安装后把工具路径换为产品根下的 `tools/task-temp.mjs`，并使用兼容 Node。
+[生命周期](../delivery/policy/models.md#task-temporary-directories)拥有任务临时资源的归属和收尾责任。[调用合同](../delivery/policy/tool-contracts.md#task-temp)拥有参数、清理边界及错误处理。入口随各产品工具交付，不安装定时任务或个人配置。以下命令从仓库运行；安装后把工具路径换为产品根下的 `tools/task-temp.mjs`，并使用兼容 Node。
 
 ```bash
 .cache/agents-tools/bin/node delivery/tools/task-temp.mjs run \
@@ -187,7 +187,7 @@ run 保持原工作目录，只清理本次分配的 scratch 及归属目录。�
 
 ## 双端安装
 
-安装器已交付 plan、apply、verify 和 rollback。一份计划将共享 Skills 及必要依赖复制到 Codex 与 Claude Code，Codex 另接收专属成员。在候选源码上完成构建和完整门禁后生成计划。未提交改动由门禁报告的源码身份绑定：
+安装器已交付 plan、apply、verify 和 rollback。默认计划将所选 Skills 及必要依赖复制到 Codex 与 Claude Code，Codex 另接收专属成员。显式传入 `--include-product antigravity` 时增加 Antigravity CLI，生成 V6 计划；默认继续生成 V5 双端计划。在候选源码上完成构建和完整门禁后生成计划。未提交改动由门禁报告的源码身份绑定：
 
 ```bash
 umask 077
@@ -198,11 +198,13 @@ bash scripts/install.sh plan --source "$PWD" --report .cache/reports/check.json 
   --output /path/outside/checkout/agents-plan.json
 ```
 
+选入 Antigravity CLI 时，在同一 plan 命令后增加 `--include-product antigravity`。目标根固定为 `$HOME/.gemini/antigravity-cli`，只发布下表成员。安装器不创建 Plugin，也不写 `settings.json`、发现 manifest、hooks、MCP 或规则入口。该根的 `skills/` 由 CLI 自动发现，App 不读取。已有 CLI 专属或共享目录中的同名技能可能影响优先级；实际来源通过 `/skills` 核对，见[官方发现规则](https://antigravity.google/docs/customization-discovery?tab=cli)。
+
 报告必须来自同一平台和固定 Node 的完整通过的 `all`。检出 HEAD 必须等于报告基线，源码字节必须与报告一致。计划记录本机稳定标识：Linux 取 `/etc/machine-id`，macOS 取 `sysctl -n kern.uuid`。取不到即拒绝。apply、verify、rollback 均核对该标识。主机名变更只在 verify 中报告。报告绑定的被忽略文件同样阻止计划。V5 运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，只保存计划与回执。候选和恢复运行副本位于 `${CODEX_HOME:-$HOME/.codex}/.agents-install/<run-id>/`。计划另在 `--output` 写出同字节审阅副本。它只读公开目标，但会建立私有安装器目录。
 
 已有链接，包括指向旧部署快照的链接，都必须用 `--adopt KEY` 显式接管。悬空链接、普通文件和已有目录同样如此。接管文件或目录时，目标及目录成员必须由安装用户拥有。复制备份无法恢复其他用户的所有权，计划会报告 `backup-owner-unrestorable`。已交付内容与新候选完全一致时列为不变。KEY 见[安装目标](#安装目标与接管)。未列入清单的名称只以路径列在 `reported` 中；安装器不读取其内容。
 
-新计划与回执记录为版本 5。公开目标为普通文件或完整技能目录。V5 入口拒绝 V4 及更早版本的 apply、verify 和 rollback，不转换记录或清理旧材料。原 V4 运行副本和必要材料仍在时，可用原回执提供的恢复命令。`status` 不识别旧回执；部署目录中仍有旧回执时报告 `indeterminate`，并在 `unreadable` 中列出路径。这一限制在新 V5 目标验证通过后仍存在。
+新入口同时接受 V5 双端与 V6 三端记录。V5 记录不含 Antigravity 根，恢复时不推导第三端目标；V6 绑定该根，回执版本与计划一致。公开目标为普通文件或完整技能目录。入口拒绝 V4 及更早版本的 apply、verify 和 rollback，不转换记录或清理旧材料。原 V4 运行副本和必要材料仍在时，可用原回执提供的恢复命令。`status` 不识别这些旧回执；部署目录中仍有旧回执时报告 `indeterminate`，并在 `unreadable` 中列出路径。这一限制在新目标验证通过后仍存在。
 
 参数错误返回 2。缺口以 JSON `gaps` 输出并返回 1，此时不建立运行目录。源、报告、根目录与目标的读取问题也列为缺口。候选目标超出记录大小限制时报告 `source-unreadable`。权限问题同样一次列出。计划写入中途失败只删除本次创建的运行目录、私有候选和审阅副本。新建上级目录仅在仍为空时删除。
 
@@ -217,7 +219,7 @@ bash scripts/install.sh status
 
 仓库入口先核验私有 `runtime/node` 与 `runtime/install.mjs`，再交给该副本执行。检出删除后，可直接运行 JSON 输出 `recovery` 中的命令。apply 与 rollback 持有部署根下的 `.install.lock`。锁被占用时拒绝，不自动清除旧锁。前置检查不通过时输出 `refused` 与 `problems` 并返回 1。此时回执与公开目标都不改变。同一计划只应用一次。
 
-应用前整体核对两个产品的目标，任一缺口都在首次目标写入前拒绝。应用过程中逐个替换目标。目录目标通过同级暂存和两次重命名切换，可能短暂不可见。客户端也可能看到新旧混合的指令和技能；应暂停两端正在使用交付内容的会话。每步先备份和回读，再记录待应用步骤。任一端失败时跨两端逆序恢复仍匹配的目标；第三方改动或无法确认归属的临时项会保留并报告不完整。rollback 同样只恢复仍匹配的目标和本次创建的空目录，冲突时可处置后重试。verify 核对已安装或已回滚的结果。结果中 `directories.pending` 不为 0，说明计划目录已存在，但回执未记录由本次创建。工具保留它供核对。备份、计划、候选和回执在回滚后保留。
+应用前整体核对计划中全部产品的目标，任一缺口都在首次目标写入前拒绝。应用过程中逐个替换目标。目录目标通过同级暂存和两次重命名切换，可能短暂不可见。客户端也可能看到新旧混合的指令和技能；应暂停计划涉及的使用会话。每步先备份和回读，再记录待应用步骤。任一端失败时跨全部选中产品逆序恢复仍匹配的目标；第三方改动或无法确认归属的临时项会保留并报告不完整。rollback 同样只恢复仍匹配的目标和本次创建的空目录，冲突时可处置后重试。verify 核对已安装或已回滚的结果。结果中 `directories.pending` 不为 0，说明计划目录已存在，但回执未记录由本次创建。工具保留它供核对。备份、计划、候选和回执在回滚后保留。
 
 全为 `unchanged` 的运行没有替换步骤。对其 rollback 会把回执标为 `rolled-back`，但原有目标仍在。若无其他已安装回执，`status` 将返回 `none`。这不是卸载入口。
 
@@ -228,24 +230,29 @@ bash scripts/install.sh status
 | 目标类别 | 安装位置 | 候选来源 |
 | --- | --- | --- |
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
-| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code}.md` | `delivery/policy/` 对应七个文件 |
+| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code,antigravity}.md` | `delivery/policy/` 对应八个文件 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
 | 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应三个文件 |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
 | Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
 | Claude 按需参考 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/policy/{writing,tool-contracts,review}.md` | 同一份 `delivery/policy/` 公共合同 |
 | Claude 工具 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
-| Claude 技能 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/<name>` | `delivery/skills/` 中归属为 `shared` 的完整顶层目录 |
+| Claude 技能 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/<name>` | 清单选择 Claude 的完整顶层目录 |
+| Antigravity CLI 按需参考 | `$HOME/.gemini/antigravity-cli/policy/{writing,tool-contracts,review}.md` | 同一份公共合同，由技能引用 |
+| Antigravity CLI 工具 | `$HOME/.gemini/antigravity-cli/tools/<name>.mjs` | 同一份打包工具 |
+| Antigravity CLI 技能 | `$HOME/.gemini/antigravity-cli/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
 Codex 交付七个完整顶层技能包，十六个内容入口参与验证。Claude 接收其中六个共享包、十五个内容入口。`figma-design-workflow` 依赖 Codex 的模型路线与负责人验收，仅交付给 Codex。wechatide 的九个子入口由父入口按相对链接路由，不要求 Claude 自动发现所有内容入口。Claude 不接收 `CLAUDE.md`、`AGENTS.md`、模型政策、Rust/SQL 偏好或配置片段。推荐配置只交付给 Codex，合并到产品配置由本人完成。
 
-部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录物理根、变量来源和祖先身份。两个产品根相同或互相包含时拒绝。产品根与源码、部署记录、备份或审阅副本重叠时同样拒绝。公开目标不得覆盖私有候选或恢复运行副本。
+Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`，共五个顶层包及五个入口。它只接收三份公共合同和三个配套工具，不接收 Codex 规则、模型路线、设计工作流或配置片段。wechatide 的执行器只接受 `Codex` 与 `ClaudeCode`，本片不向 Antigravity 发布。清单支持按固定顺序列出 `codex,claude,antigravity` 的子集；历史 `shared` 仅表示 Codex 与 Claude，不自动扩张。
+
+默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。选入 Antigravity CLI 时增加上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与源码、部署记录、备份或审阅副本重叠时同样拒绝。公开目标不得覆盖私有候选或恢复运行副本。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
 adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `claude:gh`；其他成员使用 `codex:AGENTS.md`、`claude:policy/writing.md` 等相对路径。一个 KEY 只接管对应产品的目标。裸技能名、未知或未使用的 KEY 均拒绝。任一产品的根、权限或接管缺口阻止整个计划。清单外名称仅报告，保留原值。
 
 ### 安装记录与恢复边界
 
-报告只证明已记录的检查，不授予安装权限。候选绑定源码字节、完整报告与固定运行副本。复制前后及计划冻结时均核对身份。候选冻结后不原地更新。私有运行副本包含固定 Node、安装 bundle 和许可证，由 Codex 私有目录承载本次双端恢复。Claude 公开内容不依赖该目录，但恢复命令依赖它。缺失、损坏或平台不符时拒绝，不联网修复。
+报告只证明已记录的检查，不授予安装权限。候选绑定源码字节、完整报告与固定运行副本。复制前后及计划冻结时均核对身份。候选冻结后不原地更新。私有运行副本包含固定 Node、安装 bundle 和许可证，由 Codex 私有目录承载本次计划的恢复。Claude 与 Antigravity 的公开内容不依赖该目录，但恢复命令依赖它。缺失、损坏或平台不符时拒绝，不联网修复。
 
 持久计划是恢复依据，审阅副本只是同字节副本。应用前核对同次持久计划，再把其身份写入回执。审阅副本随后缺失不影响 verify 或 rollback。持久计划损坏、移动或被链接替换时拒绝。工具不扫描其他运行来猜测替代记录。计划与回执字段由 `scripts/install-records.ts` 唯一定义。结构验证不替代主机、路径与当前目标核对。
 
@@ -257,7 +264,7 @@ adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `claude:gh`；�
 
 ## 既有安装快照过渡
 
-逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果；V5 运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的 V5 计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和两个产品的每个目标，不读取候选源码。旧回执、无法读取的 V5 回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。旧记录的留存取决于实际清理状态，不能据此推断恢复入口仍在。合并源码不会自动更新已安装目标。
+逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果；V5 与 V6 运行目录均位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的受支持计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和该计划的每个目标，不读取候选源码。无法读取或不受支持的回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。默认双端计划不卸载先前的 Antigravity 安装；status 只证明选中计划的目标，未被该计划列出的旧成员保持原样。合并源码不会自动更新已安装目标。
 
 个人安装形态只有一种，没有 managed 模式或 bot 入口目标。`~/.agents/github-app/` 不在安装范围内，本地 bot 凭据提供器已退役。个人安装不交付 App 私钥或本地令牌签发入口。旧项目审查关卡及其签发入口已移除，不属于当前源码或个人安装目标。
 
@@ -305,7 +312,7 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 
 [工具门禁](tooling.md#选择检查)会将非忽略的新 Markdown 文件纳入显式检查集合。它检查机器路径、格式、本地链接和锚点。`all` 还运行源码检查、契约绑定、技能成员、工具打包新鲜度、发布形态引用、固定产品验证器、隔离安装回归及无模型 Codex 加载检查。加载检查确认隔离候选的指令和技能目录进入 CLI 输入。它也核对模型政策入口及隔离文件的字节一致性。这不证明模型读取了按需正文、实际切换模型或遵循规则，也不证明个人安装已加载。语义遗漏仍须依据场景和适用审查核对。
 
-技能候选只从仓库清单与源码读取。清单是 [personal-skills.txt](../config/personal-skills.txt)，不从个人 HOME 读取已安装技能。两端入口数量由当前清单实时推导。每个顶层成员只安装一次，wechatide 的九个嵌套入口随顶层包交付并参与验证。删除清单行、必需引用、执行器或随技能测试均不能绕过完整门禁。共享与专用技能按[技能格式校验合同](tooling.md#技能格式校验)执行对应官方验证器。当前入口数量见[安装目标](#安装目标与接管)。格式校验不代表 Claude CLI 加载或模型使用已验证。
+技能候选只从仓库清单与源码读取。清单是 [personal-skills.txt](../config/personal-skills.txt)，不从个人 HOME 读取已安装技能。各产品入口数量由当前清单实时推导。每个顶层成员只安装一次，wechatide 的九个嵌套入口随顶层包交付并参与验证。删除清单行、必需引用、执行器或随技能测试均不能绕过完整门禁。共享与专用技能按[技能格式校验合同](tooling.md#技能格式校验)执行对应官方验证器。当前入口数量见[安装目标](#安装目标与接管)。格式校验不代表 Claude CLI 加载或模型使用已验证。
 
 本地审查路线没有本仓库交付的执行器，门禁也不启动任何模型。场景只静态核对规则文本。门禁证据不覆盖实际审查者行为。CLI 服务兼容性与评审者资格也不在其中。
 
