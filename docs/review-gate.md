@@ -16,7 +16,7 @@
 
 本约定面向以本内容源建立的 `headironc/agents` 实例及发往 `main` 的普通 PR，按[共享合并流程](../delivery/policy/review.md#merge-admission)采用原生 CI 与独立审查。它不继承旧实例的自动准入、批准或冻结来源，也不授权创建、发布或修改平台配置。初始化发布另行绑定准确对象及授权，不伪造 PR 或 required 结果。
 
-变更保持一个已选结果，完成[适用本地检查](tooling.md#选择检查)和独立代码及安全审查。修复阻断项，记录其他发现的处置。已知缺陷仍须处理。本地检查、正式审查、平台条件和真实交付分别确认，不互相替代。
+变更保持一个已选结果，完成[适用本地检查](tooling.md#选择检查)。先按[依赖更新例外](../delivery/policy/review.md#dependency-updates)核实豁免资格。仅经机械核验的可信自动化低风险清单更新适用例外。其余变更及资格未知项完成适用的独立代码及安全审查。修复阻断项，记录其他发现的处置。已知缺陷仍须处理。本地检查、正式审查、平台条件和真实交付分别确认，不互相替代。
 
 发布与合并遵循 Human 的有效授权。对准确候选使用平台支持的普通合并，保留仍生效的保护，不使用管理员绕过。输入变化后只补齐受影响覆盖。外部写入结果未知时先读取原对象，不重复发送。
 
@@ -26,7 +26,7 @@
 
 运行合同由[工具说明](tooling.md#ci-与审查边界)拥有。两个稳定结果为 `repository (ubuntu-latest)` 和 `repository (macos-latest)`。工作流源码不设置保护，也不证明这两个 context 已成为 required。配置 owner 在获得准确平台授权后，核对现存 ruleset、传统保护、来源绑定及 bypass，再按真实结果配置和验收。首片不新增 required approval 计数或批准控制器。
 
-独立代码及安全审查的常规提供方与 Cubic 额度不足时的替代，由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。按 [gh 触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式请求，读取所选提供方针对当前候选的实际报告。按[审查覆盖](../delivery/policy/review.md#review-coverage)核对候选、目标基线、覆盖和完成状态。报告中的阻断发现先修复，其他发现保留处置理由。Cubic 的成功状态可能仍有发现或实际跳过审查；成功检查、普通评论或解决线程都不单独证明发现已妥善处置。审查者核对 workflow、检查目录、脚本、工具与依赖的变更，识别删除检查、条件跳过、伪造成功和扩大权限。
+需要 AI 审查时，常规提供方与 Cubic 额度不足时的替代，由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。按 [gh 触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式请求，读取所选提供方针对当前候选的实际报告。按[审查覆盖](../delivery/policy/review.md#review-coverage)核对候选、目标基线、覆盖和完成状态。报告中的阻断发现先修复，其他发现保留处置理由。Cubic 的成功状态可能仍有发现或实际跳过审查；成功检查、普通评论或解决线程都不单独证明发现已妥善处置。审查者核对 workflow、检查目录、脚本、工具与依赖的变更，识别删除检查、条件跳过、伪造成功和扩大权限。
 
 普通 required checks 只强制平台认可的结果及生产者。候选可以修改工作流和检查代码，同名绿灯不能证明执行器未被篡改。独立审查及发现处置仍是负责人交付责任，平台显示可合并不证明审查已完成。源码不提供平台强制独立 APPROVED review 的保证，实际批准要求以该实例配置为准。
 

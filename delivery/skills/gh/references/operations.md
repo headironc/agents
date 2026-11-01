@@ -22,7 +22,7 @@ When no matching PR exists, create with the explicit repository, base, head, tit
 
 ## Automatic review and feedback
 
-Apply [automatic-review authorization and waiting](workflow-authorization.md#automatic-review-and-waiting) to authorized PR creation, ready transitions and repair pushes.
+First establish whether the exact candidate qualifies for the shared [dependency-update exception](../../../policy/review.md#dependency-updates). A dependency label or unknown eligibility supplies no exemption. For required AI review, apply [automatic-review authorization and waiting](workflow-authorization.md#automatic-review-and-waiting) to authorized PR creation, ready transitions and repair pushes.
 
 Take the selected providers and missing review kinds from [provider selection](../../../policy/review.md#review-provider-selection). Within authorization to complete the required review, carry out the selected provider's explicit GitHub PR request rather than assuming an automatic event starts it or only recommending a request. Bind the repository, PR, head, target baseline and missing review kinds. Reuse valid coverage and any existing request, including one the Human already triggered. Read back an unknown write on the same target before considering another request. Preserve event-only authority, explicit request limits and actual platform refusals. Do not substitute a local reviewer CLI for this PR route unless the Human explicitly selected it or the adopted project contract requires that route.
 
