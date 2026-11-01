@@ -9,7 +9,7 @@
 | 能力 | 入口 | 使用边界 |
 | --- | --- | --- |
 | Codex 规则与专业偏好 | [Codex 规则](delivery/AGENTS.md)、[写作规范](delivery/policy/writing.md)、[Rust](delivery/policy/rust.md)、[SQL](delivery/policy/sql.md) | 专业偏好由项目明确采用 |
-| 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 创建任务会话或组织执行前选择模型与路线，再绑定会话、工作区及适用 Goal，进入执行与验收；普通短任务直接完成，实际经验见[验证边界](docs/usage.md#验证能说明什么) |
+| 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 开发仅在本机执行，Desktop 优先复用现有工具；创建前选择模型与路线，绑定本机工作区及适用 Goal；普通短任务直接完成，实际经验见[验证边界](docs/usage.md#验证能说明什么) |
 | 总协调启动提示词 | [通用模板与 Nucleus 使用约定](docs/prompts/coordinator.md) | 明确启用后，总协调派发、跟进和接纳，负责人实施与验证；普通文档，不安装，也不自动继承持续交付或合并授权 |
 | 本机协作提醒 | [使用与恢复](docs/usage.md#本机协作提醒) | 本机可选配置，独立于源码交付；启用状态与授权按实际环境核对 |
 | Claude Code 与 DeepSeek 主动委派 | [分工与授权](delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](delivery/policy/claude-code.md) | 主动委派适任且已授权的完整结果；设计稿另走设计路线；负责人判断与验收，不设调用比例；未接入 CI 或审查关卡 |
