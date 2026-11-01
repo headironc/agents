@@ -11,9 +11,16 @@
 
 ## Dependency updates
 
-Dependency-update PRs do not require AI code or security review. Apply this exception before provider selection, review requests, waiting, and recovery. It covers direct and transitive version updates, lockfiles, and compatibility changes necessary for the update, regardless of author, update service, or version increment. Keep unrelated business or governance changes in separate slices under their applicable review requirements. Honor an explicit Human request for AI review of a particular update or batch within that request's scope.
+Exempt a dependency-update PR from AI code and security review only after mechanically establishing all of the following against its exact head and trusted target baseline:
 
-Keep applicable checks, known-defect and finding disposition, required discussions and approvals, merge authority, actual platform protection, and result readback. Reuse valid checks for unchanged inputs. Do not add a replacement human or model review solely because AI review is not required. Report AI review as not required, not passed. Preserve original handles for existing requests and unknown writes; this exception does not cancel a run or authorize changing review settings or bypassing platform protection. A project adopting this exception updates its own review contract through its authorized rule owner; changing this source alone does not activate a project or platform change.
+- The verified automation identity and update mechanism are trusted by the project's established policy or effective Human selection. A bot-like name, label, PR description, or policy changed by the candidate establishes no trust.
+- The complete diff changes only dependency versions in manifests and their generated lockfile metadata. It introduces no executable compatibility changes, lifecycle scripts, registry settings, overrides, patches, workflow changes, or unrelated behavior.
+- Every affected direct and transitive package stays within the project's established compatible update range and intended upstream source. Major upgrades, new package identities or sources, prereleases without established compatibility, and unknown compatibility require normal review.
+- Applicable provenance, integrity, vulnerability, and project checks succeed, with no unresolved known security problem. A valid checksum or successful CI alone establishes neither trusted authorship nor safe dependency behavior.
+
+Apply eligibility before provider selection, review requests, waiting, and recovery. Use the normal code and security review path for manual updates or any unmet or unverified condition; a dependency label does not exempt them. Keep independent business or governance changes in separate slices. Honor an explicit Human request for AI review of a particular update or batch within that request's scope.
+
+For an eligible update, keep applicable checks, known-defect and finding disposition, required discussions and approvals, merge authority, actual platform protection, and result readback. Reuse valid checks for unchanged inputs. Do not add a replacement human or model review solely because an eligible update does not require AI review. Report AI review as not required, not passed. Preserve original handles for existing requests and unknown writes; this exception does not cancel a run or authorize changing review settings or bypassing platform protection. A project adopting this exception updates its own review contract through its authorized rule owner; changing this source alone does not activate a project or platform change.
 
 ## Review provider selection
 
