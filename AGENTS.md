@@ -1,7 +1,7 @@
 # Repository Instructions
 
 - Before repository work, read and apply [Codex rules](delivery/AGENTS.md), then [current delivery and maintenance navigation](README.md), the relevant [usage contracts](docs/usage.md), and [tooling contracts](docs/tooling.md).
-- Use README for current delivery status and locate the external `review-launch-status.json` current handoff through [README execution records](README.md#执行记录) for exact execution evidence; historical stage records remain in Git and the external evidence directory.
+- Use README for current delivery status and follow [execution-record navigation](README.md#执行记录) when exact task evidence is needed.
 - Load [Rust](delivery/policy/rust.md) or [SQL](delivery/policy/sql.md) preferences only under their stated adoption scope and the selected review contract's required sections.
 - Keep work within the authorized scope and branch. Reassess a design when implementation changes its agreed boundaries.
 - Use historical source as migration and recovery evidence, not as an implicit target design.

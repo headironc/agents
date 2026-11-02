@@ -34,21 +34,17 @@
 
 将规范纳入项目时，保留实际采用章节及必需引用。Rust 的数据库错误章节引用 SQL 失败边界，不表示采用全部 SQL 命名偏好。迁入的项目规则在声明范围内由项目维护。个人偏好后续更新不自动覆盖项目决定。本仓库继续提供复用源，不自动迁移或安装到其他项目。
 
-[模型政策](../delivery/policy/models.md)拥有从任务组织到执行、验收及收尾的决策。[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)在创建任务会话或安排执行前触发。普通短任务直接完成，已明确分工不反复重建。创建与续接的模型参数、默认覆盖条件及证据边界见[运行限制](../delivery/policy/models.md#runtime-limits)。[工作区章节](../delivery/policy/models.md#workspaces)规定新源码开发会话的独立 worktree 默认策略、受管优先及续作等例外。通用代码工具的绑定由[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)拥有。[Goal 章节](../delivery/policy/models.md#goals)规定适用条件、明确创建授权、内容语义及[实际接口限制](../delivery/policy/models.md#goal-tool-interfaces)。收尾章节规定证据保留及可恢复回收。默认映射只在模型政策维护。团队、CI 或托管审查强制采用时，沿用上述项目内版本化和单一所有者要求。项目入口注明采用范围、权威位置及覆盖项，保留政策所需的操作与审查引用。入口引用不等于正文已经加载，安装政策也不切换模型或修改客户端配置。
+[模型政策](../delivery/policy/models.md)拥有任务组织、执行、验收及收尾的决策。按任务从[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)进入，查阅[工作区](../delivery/policy/models.md#workspaces)、[Goal](../delivery/policy/models.md#goals) 及[收尾](../delivery/policy/models.md#task-completion-and-chat-archival)规则。代码工具的通用绑定见[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)。团队采用仍遵循上述项目内版本化要求。入口引用不等于正文已经加载；安装政策不切换模型或修改客户端配置。
 
-[阶段职责](../delivery/policy/models.md#delegation-and-acceptance)拥有完整已授权目标的缺口核实。该处规定沿原负责人推进，及时补齐未承接责任。实施作者默认完成已授权的签名提交、推送、PR 和片内修复。设计者保留设计与实质验收。具体分工及能力受限时的承接也由该处规定。[工作区章节](../delivery/policy/models.md#workspaces)允许设计、实施和验收分阶段共用合适检出。交接保留唯一写者、稳定候选与客户端生命周期边界。角色变化不要求另造出版树，也不使未变输入的有效检查失效。这些默认职责不增加发布、合并或安装授权。
+[阶段职责](../delivery/policy/models.md#delegation-and-acceptance)拥有委派、缺口核实、交付责任及结果接纳。阶段共用检出与写者交接见[工作区规则](../delivery/policy/models.md#workspaces)。
 
-[模型偏好](../delivery/policy/models.md#current-defaults)区分 Codex 职责映射与[外部路线候选](../delivery/policy/models.md#route-model-preferences)。Antigravity 候选包括 Argon、Opus、Sonnet 和 Flash。DeepSeek 当前采用 V4.1 Flash，覆盖适任的普通实现及复杂推理，不自动升到旧版 Pro。实际标识与档位由对应客户端核实。先核材料和服务授权、账号支持、工具与模态。再按任务负担和实际成本选择，不把所有工作固定在 max。
+[Codex 模型偏好](../delivery/policy/models.md#current-defaults)与[外部路线模型偏好](../delivery/policy/models.md#route-model-preferences)分别维护具体模型及档位。创建、续接和变更时的参数及证据要求见[运行限制](../delivery/policy/models.md#runtime-limits)。
 
-新版[总协调模板](prompts/coordinator.md#负责人模型与协作)在明确启用时选择本目标适用的具体角色映射。原始选择、作用域及所选表版本沿已有任务上下文复用。修改或阅读模板不追授旧任务选择，后续改表也不自动切换既有选择。创建接口分别核 `model` 和 `thinking`。默认模型已知且接口允许时，落实兼容档位。不要因模型字段受限一并省略。实际请求与运行证据按[运行限制](../delivery/policy/models.md#runtime-limits)分层报告。
+[总协调模板](prompts/coordinator.md)提供明确启用时的分工和可选授权文本，采用方法由模板拥有。
 
-Claude Code 与 DeepSeek 的主动委派由模型政策管理。模型接口限定为 DeepSeek 官方和 OpenCode 官方服务。负责人在允许范围内自行选择或复用可用路线，不逐次请示。实际接收端点、凭据来源、模型与 effort 按本次调用核对。兼容协议或同名模型不构成第三方接收方许可。保留任务的材料、操作边界及更窄的明确限制。
-
-任务拆解时评估客户端能交付的完整结果。适任且授权、工具就绪时实际派发，不默认由负责人完成全部执行。范围涵盖分析、设计、实现、文档、测试和修复；设计稿采用[设计专用路线](../delivery/policy/models.md#task-start-and-execution-routing)。负责人先完成必要的业务、授权、事务与恢复判断，确认实现边界与设计。授权路线可用时，把适任的完整实现连同相关测试、文档和修复一并委派。整体任务复杂，或负责人保留关键判断和验收责任，都不是收回全部实现的理由。交付操作按阶段分配，不因委派客户端能力受限就全部回交负责人。能力、工具或拆分同一职责的成本不适当时，适用模型政策保留的兜底路线。负责人自行选择任务、模型与 effort，必要时接回；不设比例或机械必调。调用前按任务选择只读、有界执行或显式选用的设计模式。执行绑定实际宿主、工作区、候选及允许操作，遵守唯一写者或隔离写区要求。已交付内容是规则与合同；CLI、账号与服务由使用者提供。本仓库不安装客户端或修改个人配置，也未将这条路线接入 CI 或项目审查关卡。实际演练与静态检查的区别见[验证边界](#验证能说明什么)。
+[Claude Code 与 DeepSeek 委派政策](../delivery/policy/models.md#claude-code-and-deepseek-delegation)拥有选用、材料授权、服务范围、分工与兜底条件。[调用合同](../delivery/policy/claude-code.md)拥有实际调用、权限与恢复。本仓库交付这些规则和合同；CLI、账号与服务由使用者提供。该路线未接入 CI 或项目审查关卡，实际演练范围见[验证边界](#验证能说明什么)。
 
 这种分层依据 [Codex 指令发现文档](https://developers.openai.com/codex/guides/agents-md)。Codex 分层加载全局与项目入口，普通政策文件由入口按需引用。[Astra 指令建议](https://developers.openai.com/api/docs/guides/latest-model#instruction-following)强调处理含混或冲突的文件指令。这里据此明确采用范围、规则归属与切片停止点。它们是本仓库的工作约定，不是模型自动保证的行为。
-
-自己的已授权开发仓库沿用同一任务范围和宿主权限规则。正常读写、命令和测试不因交给 Claude Code 而增加单独审批或强制沙箱要求。实际出现材料或执行边界问题时，按[调用合同](../delivery/policy/claude-code.md#有界执行)处理受影响的调用。
 
 ## 本机开发与 Desktop 工具
 
@@ -126,7 +122,7 @@ DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现
 
 入口负责需求拆分、搜索选择、互补技能和结果交接。[HTTP 参考](../delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md)拥有请求形式。[验证参考](../delivery/skills/alibabacloud-find-skills/references/verification-method.md)拥有响应和分页判据。[安装参考](../delivery/skills/alibabacloud-find-skills/references/installation.md)区分下载、安装与后续使用。[示例](../delivery/skills/alibabacloud-find-skills/references/search-examples.md)仅说明选择方法。来源、原件摘要和退役依据见[来源记录](skill-sources.md#alibabacloud-find-skills)。
 
-该技能的候选与执行证据见独立切片交接。交接位置由 [README](../README.md) 列出。它不替换全局 `current_handoff`。本地门禁与[静态场景](../tests/scenarios/rules.md#阿里云技能发现与操作边界)不证明 AgentExplorer 实际兼容。它们也不证明模型行为、当前实现的审查覆盖或安装成功。本片不安装个人配置。
+该技能的候选与执行证据见独立切片交接。定位方式和缺少位置时的处理见 [README 执行记录](../README.md#执行记录)。独立交接不替换全局 `current_handoff`。本地门禁与[静态场景](../tests/scenarios/rules.md#阿里云技能发现与操作边界)不证明 AgentExplorer 实际兼容。它们也不证明模型行为、当前实现的审查覆盖或安装成功。本片不安装个人配置。
 
 ## 交付目录
 
@@ -326,15 +322,11 @@ Claude Code 的[权限模式与审批转交](../delivery/policy/claude-code.md#�
 
 本内容源交付原生 CI 源码，实例配置与验收按[项目约定](review-gate.md#重建期交付规则)执行。旧 App 验收和 PR 记录的访问边界见[历史来源](review-gate.md#历史合同与验收)，不代表新实例已启用保护或审查。以下证据说明继续适用于审查、发现修复和明确审计；内容源独立不等于省略已承接的审查。
 
-仓库的远端审查机制不固定为某个模型或某个工作流。直接核实时，用 GitHub 的只读接口核对实际入口和触发方式。检查工作流是否启用、审查 App 或 bot 的身份、PR 触发事件、评论或 review 绑定的 head SHA、结果及覆盖声明。`disabled_manually`、缺少运行记录或只存在 YAML 时，把该路线记为不可用或覆盖未核实。旧的 Claude PR 工作流已从仓库源码移除；历史运行不证明当前候选受审，普通 CI 绿灯也不能当成模型审查。当前消费者实际使用的 Codex、Claude 或其他已配置入口，均按同一证据规则判断。
+审查提供方、覆盖和结束条件由[共享审查规则](../delivery/policy/review.md)拥有。GitHub 请求、结果面读取和发现处置的操作入口见 [gh 操作参考](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)。旧的 Claude PR 工作流已从仓库源码移除；历史运行不证明当前候选受审。
 
-Codex App 有发现时通常发布行内评论；没有发现时没有 finding 行内评论，但可能留下完成摘要或 👍 反应。[官方 Codex Code Review 合同](https://learn.chatgpt.com/docs/third-party/github)以 PR diff 为输入。核对完成摘要的发布者是否为已核验的审查 App，摘要是否属于本次运行并绑定当前 PR 和 head。还须核实审查时的目标分支基线、触发与完成状态，并确认本次运行的评论和线程没有发现或失败。旧运行的发现另按处置规则跟踪。目标基线在审查后移动时，须取得覆盖新基线的审查。单独的 👍 反应只能作为运行信号，不能证明无发现覆盖；没有正式 GitHub review 对象也不能据此认定模型未运行。
+Codex App 有发现时通常发布行内评论；没有发现时没有 finding 行内评论，但可能留下完成摘要或 👍 反应。[官方 Codex Code Review 合同](https://learn.chatgpt.com/docs/third-party/github)以 PR diff 为输入。这是所记录的提供方输入合同；完成摘要与反应的验收按[审查覆盖规则](../delivery/policy/review.md#review-coverage)判断。
 
-本页记录的输入合同仍适用时，直接复用。新的 PR 不要求重查官方文档。审查和审计仍核对该 PR 的实际运行证据。证据齐全且发现已处置，就结束审查核验。合并仍须满足已采用流程的其他条件及操作授权。复核的触发条件与范围见[审查覆盖规则](../delivery/policy/review.md#review-coverage)。
-
-直接核实后续提交时，留意已有 bot 摘要可能已更新。`latestReviews` 仍可能列出旧 head 的有发现 review。回读摘要正文与更新时间，核对 bot 身份、当前 PR 和 head。再核对审查基线、触发事件、完成状态、行内评论与线程。旧 review 不证明新 head 未受审。完成记录只证明本次运行；它不证明审查者逐一阅读了哪些文件。摘要无法绑定当前 head，或审查基线无法核实时，记为未核实。
-
-审查阶段由维护者按授权核对报告并处置发现。非阻塞建议可实施、说明延期理由，或提供不采纳的证据。理由留在原发现线程或原报告讨论中，已有有效记录直接复用。批准只能证明关卡实际核验的条件。旧关卡及其覆盖限制见[历史来源](review-gate.md#历史合同与验收)。解决线程不等于必须修改代码。操作细节见 [gh 操作参考](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)。
+已有观察显示，后续提交可能更新原 bot 摘要，而 `latestReviews` 仍列出旧 head 的有发现 review。这个观察解释了为何要读取当前摘要，不能单凭旧 review 判定新 head 未受审；它不证明审查者逐一阅读了哪些文件。具体覆盖与发现处置仍按上述权威规则核对。
 
 pre-commit 源码已提供，现有 `core.hooksPath` 保持原配置。覆盖选择、工具前置和临时仓库测试边界见[提交入口](tooling.md#提交入口)。`pr-review` 不作为独立技能恢复或安装。PR 打开、审查与合并操作由 [gh 操作参考](../delivery/skills/gh/references/operations.md)承担。原已验证候选保留原交接和验证范围。位置见 [README 执行记录](../README.md#执行记录)。
 
