@@ -116,6 +116,7 @@ const required = [
   "delivery/policy/models.md",
   "delivery/policy/review.md",
   "delivery/policy/claude-code.md",
+  "delivery/policy/antigravity.md",
   "delivery/skills/figma-design-workflow/SKILL.md",
   "delivery/skills/gh/SKILL.md",
   "delivery/skills/gh/references/extended-commands.md",
