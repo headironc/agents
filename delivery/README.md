@@ -18,9 +18,9 @@
 
 [模型选择](policy/models.md#current-defaults)分别维护 Codex 职责映射与[外部路线模型偏好](policy/models.md#route-model-preferences)。按任务需要选择获准路线及适任模型，核实际标识、effort 和可用能力。持续选择按原始采用范围复用。创建接口的模型和档位字段分别判断，不因默认值存在就省略已允许参数。
 
-[Claude Code 与 DeepSeek](policy/models.md#claude-code-and-deepseek-delegation) 的分工从任务拆解时主动评估。适任且授权、工具就绪的完整结果，应实际交给客户端执行。设计稿采用[设计专用路线](policy/models.md#task-start-and-execution-routing)。负责人绑定单一结果与写区，并验收实际产物；不设调用比例或逐项审批。[调用合同](policy/claude-code.md)区分只读、有界执行和选用本客户端后的显式设计模式。客户端由使用者提供，安装规则不启用模型或扩大权限。
+[Claude Code 与 DeepSeek](policy/models.md#claude-code-and-deepseek-delegation) 按任务与能力适配选用。选用后可交付适任完整结果。设计稿采用[设计专用路线](policy/models.md#task-start-and-execution-routing)。负责人绑定单一结果与写区，并验收实际产物；不设调用比例或逐项审批。[调用合同](policy/claude-code.md)区分只读、有界执行和选用本客户端后的显式设计模式。客户端由使用者提供，安装规则不启用模型或扩大权限。
 
-[Antigravity CLI](policy/models.md#antigravity-cli-delegation) 仅在明确选用或有效持续路线覆盖时进入调用准备。[合同](policy/antigravity.md)要求核受支持的账号与调用方式、材料、实际参数、权限和完整结果。消费计划不支持第三方代理嵌套调用；安装了 `agy` 不证明路线就绪。源码交付不启用模型、账号或个人配置。
+[Antigravity CLI](policy/models.md#antigravity-cli-delegation) 按统一的[路线偏好](policy/models.md#route-model-preferences)进入调用准备。[合同](policy/antigravity.md)覆盖目录查询、档位试验及任务调用，要求核账号支持、材料、实际参数、权限和完整结果。消费计划不支持第三方代理嵌套调用；安装了 `agy` 不证明路线就绪。参数观察见[有限实测](policy/antigravity.md#有限参数实测)。源码交付不启用模型、账号或个人配置。
 
 [项目导航与验证](skills/project-guide/SKILL.md)提供四项能力。它识别项目与版本，发现权威资料，选择并执行原生检查，报告证据与缺口。按任务需要使用，不增加普通开发的必经流程。命令、业务规则及授权范围由目标项目和当前任务决定。
 

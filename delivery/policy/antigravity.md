@@ -2,7 +2,7 @@
 
 Contract subject: `antigravity-cli`.
 
-本合同约束 `agy` 的调用、材料、权限与结果。触发条件由[模型政策](models.md#antigravity-cli-delegation)拥有。开发执行遵循[仅本机开发](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。选用路线后再读取本合同，不因文档或可执行文件存在就启动模型。
+本合同约束 `agy` 的调用、材料、权限与结果。触发条件由[模型政策](models.md#antigravity-cli-delegation)拥有。开发执行遵循[仅本机开发](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。选用或调用前读取相关小节，复用未变证据。不因文档或可执行文件存在就启动模型。
 
 ## 路线与账号就绪
 
@@ -21,6 +21,21 @@ Contract subject: `antigravity-cli`.
 核对[自动发现](https://antigravity.google/docs/customization-discovery/)的规则、技能、插件、hooks、MCP 和额外目录。自动加载的内容也属于材料。排除秘密和无关内容，不依靠提示词声明代替实际权限边界。保留可信 hooks、原有 deny 和宿主限制。边界无法满足时停止依赖调用，不通过跳过配置或更换执行者规避拒绝。
 
 按实际支持选择模型和 effort，显式传入已选定且获准的参数。[模型说明](https://antigravity.google/docs/models/)和 [effort 说明](https://antigravity.google/docs/cli/commands/effort/)提供核对入口；网页列举、另一个 CLI 的档位或 Codex 模型表不证明本次组合可用。配置、请求参数、返回标识和服务端执行事实分别报告。切换模型不扩大接收服务或操作范围。
+
+目录查询和模型/effort 短试验也遵循账号支持、自动加载材料、权限及有界运行要求。普通帮助读取只核相关条件，不重复全量审计。`--help` 接受某个 effort 值，不证明所选模型也支持该档位。按当前目录核对完整模型 ID 的档位后缀与显式 `--effort` 是否一致；使用系列别名时核对实际解析结果。冲突或不支持时保留错误，不假定后缀或参数优先，也不自动降档、换系列或重复失败。客户端标签及参数传播日志不证明服务端内部推理预算。
+
+### 有限参数实测
+
+2026-11-03 的原 Nucleus 聊天使用本机 `~/.local/bin/agy`，工作目录为 `/private/tmp`。CLI 本体版本未单独核实；启动日志显示语言服务 1.4.12。当日目录暴露 low、medium、high 变体，帮助另列 xhigh、max。以下是该次客户端观察，由本任务接收证据，未在规则维护时重测。
+
+| 请求 | 观察 |
+| --- | --- |
+| `gemini-4-argon-high` + `high` | `SUCCESS`，返回固定短文本 |
+| `gemini-4-argon-high` + `xhigh` 或 `max`；`gemini-4-argon-low` + `high` | 参数冲突，退出 1、`ERROR`、0 turns、返回 usage 全为 0 |
+| `gemini-4-argon` + `xhigh` 或 `max`；`claude-opus-5-5` + `max` | 报不支持；列出的可用档位为 low、medium、high；同样在 0 turns 失败 |
+| `gemini-4-argon` + `low` | 别名解析为 `gemini-4-argon-low`，日志传播 `Gemini 4 Argon (Low)` 标签，`SUCCESS` 并返回 `EFFORT_TEST_OK` |
+
+短提示要求仅回固定文本且不读文件、不用工具。生成请求使用 `--sandbox --mode plan --output-format json --print-timeout 45s --print`。这些观察不证明全部系列永久不支持 xhigh/max，也不证明账号适合嵌套调用。原进程均已退出，但日志、凭据保存、会话及缓存曾被宿主拒绝写入。技术回复成功不证明会话恢复、完整开发或正式审查已验收。未来调用仍按当前版本、账号及目录核对受影响事实。
 
 ## 有界调用
 
