@@ -11,7 +11,10 @@ import {
 } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { InstallPlanSchema } from "../../scripts/install-records.ts";
+import {
+  InstallPlanSchema,
+  installPathCollisions,
+} from "../../scripts/install-records.ts";
 import {
   foreignOwnedMember,
   readCopiedTargetState,
@@ -473,6 +476,89 @@ test("overlapping deployment, backup, source and private roots block before plan
     );
     assert.deepEqual(f.runs(), []);
   }
+});
+
+test("file selection rejects unknown, repeated, unselected-product and directory keys", (t) => {
+  const f = installFixture(t);
+  assert.equal(
+    f.plan(["--target", "codex:AGENTS.md", "--target", "codex:AGENTS.md"])
+      .status,
+    2,
+  );
+  assert.equal(f.plan(["--target", "AGENTS.md"]).status, 2);
+  for (const key of [
+    "codex:missing",
+    "antigravity:policy/review.md",
+    "codex:wechatide",
+  ]) {
+    assert.ok(
+      f
+        .gaps(f.plan(["--target", key]))
+        .some((gap) => gap.code === "invalid-file-target" && gap.key === key),
+    );
+  }
+  assert.deepEqual(f.runs(), []);
+});
+
+test("selected plans bind their exact file set and retain source collision protections", (t) => {
+  const f = installFixture(t, { worktree: ".codex/worktrees/fixture/agents" });
+  const { plan } = f.planned(["--target", "codex:AGENTS.md"]);
+  assert.deepEqual(plan.selectedTargets, ["codex:AGENTS.md"]);
+  assert.deepEqual(
+    plan.targets.map((target) => target.key),
+    ["codex:AGENTS.md"],
+  );
+  assert.ok(
+    installPathCollisions(plan, (file) =>
+      file === f.checkout ? path.join(f.home, ".codex/policy") : file,
+    ).includes(path.join(f.home, ".codex")),
+  );
+  for (const mutate of [
+    (value: typeof plan) => {
+      value.selectedTargets = [];
+    },
+    (value: typeof plan) => {
+      value.selectedTargets = ["codex:README.md"];
+    },
+    (value: typeof plan) => {
+      value.selectedTargets!.push("codex:AGENTS.md");
+    },
+    (value: typeof plan) => {
+      value.checkout.directory = path.join(f.home, ".codex");
+    },
+    (value: typeof plan) => {
+      value.checkout.directory = path.join(f.home, ".codex/policy");
+    },
+    (value: typeof plan) => {
+      value.checkout.directory = plan.run.source;
+    },
+    (value: typeof plan) => {
+      value.checkout.directory = plan.roots.backup.path;
+    },
+  ]) {
+    const changed = structuredClone(plan);
+    mutate(changed);
+    const { sha256: _digest, ...body } = changed;
+    assert.equal(
+      InstallPlanSchema.safeParse({ ...body, sha256: canonicalDigest(body) })
+        .success,
+      false,
+      JSON.stringify({
+        selectedTargets: changed.selectedTargets,
+        checkout: changed.checkout.directory,
+      }),
+    );
+  }
+});
+
+test("a source under an actual delivery directory is refused before plan writes", (t) => {
+  const f = installFixture(t, { worktree: ".codex/skills/source" });
+  assert.ok(
+    f
+      .gaps(f.plan(["--target", "codex:AGENTS.md"]))
+      .some((gap) => gap.code === "path-collision"),
+  );
+  assert.deepEqual(f.runs(), []);
 });
 
 test("existing case variants use physical identity for root collisions", async (t) => {

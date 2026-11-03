@@ -60,6 +60,79 @@ function refusal(action: () => unknown) {
   return assert.fail("Expected installation to be refused");
 }
 
+test("five selected files install and roll back from a Codex worktree without changing unselected targets", (t) => {
+  const f = installFixture(t, {
+    realRuntime: true,
+    worktree: ".codex/worktrees/fixture/agents",
+  });
+  const names = [
+    "README.md",
+    "policy/models.md",
+    "policy/claude-code.md",
+    "policy/antigravity.md",
+    "AGENTS.md",
+  ];
+  const codex = path.join(f.home, ".codex");
+  const originals = new Map<string, ReturnType<typeof readTargetState>>();
+  for (const name of names) {
+    const target = path.join(codex, name);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, `previous ${name}\n`, { mode: 0o600 });
+    originals.set(target, readTargetState(target));
+  }
+  const unselected = [
+    path.join(codex, "skills/wechatide"),
+    path.join(f.home, ".claude/skills/wechatide"),
+  ];
+  for (const directory of unselected) {
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    writeFileSync(path.join(directory, "SKILL.md"), "personal skill\n", {
+      mode: 0o600,
+    });
+  }
+  const args = names.flatMap((name) => [
+    "--target",
+    `codex:${name}`,
+    "--adopt",
+    `codex:${name}`,
+  ]);
+  const { plan, review } = f.planned(args);
+  writeFileSync(
+    path.join(unselected[0]!, "SKILL.md"),
+    "changed after planning\n",
+  );
+  const states = unselected.map(readTargetState);
+  assert.equal(plan.targets.length, 5);
+  assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
+  for (const target of plan.targets)
+    assert.deepEqual(
+      readTargetState(target.path),
+      readTargetState(target.source),
+    );
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+  const status = f.cli(["status"]);
+  assert.deepEqual(
+    JSON.parse(status.stdout).selectedTargets,
+    names.map((name) => `codex:${name}`).sort(),
+  );
+  assert.deepEqual(unselected.map(readTargetState), states);
+  assert.equal(f.git("rev-parse", "--show-toplevel").trim(), f.checkout);
+  assert.equal(
+    outcome(f.cli(["rollback", "--receipt", plan.run.receipt])).status,
+    "rolled-back",
+  );
+  for (const [target, state] of originals)
+    assert.deepEqual(readTargetState(target), state);
+  assert.deepEqual(unselected.map(readTargetState), states);
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+});
+
 test("V6 applies, reads back and restores Antigravity without touching App settings or unlisted skills", (t) => {
   const f = installFixture(t, { realRuntime: true });
   const root = path.join(f.home, ".gemini/antigravity-cli");

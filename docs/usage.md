@@ -198,6 +198,10 @@ bash scripts/install.sh plan --source "$PWD" --report .cache/reports/check.json 
 
 选入 Antigravity CLI 时，在同一 plan 命令后增加 `--include-product antigravity`。目标根固定为 `$HOME/.gemini/antigravity-cli`，只发布下表成员。安装器不创建 Plugin，也不写 `settings.json`、发现 manifest、hooks、MCP 或规则入口。该根的 `skills/` 由 CLI 自动发现，App 不读取。已有 CLI 专属或共享目录中的同名技能可能影响优先级；实际来源通过 `/skills` 核对，见[官方发现规则](https://antigravity.google/docs/customization-discovery?tab=cli)。
 
+仅更新受管文件时，重复传入 `--target KEY` 指定完整目标集合。KEY 与下述接管名称相同，例如 `--target codex:AGENTS.md --target codex:policy/models.md`。选择只接受已选产品的受管文件，拒绝重复、未知名称及技能目录。未传时沿用整批计划。`--target` 不替代 `--adopt`；已有差异文件仍须明确接管。调用者按当前任务核对完整依赖，安装器不自动加入其他目标。未选目标不读取内容、不要求接管，也不修改权限。完整源码检查与冻结快照仍覆盖原候选。
+
+文件选择写入计划的 `selectedTargets`，并与实际目标集合严格匹配。apply、verify 和 rollback 均只处理计划目标。`status` 同时展示该选择，不把部分交付称为整批安装。旧 V5/V6 计划没有该字段时保持原语义；不支持文件选择的旧安装器会拒绝含新字段的计划，恢复使用本计划绑定的运行副本。
+
 报告必须来自同一平台和固定 Node 的完整通过的 `all`。检出 HEAD 必须等于报告基线，源码字节必须与报告一致。计划记录本机稳定标识：Linux 取 `/etc/machine-id`，macOS 取 `sysctl -n kern.uuid`。取不到即拒绝。apply、verify、rollback 均核对该标识。主机名变更只在 verify 中报告。报告绑定的被忽略文件同样阻止计划。V5 运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，只保存计划与回执。候选和恢复运行副本位于 `${CODEX_HOME:-$HOME/.codex}/.agents-install/<run-id>/`。计划另在 `--output` 写出同字节审阅副本。它只读公开目标，但会建立私有安装器目录。
 
 已有链接，包括指向旧部署快照的链接，都必须用 `--adopt KEY` 显式接管。悬空链接、普通文件和已有目录同样如此。接管文件或目录时，目标及目录成员必须由安装用户拥有。复制备份无法恢复其他用户的所有权，计划会报告 `backup-owner-unrestorable`。已交付内容与新候选完全一致时列为不变。KEY 见[安装目标](#安装目标与接管)。未列入清单的名称只以路径列在 `reported` 中；安装器不读取其内容。
@@ -244,7 +248,7 @@ Codex 交付七个完整顶层技能包，十六个内容入口参与验证。Cl
 
 Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`，共五个顶层包及五个入口。它只接收三份公共合同和三个配套工具，不接收 Codex 规则、模型路线、设计工作流或配置片段。wechatide 的执行器只接受 `Codex` 与 `ClaudeCode`，本片不向 Antigravity 发布。清单支持按固定顺序列出 `codex,claude,antigravity` 的子集；历史 `shared` 仅表示 Codex 与 Claude，不自动扩张。
 
-默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。选入 Antigravity CLI 时增加上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与源码、部署记录、备份或审阅副本重叠时同样拒绝。公开目标不得覆盖私有候选或恢复运行副本。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
+默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。选入 Antigravity CLI 时增加上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于 Codex 根的 `worktrees/` 子目录内，或在所有产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
 adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `claude:gh`；其他成员使用 `codex:AGENTS.md`、`claude:policy/writing.md` 等相对路径。一个 KEY 只接管对应产品的目标。裸技能名、未知或未使用的 KEY 均拒绝。任一产品的根、权限或接管缺口阻止整个计划。清单外名称仅报告，保留原值。
 
