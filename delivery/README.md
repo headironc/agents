@@ -20,6 +20,8 @@
 
 [Claude Code 与 DeepSeek](policy/models.md#claude-code-and-deepseek-delegation) 按任务与能力适配选用。选用后可交付适任完整结果。设计稿采用[设计专用路线](policy/models.md#task-start-and-execution-routing)。负责人绑定单一结果与写区，并验收实际产物；不设调用比例或逐项审批。[调用合同](policy/claude-code.md)区分只读、有界执行和选用本客户端后的显式设计模式。客户端由使用者提供，安装规则不启用模型或扩大权限。
 
+[Antigravity 安装说明](policy/antigravity.md)保留为交付成员；Antigravity CLI 可选安装通用 Skills 及必要依赖，与 Codex 模型选择分开。
+
 [项目导航与验证](skills/project-guide/SKILL.md)提供四项能力。它识别项目与版本，发现权威资料，选择并执行原生检查，报告证据与缺口。按任务需要使用，不增加普通开发的必经流程。命令、业务规则及授权范围由目标项目和当前任务决定。
 
 [设计工作流](skills/figma-design-workflow/SKILL.md)供 Codex 制作授权内的可编辑设计稿，核对实际像素并由负责人验收。模型与 effort 见[模型政策](policy/models.md#current-defaults)。Figma 按任务需要使用；选用时加载实际技能并读回目标。源码交付不代表模型已经切换、插件已安装或真实设计演练已通过。

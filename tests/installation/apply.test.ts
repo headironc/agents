@@ -60,7 +60,7 @@ function refusal(action: () => unknown) {
   return assert.fail("Expected installation to be refused");
 }
 
-test("four selected files install and roll back from a Codex worktree without changing unselected targets", (t) => {
+test("five selected files install and roll back from a Codex worktree without changing unselected targets", (t) => {
   const f = installFixture(t, {
     realRuntime: true,
     worktree: ".codex/worktrees/fixture/agents",
@@ -69,6 +69,7 @@ test("four selected files install and roll back from a Codex worktree without ch
     "README.md",
     "policy/models.md",
     "policy/claude-code.md",
+    "policy/antigravity.md",
     "AGENTS.md",
   ];
   const codex = path.join(f.home, ".codex");
@@ -101,7 +102,7 @@ test("four selected files install and roll back from a Codex worktree without ch
     "changed after planning\n",
   );
   const states = unselected.map(readTargetState);
-  assert.equal(plan.targets.length, 4);
+  assert.equal(plan.targets.length, 5);
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
   for (const target of plan.targets)
     assert.deepEqual(
@@ -205,59 +206,6 @@ test("selected review files and complete skills preserve other targets through r
     outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
     true,
   );
-});
-
-test("retired policy records retain apply, verify and rollback through their frozen runtime", (t) => {
-  for (const include of [[], ["--include-product", "antigravity"]]) {
-    const f = installFixture(t, { realRuntime: true });
-    const { plan, review } = f.planned([
-      ...include,
-      "--target",
-      "codex:policy/claude-code.md",
-    ]);
-    const target = plan.targets[0]!;
-    const originalSource = target.source;
-    target.key = "codex:policy/antigravity.md";
-    target.path = path.join(plan.roots.codex.path, "policy/antigravity.md");
-    target.source = path.join(
-      plan.run.source,
-      "delivery/policy/antigravity.md",
-    );
-    cpSync(originalSource, target.source);
-    const entry = plan.candidate.entries.find(
-      (item) => item.path === "delivery/policy/claude-code.md",
-    )!;
-    plan.candidate.entries.push({
-      ...entry,
-      path: "delivery/policy/antigravity.md",
-    });
-    plan.candidate.entries.sort((a, b) =>
-      Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)),
-    );
-    plan.candidate.sha256 = canonicalDigest(plan.candidate.entries);
-    plan.selectedTargets = [target.key];
-    const { sha256: _digest, ...body } = plan;
-    plan.sha256 = canonicalDigest(body);
-    const bytes = JSON.stringify(plan);
-    writeFileSync(review, bytes);
-    chmodSync(plan.run.plan, 0o600);
-    writeFileSync(plan.run.plan, bytes);
-    chmodSync(plan.run.plan, 0o400);
-    assert.equal(
-      outcome(f.cli(["apply", "--plan", review])).status,
-      "installed",
-    );
-    assert.equal(
-      outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
-      true,
-    );
-    assert.deepEqual(readTargetState(target.path), target.installed);
-    assert.equal(
-      outcome(f.cli(["rollback", "--receipt", plan.run.receipt])).status,
-      "rolled-back",
-    );
-    assert.equal(existsSync(target.path), false);
-  }
 });
 
 test("V6 applies, reads back and restores Antigravity without touching App settings or unlisted skills", (t) => {

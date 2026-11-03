@@ -214,7 +214,7 @@ bash scripts/install.sh status
 
 全为 `unchanged` 的运行没有替换步骤。对其 rollback 会把回执标为 `rolled-back`，但原有目标仍在。若无其他已安装回执，`status` 将返回 `none`。这不是卸载入口。
 
-Codex 的 Antigravity 调用合同已退役，不再派生为新安装目标。旧 V5/V6 记录仍按其冻结目标及运行副本验证和恢复；源码删除不卸载已安装文件。
+Codex 的 `policy/antigravity.md` 保留为安装说明，不再包含模型调用合同或路线。原有安装目标和 Antigravity 通用技能支持保持不变；旧 V5/V6 记录继续使用其绑定的运行副本验证和恢复。
 
 ### 安装目标与接管
 
@@ -223,7 +223,7 @@ Codex 的 Antigravity 调用合同已退役，不再派生为新安装目标。�
 | 目标类别 | 安装位置 | 候选来源 |
 | --- | --- | --- |
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
-| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code}.md` | `delivery/policy/` 对应七个文件 |
+| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code,antigravity}.md` | `delivery/policy/` 对应八个文件 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
 | 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应三个文件 |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |

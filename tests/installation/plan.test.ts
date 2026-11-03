@@ -490,11 +490,7 @@ test("target selection rejects unknown, repeated, unselected-product and nested 
     f.plan(["--target", "codex:gh/references/operations.md"]).status,
     2,
   );
-  for (const key of [
-    "codex:missing",
-    "antigravity:policy/review.md",
-    "codex:policy/antigravity.md",
-  ]) {
+  for (const key of ["codex:missing", "antigravity:policy/review.md"]) {
     assert.ok(
       f
         .gaps(f.plan(["--target", key]))

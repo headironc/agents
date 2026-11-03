@@ -13,7 +13,7 @@ export const memberCategories = [
 export const products = ["codex", "claude", "antigravity"] as const;
 export type Product = (typeof products)[number];
 const sharedPolicies = ["writing", "tool-contracts", "review"];
-const codexPolicies = ["rust", "sql", "models", "claude-code"];
+const codexPolicies = ["rust", "sql", "models", "claude-code", "antigravity"];
 // Deployed executables a consuming project runs directly, published beside the rules they enforce.
 // Kept in name order, so a new entry lands in one place and the plan stays comparable.
 const tools: [string, string][] = [
