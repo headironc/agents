@@ -133,6 +133,81 @@ test("five selected files install and roll back from a Codex worktree without ch
   );
 });
 
+test("selected review files and complete skills preserve other targets through refusal, apply and rollback", (t) => {
+  const f = installFixture(t, { realRuntime: true });
+  const keys = [
+    "codex:gh",
+    "codex:policy/review.md",
+    "claude:gh",
+    "claude:policy/review.md",
+  ];
+  const originals = new Map<string, ReturnType<typeof readTargetState>>();
+  const untouched: string[] = [];
+  for (const product of ["codex", "claude"]) {
+    const root = path.join(f.home, `.${product}`);
+    const gh = path.join(root, "skills/gh");
+    cpSync(path.join(f.checkout, "delivery/skills/gh"), gh, {
+      recursive: true,
+    });
+    writeFileSync(
+      path.join(gh, "references/operations.md"),
+      "previous operations\n",
+    );
+    originals.set(gh, readTargetState(gh));
+    const review = path.join(root, "policy/review.md");
+    mkdirSync(path.dirname(review), { recursive: true });
+    writeFileSync(review, "previous review\n", { mode: 0o600 });
+    originals.set(review, readTargetState(review));
+    const other = path.join(root, "skills/wechatide");
+    mkdirSync(other, { recursive: true, mode: 0o700 });
+    writeFileSync(
+      path.join(other, "SKILL.md"),
+      "retain personal permissions\n",
+      { mode: 0o400 },
+    );
+    untouched.push(other);
+  }
+  const states = untouched.map(readTargetState);
+  const { plan, review } = f.planned(
+    keys.flatMap((key) => ["--target", key, "--adopt", key]),
+  );
+  assert.deepEqual(plan.selectedTargets, [...keys].sort());
+  assert.equal(plan.targets.length, 4);
+  assert.equal(
+    plan.targets.filter((target) => target.kind === "directory").length,
+    2,
+  );
+  const drift = path.join(f.home, ".claude/skills/gh/new-owner.txt");
+  writeFileSync(drift, "third party\n");
+  assert.equal(f.cli(["apply", "--plan", review]).status, 1);
+  assert.equal(existsSync(plan.run.receipt), false);
+  for (const target of plan.targets.filter((target) => target.kind === "file"))
+    assert.deepEqual(readTargetState(target.path), originals.get(target.path));
+  unlinkSync(drift);
+  assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
+  for (const target of plan.targets)
+    assert.deepEqual(
+      readTargetState(target.path),
+      readTargetState(target.source),
+    );
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+  assert.deepEqual(untouched.map(readTargetState), states);
+  assert.equal(
+    outcome(f.cli(["rollback", "--receipt", plan.run.receipt])).status,
+    "rolled-back",
+  );
+  for (const [target, state] of originals)
+    assert.deepEqual(readTargetState(target), state);
+  assert.deepEqual(untouched.map(readTargetState), states);
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+});
+
 test("V6 applies, reads back and restores Antigravity without touching App settings or unlisted skills", (t) => {
   const f = installFixture(t, { realRuntime: true });
   const root = path.join(f.home, ".gemini/antigravity-cli");

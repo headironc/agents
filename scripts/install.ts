@@ -663,8 +663,7 @@ export function planInstallation(
   const available = deriveTargets(roots, run.source, entries);
   for (const key of args.targets) {
     const target = available.find((target) => target.key === key);
-    if (!target || target.kind !== "file")
-      gaps.push({ code: "invalid-file-target", key });
+    if (!target) gaps.push({ code: "invalid-target", key });
   }
   block();
   const drafts = args.targets.length

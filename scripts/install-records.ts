@@ -196,10 +196,9 @@ export const InstallPlanSchema = z
           (key, index) =>
             index > 0 && bytewise(plan.selectedTargets![index - 1]!, key) >= 0,
         ) ||
-        canonicalDigest(keys) !== canonicalDigest(plan.selectedTargets) ||
-        plan.targets.some((target) => target.kind !== "file")
+        canonicalDigest(keys) !== canonicalDigest(plan.selectedTargets)
       )
-        issue("Selected file targets must match the complete target list");
+        issue("Selected targets must match the complete target list");
     }
     for (const collision of installPathCollisions(plan))
       issue(`Installation paths overlap: ${collision}`);
