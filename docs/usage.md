@@ -196,9 +196,9 @@ bash scripts/install.sh plan --source "$PWD" --report .cache/reports/check.json 
 
 选入 Antigravity CLI 时，在同一 plan 命令后增加 `--include-product antigravity`。目标根固定为 `$HOME/.gemini/antigravity-cli`，只发布下表成员。安装器不创建 Plugin，也不写 `settings.json`、发现 manifest、hooks、MCP 或规则入口。该根的 `skills/` 由 CLI 自动发现，App 不读取。已有 CLI 专属或共享目录中的同名技能可能影响优先级；实际来源通过 `/skills` 核对，见[官方发现规则](https://antigravity.google/docs/customization-discovery?tab=cli)。
 
-仅更新受管文件时，重复传入 `--target KEY` 指定完整目标集合。KEY 与下述接管名称相同，例如 `--target codex:AGENTS.md --target codex:policy/models.md`。选择只接受已选产品的受管文件，拒绝重复、未知名称及技能目录。未传时沿用整批计划。`--target` 不替代 `--adopt`；已有差异文件仍须明确接管。调用者按当前任务核对完整依赖，安装器不自动加入其他目标。未选目标不读取内容、不要求接管，也不修改权限。完整源码检查与冻结快照仍覆盖原候选。
+仅更新部分受管目标时，重复传入 `--target KEY` 指定完整目标集合。KEY 与下述接管名称相同，例如 `--target codex:policy/review.md --target codex:gh`。选择接受已选产品的受管文件和完整技能目录，拒绝重复、未知名称及技能内部文件路径。技能目录沿用完整备份、替换、回读和回滚，不拆分安装内部成员。未传时沿用整批计划。`--target` 不替代 `--adopt`；已有差异目标仍须明确接管。调用者按当前任务核对完整依赖，安装器不自动加入其他目标。未选目标不读取内容、不要求接管，也不修改权限。完整源码检查与冻结快照仍覆盖原候选。
 
-文件选择写入计划的 `selectedTargets`，并与实际目标集合严格匹配。apply、verify 和 rollback 均只处理计划目标。`status` 同时展示该选择，不把部分交付称为整批安装。旧 V5/V6 计划没有该字段时保持原语义；不支持文件选择的旧安装器会拒绝含新字段的计划，恢复使用本计划绑定的运行副本。
+目标选择写入计划的 `selectedTargets`，并与实际目标集合严格匹配。apply、verify 和 rollback 均只处理计划目标。`status` 同时展示该选择，不把部分交付称为整批安装。旧 V5/V6 计划没有该字段时保持原语义；不支持所选目标的旧安装器会拒绝计划，恢复使用本计划绑定的运行副本。
 
 报告必须来自同一平台和固定 Node 的完整通过的 `all`。检出 HEAD 必须等于报告基线，源码字节必须与报告一致。计划记录本机稳定标识：Linux 取 `/etc/machine-id`，macOS 取 `sysctl -n kern.uuid`。取不到即拒绝。apply、verify、rollback 均核对该标识。主机名变更只在 verify 中报告。报告绑定的被忽略文件同样阻止计划。V5 运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，只保存计划与回执。候选和恢复运行副本位于 `${CODEX_HOME:-$HOME/.codex}/.agents-install/<run-id>/`。计划另在 `--output` 写出同字节审阅副本。它只读公开目标，但会建立私有安装器目录。
 

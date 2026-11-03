@@ -478,7 +478,7 @@ test("overlapping deployment, backup, source and private roots block before plan
   }
 });
 
-test("file selection rejects unknown, repeated, unselected-product and directory keys", (t) => {
+test("target selection rejects unknown, repeated, unselected-product and nested member keys", (t) => {
   const f = installFixture(t);
   assert.equal(
     f.plan(["--target", "codex:AGENTS.md", "--target", "codex:AGENTS.md"])
@@ -486,15 +486,15 @@ test("file selection rejects unknown, repeated, unselected-product and directory
     2,
   );
   assert.equal(f.plan(["--target", "AGENTS.md"]).status, 2);
-  for (const key of [
-    "codex:missing",
-    "antigravity:policy/review.md",
-    "codex:wechatide",
-  ]) {
+  assert.equal(
+    f.plan(["--target", "codex:gh/references/operations.md"]).status,
+    2,
+  );
+  for (const key of ["codex:missing", "antigravity:policy/review.md"]) {
     assert.ok(
       f
         .gaps(f.plan(["--target", key]))
-        .some((gap) => gap.code === "invalid-file-target" && gap.key === key),
+        .some((gap) => gap.code === "invalid-target" && gap.key === key),
     );
   }
   assert.deepEqual(f.runs(), []);
