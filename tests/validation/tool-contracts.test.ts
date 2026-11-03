@@ -43,7 +43,6 @@ test("core inventory has the independently expected delivered subjects and valid
     "codex-cli-loader",
     "codex-cli",
     "claude-code",
-    "antigravity-cli",
     "pinned-tool-bootstrap",
   ];
   assert.deepEqual(
@@ -113,12 +112,7 @@ test("every delivered consumer has its independently expected binding and declar
     ],
     "delivery/policy/tool-contracts.md": ["rg", "jq", "curl", "git", "openssh"],
     "delivery/policy/claude-code.md": ["claude-code"],
-    "delivery/policy/antigravity.md": ["antigravity-cli"],
-    "delivery/policy/models.md": [
-      "claude-code",
-      "antigravity-cli",
-      "task-temp",
-    ],
+    "delivery/policy/models.md": ["claude-code", "task-temp"],
     "delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md":
       ["curl"],
     "delivery/skills/alibabacloud-find-skills/references/verification-method.md":

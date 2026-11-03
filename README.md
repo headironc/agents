@@ -13,7 +13,6 @@
 | 总协调启动提示词 | [通用模板与 Nucleus 使用约定](docs/prompts/coordinator.md) | 明确启用后，总协调派发、跟进和接纳，负责人实施与验证；普通文档，不安装，也不自动继承持续交付或合并授权 |
 | 本机协作提醒 | [使用与恢复](docs/usage.md#本机协作提醒) | 本机可选配置，独立于源码交付；启用状态与授权按实际环境核对 |
 | Claude Code 与 DeepSeek 可选委派 | [分工与授权](delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](delivery/policy/claude-code.md) | 按任务与能力适配选用，支持完整结果；负责人判断与验收，不设调用比例；未接入 CI 或审查关卡 |
-| Antigravity CLI 优先路线 | [路线偏好](delivery/policy/models.md#route-model-preferences)、[调用合同](delivery/policy/antigravity.md) | Argon/Opus 优先，确认额度耗尽后回退 Codex；保留账号支持、材料与操作边界；短探测也先读合同，不安装客户端或配置 |
 | 设计稿与看图验收 | [figma-design-workflow](delivery/skills/figma-design-workflow/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Codex 专用；Figma 按需使用，保留可编辑结果与真实像素验收；历史实测范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
 | 产品指令 | [交付目录](docs/usage.md#交付目录) | 直接维护与安装位置相同的源码布局 |
 | 文档检查器 | [工具契约](delivery/policy/tool-contracts.md) | 提示中文句长，阻塞混排空格及表格编号错误 |

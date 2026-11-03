@@ -20,7 +20,7 @@
 
 [Claude Code 与 DeepSeek](policy/models.md#claude-code-and-deepseek-delegation) 按任务与能力适配选用。选用后可交付适任完整结果。设计稿采用[设计专用路线](policy/models.md#task-start-and-execution-routing)。负责人绑定单一结果与写区，并验收实际产物；不设调用比例或逐项审批。[调用合同](policy/claude-code.md)区分只读、有界执行和选用本客户端后的显式设计模式。客户端由使用者提供，安装规则不启用模型或扩大权限。
 
-[Antigravity CLI](policy/models.md#antigravity-cli-delegation) 按统一的[路线偏好](policy/models.md#route-model-preferences)进入调用准备。[合同](policy/antigravity.md)覆盖目录查询、档位试验及任务调用，要求核账号支持、材料、实际参数、权限和完整结果。消费计划不支持第三方代理嵌套调用；安装了 `agy` 不证明路线就绪。参数观察见[有限实测](policy/antigravity.md#有限参数实测)。源码交付不启用模型、账号或个人配置。
+[Antigravity 使用支持](policy/antigravity.md)保留安装、技能发现和使用者直接操作 CLI 的说明。Antigravity CLI 可选安装通用 Skills 及必要依赖；Codex 不再从该文档选择或委派模型路线。
 
 [项目导航与验证](skills/project-guide/SKILL.md)提供四项能力。它识别项目与版本，发现权威资料，选择并执行原生检查，报告证据与缺口。按任务需要使用，不增加普通开发的必经流程。命令、业务规则及授权范围由目标项目和当前任务决定。
 
