@@ -75,7 +75,7 @@ import type { SourceEntry } from "./source.ts";
 
 const closureCheck = "Installer build closure";
 const usage = [
-  "Usage: install.sh plan --source DIR --report FILE --output PLAN [--adopt KEY]... [--include-product antigravity]",
+  "Usage: install.sh plan --source DIR --report FILE --output PLAN [--target KEY]... [--adopt KEY]... [--include-product antigravity]",
   "       install.sh apply --plan PLAN",
   "       install.sh verify --receipt RECEIPT",
   "       install.sh rollback --receipt RECEIPT",
@@ -98,6 +98,7 @@ type PlanArguments = {
   report: string;
   output: string;
   adopt: string[];
+  targets: string[];
   includeAntigravity: boolean;
 };
 
@@ -109,12 +110,14 @@ export function parsePlanArguments(args: string[]): PlanArguments {
   };
   const values = new Map<string, string>();
   const adopt: string[] = [];
+  const targets: string[] = [];
   let includeAntigravity = false;
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]!;
     const value = args[index + 1];
     if (
       name !== "--adopt" &&
+      name !== "--target" &&
       name !== "--include-product" &&
       !Object.hasOwn(options, name)
     )
@@ -125,10 +128,11 @@ export function parsePlanArguments(args: string[]): PlanArguments {
       if (value !== "antigravity" || includeAntigravity)
         throw new UsageError(`Invalid or repeated product: ${value}`);
       includeAntigravity = true;
-    } else if (name === "--adopt") {
-      if (!adoptKeyPattern.test(value) || adopt.includes(value))
-        throw new UsageError(`Invalid or repeated adopted name: ${value}`);
-      adopt.push(value);
+    } else if (name === "--adopt" || name === "--target") {
+      const selected = name === "--adopt" ? adopt : targets;
+      if (!adoptKeyPattern.test(value) || selected.includes(value))
+        throw new UsageError(`Invalid or repeated ${name} key: ${value}`);
+      selected.push(value);
     } else {
       if (values.has(options[name]!))
         throw new UsageError(`Repeated argument: ${name}`);
@@ -143,6 +147,7 @@ export function parsePlanArguments(args: string[]): PlanArguments {
     report: resolved("report"),
     output: resolved("output"),
     adopt: adopt.sort(bytewise),
+    targets: targets.sort(bytewise),
     includeAntigravity,
   };
 }
@@ -655,7 +660,16 @@ export function planInstallation(
     source: path.join(privateRun, "source"),
     runtime: path.join(privateRun, "runtime"),
   };
-  const drafts = deriveTargets(roots, run.source, entries);
+  const available = deriveTargets(roots, run.source, entries);
+  for (const key of args.targets) {
+    const target = available.find((target) => target.key === key);
+    if (!target || target.kind !== "file")
+      gaps.push({ code: "invalid-file-target", key });
+  }
+  block();
+  const drafts = args.targets.length
+    ? available.filter((target) => args.targets.includes(target.key))
+    : available;
   for (const draft of drafts) {
     if (!candidate.some((entry) => inside(draft.relativeSource, entry.path)))
       gaps.push({
@@ -830,6 +844,7 @@ export function planInstallation(
       candidate: { entries: candidate, sha256: canonicalDigest(candidate) },
       runtime,
       adopt: args.adopt,
+      ...(args.targets.length ? { selectedTargets: args.targets } : {}),
       newDirectories: [...newDirectories]
         .filter((directory) => !lstatIfExists(directory))
         .sort(bytewise),
@@ -929,6 +944,7 @@ type InstallationStatus = {
   installedAt?: string | undefined;
   checkout?: { directory: string; commit: string } | undefined;
   candidate?: { sha256: string } | undefined;
+  selectedTargets?: string[] | undefined;
   // `ahead` is what the baseline commit has and the checkout's HEAD does not. Zero means the
   // baseline is on this line of history and `behind` is a distance; anything else means the two
   // diverged and `behind` is one side of that, not a number to close.
@@ -1018,6 +1034,7 @@ function installationStatus(
       commit: plan.checkout.commit,
     },
     candidate: { sha256: plan.candidate.sha256 },
+    ...(plan.selectedTargets ? { selectedTargets: plan.selectedTargets } : {}),
     repository: comparedWith(plan),
   };
 }

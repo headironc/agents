@@ -127,13 +127,13 @@ export function link(target: string, file: string): void {
 /** A committed checkout, passing report and temporary HOME; the fake runtime only answers the plan probes. */
 export function installFixture(
   t: TestContext,
-  options: { realRuntime?: boolean; home?: string } = {},
+  options: { realRuntime?: boolean; home?: string; worktree?: string } = {},
 ) {
   const base = realpathSync(
     mkdtempSync(path.join(os.tmpdir(), "agents-install-")),
   );
   t.after(() => rmSync(base, { recursive: true, force: true }));
-  const checkout = path.join(base, "checkout");
+  let checkout = path.join(base, "checkout");
   const home = path.join(base, options.home ?? "home");
   const outputs = path.join(base, "outputs");
   for (const item of [checkout, home, outputs]) directory(item);
@@ -206,6 +206,16 @@ export function installFixture(
       'console.error("usage"); process.exitCode = 2;\n',
       0o600,
     );
+  }
+  if (options.worktree) {
+    const linked = path.join(home, options.worktree);
+    directory(path.dirname(linked));
+    git("worktree", "add", "--detach", linked, "HEAD");
+    for (const file of runtimeInputs) {
+      directory(path.dirname(path.join(linked, file)));
+      cpSync(path.join(checkout, file), path.join(linked, file));
+    }
+    checkout = linked;
   }
   const reportPath = path.join(base, "report.json");
   const writeReport = (

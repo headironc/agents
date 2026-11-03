@@ -172,6 +172,7 @@ export const InstallPlanSchema = z
     }),
     runtime: RuntimeSchema,
     adopt: z.array(adoptKey),
+    selectedTargets: z.array(adoptKey).min(1).optional(),
     // Missing target parents, parent first; apply creates each with mode 0700.
     newDirectories: z.array(absolutePath),
     targets: z.array(InstallTargetSchema).min(1),
@@ -188,6 +189,18 @@ export const InstallPlanSchema = z
     if ((plan.version === 6) !== (plan.roots.antigravity !== undefined))
       issue("Only V6 plans include an Antigravity root");
     if (canonicalDigest(body) !== sha256) issue("Plan digest mismatch");
+    if (plan.selectedTargets) {
+      const keys = plan.targets.map((target) => target.key).sort(bytewise);
+      if (
+        plan.selectedTargets.some(
+          (key, index) =>
+            index > 0 && bytewise(plan.selectedTargets![index - 1]!, key) >= 0,
+        ) ||
+        canonicalDigest(keys) !== canonicalDigest(plan.selectedTargets) ||
+        plan.targets.some((target) => target.kind !== "file")
+      )
+        issue("Selected file targets must match the complete target list");
+    }
     for (const collision of installPathCollisions(plan))
       issue(`Installation paths overlap: ${collision}`);
     const paths = plan.candidate.entries.map((entry) => entry.path);
@@ -285,7 +298,7 @@ export const InstallPlanSchema = z
   });
 export type InstallPlan = z.infer<typeof InstallPlanSchema>;
 
-/** Public roots must be disjoint and must not contain or sit inside recovery/source storage. */
+/** Public targets cannot overlap source or recovery storage; Codex worktrees may share its root. */
 export function installPathCollisions(
   plan: {
     roots: InstallRoots;
@@ -310,6 +323,18 @@ export function installPathCollisions(
     };
     return contains(left, right) || contains(right, left);
   };
+  const codexWorktree = (directory: string) => {
+    const relative = path.relative(
+      resolvePath(path.join(plan.roots.codex.path, "worktrees")),
+      resolvePath(directory),
+    );
+    return (
+      relative !== "" &&
+      relative !== ".." &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative)
+    );
+  };
   const roots = products.flatMap((product) =>
     plan.roots[product] ? [plan.roots[product]!.path] : [],
   );
@@ -321,11 +346,24 @@ export function installPathCollisions(
   ];
   const privateRun = path.dirname(plan.run.source);
   const collisions: string[] = [];
+  for (let index = 0; index < protectedPaths.length; index++)
+    for (const other of protectedPaths.slice(index + 1))
+      if (overlaps(protectedPaths[index]!, other)) collisions.push(other);
   for (let index = 0; index < roots.length; index++)
     for (const other of roots.slice(index + 1))
       if (overlaps(roots[index]!, other)) collisions.push(other);
   for (const root of roots)
-    if (protectedPaths.some((other) => overlaps(root, other)))
+    if (
+      protectedPaths.some(
+        (other) =>
+          overlaps(root, other) &&
+          !(
+            root === plan.roots.codex.path &&
+            other === plan.checkout.directory &&
+            codexWorktree(other)
+          ),
+      )
+    )
       collisions.push(root);
   if (
     protectedPaths.some((other) => overlaps(privateRun, other)) ||

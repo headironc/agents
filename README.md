@@ -24,7 +24,7 @@
 | 原生 CI 与交付 | [运行合同](docs/tooling.md#ci-与审查边界)、[实例与证据边界](docs/review-gate.md#实例与证据边界) | 两平台复用完整检查；实际配置、运行与独立审查分别绑定实例验证 |
 | 阿里云技能发现与短信 | [技能发现](delivery/skills/alibabacloud-find-skills/SKILL.md)、[短信](delivery/skills/alibabacloud-sms-send-short-message/SKILL.md) | 发现、安装及发送遵循各自授权 |
 | 微信开发者工具 | [wechatide](delivery/skills/wechatide/SKILL.md) | 九个子入口已交付；实际 DevTools 操作限 macOS |
-| 安装与恢复 | [安装合同](docs/usage.md#双端安装) | 默认双端，显式选入 Antigravity CLI 后生成三端计划；分别复制受检内容并支持回读与恢复 |
+| 安装与恢复 | [安装合同](docs/usage.md#双端安装) | 默认双端，显式选入 Antigravity CLI 后生成三端计划；支持受管文件选择、Codex 工作树来源、回读与恢复 |
 
 规则拥有行为要求，技能拥有完整能力单元。项目决定采用范围及检查参数。工具打包器负责生成可执行产物，安装器负责目标绑定及恢复。安装后的使用入口见随交付发布的 [README.md](delivery/README.md)。
 
