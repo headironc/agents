@@ -6,7 +6,7 @@ Contract subject: `claude-code`.
 
 模型接口只允许 DeepSeek 官方与 OpenCode 官方服务。负责人在这两者中选择满足任务需要的路线，合适时复用当前配置，无须逐次请示。`https://api.deepseek.com/anthropic` 是 DeepSeek 官方 Anthropic 兼容端点。OpenCode 路线按其官方 API 文档核对实际地址。第三方转发或自建兼容地址不因使用同一模型名而进入允许范围。核对本次实际接收端点、凭据来源、模型和 effort，不显示密钥或鉴权头。客户端名及响应模型名不证明实际上游身份。材料、操作及更窄的用户限制继续适用。扩大接收方范围必须有用户明确决定。
 
-按实际服务解析模型名。[DeepSeek 的 Anthropic 兼容映射](https://api-docs.deepseek.com/guides/anthropic_api/)把 `claude-opus*` 映射到 `deepseek-v4-pro`。其他 `claude*` 别名映射到 Flash。这是兼容行为，不构成 V4 Pro 的选用建议或账号可用证明。不要把这种调用报告成 Anthropic Opus 或 Sonnet。优先使用本路线支持的明确 DeepSeek 标识，并核实际返回及计费模型。Antigravity 中选择 Claude 家族，不授权把其标识直接套入另一接收服务。
+按实际服务解析模型名。[DeepSeek 的 Anthropic 兼容映射](https://api-docs.deepseek.com/guides/anthropic_api/)把 `claude-opus*` 映射到 `deepseek-v4-pro`。其他 `claude*` 别名映射到 Flash。这是兼容行为，不构成 V4 Pro 的选用建议或账号可用证明。不要把这种调用报告成 Anthropic Opus 或 Sonnet。优先使用本路线支持的明确 DeepSeek 标识，并核实际返回及计费模型。
 
 当前 V4.1 Flash 在 [DeepSeek 官方 API](https://api-docs.deepseek.com/quick_start/pricing/) 使用 `deepseek-flash`。[OpenCode Go 目录](https://opencode.ai/v2/docs/console/go)将其列为 `deepseek-v4.1-flash`。按实际服务和协议解析，不跨路线照搬。
 

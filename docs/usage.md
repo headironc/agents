@@ -13,7 +13,6 @@
 | 维护产品指令 | [交付目录](#交付目录)、[Codex 规则](../delivery/AGENTS.md)、[产品场景](../tests/scenarios/adapters.md) | 直接维护交付目录的唯一规则源 |
 | 组织执行、选择模型路线、安排会话与 Goal，或协作、接续和收尾 | [任务起点](../delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](../delivery/policy/models.md)、[模型场景](../tests/scenarios/rules.md#模型选择与接续) | 由 Codex 规则入口按需加载；衔接需求与授权、工作区选择与绑定、Goal、自主执行、结果接纳及收尾，实际经验见[验证边界](#验证能说明什么) |
 | 按任务选用 Claude Code 与 DeepSeek | [分工与授权](../delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](../delivery/policy/claude-code.md) | 仅使用 DeepSeek 官方或 OpenCode 官方 API；按能力适配交付完整工作，保留任务边界及验收，不设调用比例 |
-| 选择或调用 Antigravity CLI，含目录与档位探测 | [路线偏好](../delivery/policy/models.md#route-model-preferences)、[调用合同](../delivery/policy/antigravity.md) | Argon/Opus 优先，确认额度耗尽后回退 Codex；先读相关合同，核账号、材料、权限和有界运行，复用未变证据 |
 | 项目明确采用 Rust 偏好 | [Rust 偏好](../delivery/policy/rust.md)与[代码偏好](../delivery/AGENTS.md#code-preferences) | 依项目明确采用的范围读取 |
 | 项目明确采用 SQL 偏好 | [SQL 偏好](../delivery/policy/sql.md)与[代码偏好](../delivery/AGENTS.md#code-preferences) | 按项目采用范围加载 SQL correctness 及其错误处理引用；PostgreSQL 约定仅适用于该数据库，表名遵循[表与模式命名偏好](../delivery/policy/sql.md#tables-and-schemas) |
 | 协同设计数据模型 | [代码偏好](../delivery/AGENTS.md#code-preferences)、[SQL 建模偏好](../delivery/policy/sql.md#data-modeling) | 先恢复整体流程与已定职责，再围绕实际未决选择细化；不设固定逐表审批，具体拆分、应用 ID 和类型取值由所属项目记录 |
@@ -62,16 +61,6 @@
 | 平台专属验收 | 项目支持的本机原生环境、已有且适用的 CI 或对应客户端 | 实际开发设备、执行边界、准确候选和运行，保留未覆盖的平台与业务行为；其他环境只沿已核实能力与授权选择 |
 
 [官方本地环境说明](https://learn.chatgpt.com/docs/environments/local-environment)提醒，工作树可能缺少未提交到 Git 的依赖和文件。[浏览器文档](https://learn.chatgpt.com/docs/browser)区分 Desktop 与 CLI 的入口。[插件文档](https://learn.chatgpt.com/docs/plugins)另列适用客户端、连接和权限条件。某执行者缺少入口时，按政策安排对应阶段，不判定整个本机缺能力。上表用于选择路径，不是已安装、已登录或行为验收的快照。
-
-## Antigravity CLI
-
-[模型政策](../delivery/policy/models.md#route-model-preferences)统一拥有路线顺序与回退条件，[调用合同](../delivery/policy/antigravity.md)拥有参数、权限、结果和恢复。用户级规则入口在选择或调用外部模型 CLI 前触发阅读，包含 `agy models` 与模型/effort 短试验。有效选择与授权成立后，绑定完整任务再调用。复用同范围持续授权及未变输入的有效结果，不设每项任务必调或逐次索批。
-
-账号和调用方式须符合当前官方支持范围。消费计划不支持第三方编码代理嵌套调用 `agy`。DeepSeek、OpenCode 或 Codex 模型选择不扩大接收方授权。CLI 版本、模型与 effort、单次设置、自动加载材料和有效权限均按本次核对。工具拒绝、软拒绝或不完整报告保留为具体缺口，不靠退出 0 接纳。
-
-Codex 的调用路线交付规则与手工合同。Antigravity CLI 自身另有可选的[通用技能安装目标](#安装目标与接管)，采用独立 CLI 根；它不继承 Codex 模型路线。仓库开发门禁使用私有缓存中的官方校验器，不安装个人 CLI、登录、配置账号或启动服务。帮助输出、格式校验和静态场景不证明当前模型行为。真实演练另核模型、材料、账号及调用方式，按[验证边界](#验证能说明什么)报告。
-
-已接收的历史参数观察见[有限参数实测](../delivery/policy/antigravity.md#有限参数实测)。该记录只支持当日所测组合的解析结论，不证明当前账号调用资格、服务端预算或新入口的真实触发行为。
 
 ## 微信项目配置、DevTools 初始化、编译、诊断、预览、项目列表、自动化、云开发与安装诊断
 
@@ -225,6 +214,8 @@ bash scripts/install.sh status
 
 全为 `unchanged` 的运行没有替换步骤。对其 rollback 会把回执标为 `rolled-back`，但原有目标仍在。若无其他已安装回执，`status` 将返回 `none`。这不是卸载入口。
 
+Codex 的 Antigravity 调用合同已退役，不再派生为新安装目标。旧 V5/V6 记录仍按其冻结目标及运行副本验证和恢复；源码删除不卸载已安装文件。
+
 ### 安装目标与接管
 
 所有公开目标直接保存内容。技能安装完整顶层目录，内部引用从该目录解析。固定类别与技能清单共同决定目标，不按历史数量验收。
@@ -232,7 +223,7 @@ bash scripts/install.sh status
 | 目标类别 | 安装位置 | 候选来源 |
 | --- | --- | --- |
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
-| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code,antigravity}.md` | `delivery/policy/` 对应八个文件 |
+| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code}.md` | `delivery/policy/` 对应七个文件 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
 | 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应三个文件 |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |

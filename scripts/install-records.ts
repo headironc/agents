@@ -252,16 +252,25 @@ export const InstallPlanSchema = z
       };
       const name = target.key.slice(target.product.length + 1);
       const relative = target.category === "skill" ? `skills/${name}` : name;
+      // Old V5/V6 records still need their frozen recovery runtime after a policy retires.
+      // New plans derive only current public members.
+      const retiredPolicy =
+        target.product === "codex" &&
+        target.category === "policy" &&
+        relative === "policy/antigravity.md" &&
+        paths.includes("delivery/policy/antigravity.md")
+          ? { relative, source: `delivery/${relative}` }
+          : undefined;
       const member =
         target.category === "skill"
           ? /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
             ? { relative, source: `delivery/${relative}` }
             : undefined
-          : publicMembers([], target.product).find(
+          : (publicMembers([], target.product).find(
               (member) =>
                 member.category === target.category &&
                 member.relative === relative,
-            );
+            ) ?? retiredPolicy);
       if (
         !target.key.startsWith(`${target.product}:`) ||
         !member ||
