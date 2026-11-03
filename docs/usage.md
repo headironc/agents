@@ -214,7 +214,7 @@ bash scripts/install.sh status
 
 全为 `unchanged` 的运行没有替换步骤。对其 rollback 会把回执标为 `rolled-back`，但原有目标仍在。若无其他已安装回执，`status` 将返回 `none`。这不是卸载入口。
 
-Codex 的 `policy/antigravity.md` 保留为安装说明，不再包含模型调用合同或路线。原有安装目标和 Antigravity 通用技能支持保持不变；旧 V5/V6 记录继续使用其绑定的运行副本验证和恢复。
+Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安装、技能发现及使用者直接操作 CLI 的说明。其他 agent 的调用入口、委派和模型路线已移除。原有安装目标及旧 V5/V6 记录的验证和恢复保持不变。
 
 ### 安装目标与接管
 
