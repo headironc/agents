@@ -35,6 +35,8 @@
 
 [模型政策](../delivery/policy/models.md)拥有任务组织、执行、验收及收尾的决策。按任务从[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)进入，查阅[工作区](../delivery/policy/models.md#workspaces)、[Goal](../delivery/policy/models.md#goals) 及[收尾](../delivery/policy/models.md#task-completion-and-chat-archival)规则。代码工具的通用绑定见[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)。团队采用仍遵循上述项目内版本化要求。入口引用不等于正文已经加载；安装政策不切换模型或修改客户端配置。
 
+已授权的权限缺口梳理、自动审批附加策略更新和接班，按[策略接续](../delivery/policy/models.md#automatic-review-policy-succession)处理。配置写入、会话创建和审批器实际加载分别取证。
+
 [阶段职责](../delivery/policy/models.md#delegation-and-acceptance)拥有委派、缺口核实、交付责任及结果接纳。阶段共用检出与写者交接见[工作区规则](../delivery/policy/models.md#workspaces)。
 
 [Codex 模型偏好](../delivery/policy/models.md#current-defaults)与[外部路线模型偏好](../delivery/policy/models.md#route-model-preferences)分别维护具体模型及档位。创建、续接和变更时的参数及证据要求见[运行限制](../delivery/policy/models.md#runtime-limits)。
