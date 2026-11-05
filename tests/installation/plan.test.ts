@@ -24,10 +24,135 @@ import { canonicalDigest } from "../../scripts/source.ts";
 import {
   expectedTargets,
   installFixture,
+  legacyPlan,
   runtimeInputs,
   sha256,
   skills,
 } from "./fixtures.ts";
+
+test("the CLI requires an explicit nonempty unique product selection before creating a plan", (t) => {
+  const f = installFixture(t);
+  const base = [
+    "plan",
+    "--source",
+    f.checkout,
+    "--report",
+    f.reportPath,
+    "--output",
+    path.join(f.outputs, "plan.json"),
+  ];
+  for (const extra of [
+    [],
+    ["--product"],
+    ["--product", ""],
+    ["--product", "unknown"],
+    ["--product", "codex,claude"],
+    ["--product", "Codex"],
+    ["--product", "codex", "--product", "codex"],
+    ["--product", "claude", "--product", "claude"],
+    ["--product", "antigravity", "--product", "antigravity"],
+    ["--include-product", "antigravity"],
+    ["--product", "codex", "--include-product", "antigravity"],
+  ]) {
+    const result = f.cli([...base, ...extra]);
+    assert.equal(result.status, 2, result.stderr + JSON.stringify(extra));
+    assert.match(result.stderr, /product/);
+    assert.deepEqual(readdirSync(f.home), []);
+    assert.deepEqual(readdirSync(f.outputs), []);
+  }
+  const help = f.cli([]);
+  assert.equal(help.status, 2);
+  assert.match(help.stderr, /--product PRODUCT/);
+  assert.match(help.stderr, /explicit selection required/);
+});
+
+test("product roots record each explicit subset in canonical order and exclude every other product", (t) => {
+  const f = installFixture(t);
+  for (const selected of [
+    ["codex"],
+    ["claude"],
+    ["antigravity"],
+    ["claude", "codex"],
+    ["codex", "antigravity"],
+    ["antigravity", "claude"],
+    ["antigravity", "claude", "codex"],
+  ] as const) {
+    const { plan } = f.planned(
+      selected.flatMap((product) => ["--product", product]),
+    );
+    const canonical = (["codex", "claude", "antigravity"] as const).filter(
+      (product) => (selected as readonly string[]).includes(product),
+    );
+    assert.equal(plan.version, 7);
+    assert.deepEqual(
+      Object.keys(plan.roots).filter((key) =>
+        ["codex", "claude", "antigravity"].includes(key),
+      ),
+      canonical,
+    );
+    assert.deepEqual(
+      plan.targets.map((target) => [target.path, target.source]),
+      expectedTargets(f.home, plan.run.source, undefined, undefined, [
+        ...canonical,
+      ]),
+    );
+    assert.equal(
+      plan.run.runtime,
+      path.join(f.home, ".local/state/agents/install", plan.run.id, "runtime"),
+    );
+    assert.equal(
+      plan.run.source,
+      path.join(f.home, ".local/state/agents/install", plan.run.id, "source"),
+    );
+  }
+});
+
+test("unselected product variables do not block planning or permit target or adoption claims", (t) => {
+  const f = installFixture(t, { products: ["claude"] });
+  const environment = { CODEX_HOME: "invalid-unused-root" };
+  const { plan } = f.planned([], environment);
+  assert.equal(plan.roots.codex, undefined);
+  assert.ok(
+    f
+      .gaps(f.plan(["--target", "codex:AGENTS.md"], environment))
+      .some((gap) => gap.code === "invalid-target"),
+  );
+  assert.ok(
+    f
+      .gaps(f.plan(["--adopt", "codex:gh"], environment))
+      .some((gap) => gap.code === "adopt-unused"),
+  );
+});
+
+test("V7 records reject empty product roots, unselected targets and legacy recovery paths", (t) => {
+  const f = installFixture(t, { products: ["claude"] });
+  const { plan } = f.planned();
+  for (const mutate of [
+    (value: typeof plan) => {
+      delete value.roots.claude;
+    },
+    (value: typeof plan) => {
+      value.version = 5;
+    },
+    (value: typeof plan) => {
+      value.run.runtime = path.join(
+        f.home,
+        ".codex/.agents-install",
+        value.run.id,
+        "runtime",
+      );
+    },
+  ]) {
+    const changed = structuredClone(plan);
+    mutate(changed);
+    const { sha256: _digest, ...body } = changed;
+    assert.equal(
+      InstallPlanSchema.safeParse({ ...body, sha256: canonicalDigest(body) })
+        .success,
+      false,
+    );
+  }
+});
 
 function installDistinctProducts(
   f: ReturnType<typeof installFixture>,
@@ -37,8 +162,8 @@ function installDistinctProducts(
   const claude = environment.CLAUDE_CONFIG_DIR ?? path.join(f.home, ".claude");
   const { plan, review } = f.planned([], environment);
   const expected = expectedTargets(f.home, plan.run.source, codex, claude);
-  assert.equal(plan.roots.codex.path, codex);
-  assert.equal(plan.roots.claude.path, claude);
+  assert.equal(plan.roots.codex?.path, codex);
+  assert.equal(plan.roots.claude?.path, claude);
   assert.deepEqual(
     plan.targets.map((target) => [target.path, target.source]),
     expected,
@@ -76,10 +201,10 @@ function installDistinctProducts(
     assert.equal(lstatSync(target, { throwIfNoEntry: false }), undefined);
 }
 
-test("Antigravity is explicit and V6 contains only its five compatible skills and dependencies", (t) => {
+test("explicit Antigravity selection contains only its five compatible skills and dependencies", (t) => {
   const f = installFixture(t);
   const initial = f.planned().plan;
-  assert.equal(initial.version, 5);
+  assert.equal(initial.version, 7);
   assert.equal(initial.roots.antigravity, undefined);
   const unsupportedUpgrade = { ...initial, version: 6 };
   const { sha256: initialDigest, ...upgradedBody } = unsupportedUpgrade;
@@ -94,9 +219,9 @@ test("Antigravity is explicit and V6 contains only its five compatible skills an
   assert.ok(
     initial.targets.every((target) => target.product !== "antigravity"),
   );
-  const { plan } = f.planned(["--include-product", "antigravity"]);
+  const { plan } = f.planned(["--product", "antigravity"]);
   const root = path.join(f.home, ".gemini/antigravity-cli");
-  assert.equal(plan.version, 6);
+  assert.equal(plan.version, 7);
   assert.equal(plan.roots.antigravity?.path, root);
   const { sha256: planDigest, ...v6Body } = plan;
   assert.equal(planDigest.length, 64);
@@ -128,14 +253,9 @@ test("Antigravity is explicit and V6 contains only its five compatible skills an
     ].sort(),
   );
   assert.ok(selected.every((target) => target.path.startsWith(`${root}/`)));
-  assert.equal(f.plan(["--include-product", "unknown"]).status, 2);
+  assert.equal(f.plan(["--product", "unknown"]).status, 2);
   assert.equal(
-    f.plan([
-      "--include-product",
-      "antigravity",
-      "--include-product",
-      "antigravity",
-    ]).status,
+    f.plan(["--product", "antigravity", "--product", "antigravity"]).status,
     2,
   );
 });
@@ -145,7 +265,7 @@ test("Antigravity collisions and adoption gaps refuse the complete plan before t
   const root = path.join(f.home, ".gemini/antigravity-cli");
   mkdirSync(path.join(root, "skills/gh"), { recursive: true });
   writeFileSync(path.join(root, "skills/gh/SKILL.md"), "existing skill\n");
-  const extra = ["--include-product", "antigravity"];
+  const extra = ["--product", "codex", "--product", "antigravity"];
   assert.ok(f.gaps(f.plan(extra)).some((gap) => gap.key === "antigravity:gh"));
   const { plan } = f.planned([...extra, "--adopt", "antigravity:gh"]);
   assert.equal(
@@ -169,7 +289,7 @@ test("a plan binds both products to independent roots and shared source", (t) =>
   const f = installFixture(t);
   const { plan } = f.planned();
   const expected = expectedTargets(f.home, plan.run.source);
-  assert.equal(plan.version, 5);
+  assert.equal(plan.version, 7);
   assert.deepEqual(Object.keys(plan.roots).sort(), [
     "backup",
     "claude",
@@ -204,7 +324,7 @@ test("custom product roots preserve the independent target contract", (t) => {
     CODEX_HOME: codex,
     CLAUDE_CONFIG_DIR: claude,
   });
-  assert.equal(plan.roots.codex.path, codex);
+  assert.equal(plan.roots.codex?.path, codex);
   assert.deepEqual(
     plan.targets.map((target) => [target.path, target.source]),
     expectedTargets(f.home, plan.run.source, codex, claude),
@@ -384,7 +504,7 @@ test("current V5 records with detailed unlisted entries remain readable", (t) =>
   const f = installFixture(t);
   const personal = path.join(f.home, ".codex/skills/personal");
   mkdirSync(personal, { recursive: true });
-  const { plan } = f.planned();
+  const { plan } = legacyPlan(f.planned(), 5);
   const previous = structuredClone(plan);
   previous.reported = [{ path: personal, state: readTargetState(personal) }];
   const { sha256: _digest, ...body } = previous;
@@ -632,6 +752,28 @@ test("new case variants collide only on a case-insensitive filesystem", (t) => {
   }
 });
 
+test("distinct product roots can share newly created ancestor aliases", (t) => {
+  const f = installFixture(t, { realRuntime: true });
+  installDistinctProducts(f, {
+    CODEX_HOME: path.join(f.home, "NewParent/codex"),
+    CLAUDE_CONFIG_DIR: path.join(f.home, "newparent/claude"),
+  });
+});
+
+test("a failed runtime preparation removes only this plan's newly created product and storage directories", (t) => {
+  const f = installFixture(t, { products: ["claude"] });
+  f.put(
+    ".cache/agents-build/install.mjs",
+    "throw new Error('fixture runtime failure');\n",
+    0o600,
+  );
+  f.writeReport();
+  const result = f.plan();
+  assert.equal(result.status, 1);
+  assert.deepEqual(readdirSync(f.home), []);
+  assert.deepEqual(readdirSync(f.outputs), []);
+});
+
 test("Claude roots reject relative values and linked ancestors", (t) => {
   const f = installFixture(t);
   assert.ok(
@@ -671,7 +813,7 @@ test("record validation binds product, path, source and backup even with a recom
       )!.key = "claude:AGENTS.md";
     },
     (value: typeof plan) => {
-      value.roots.claude.path = value.roots.codex.path;
+      value.roots.claude!.path = value.roots.codex!.path;
     },
   ]) {
     const changed = structuredClone(plan);

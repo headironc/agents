@@ -158,7 +158,7 @@ export function readCurrentInstallation(
   // Only the roots this answer rests on decide where the records are: the deployment root derives
   // from the state root, and that from `XDG_STATE_HOME` or `HOME`. A gap on any other root is
   // reported by the verification below, weighed there, and never keeps this from answering.
-  const inspected = inspectRoots(environment, gaps);
+  const inspected = inspectRoots(environment, gaps, []);
   if (!inspected)
     throw new Error(
       `Cannot resolve the installation roots: ${JSON.stringify(gaps)}`,

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { z } from "zod";
 import { memberCategories, products, publicMembers } from "./delivery.ts";
+import type { Product } from "./delivery.ts";
 import { canonicalDigest, SourceEntrySchema } from "./source.ts";
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -76,14 +77,19 @@ const RootSchema = z.strictObject({
 export type RootRecord = z.infer<typeof RootSchema>;
 export const InstallRootsSchema = z.strictObject({
   home: RootSchema,
-  codex: RootSchema,
-  claude: RootSchema,
+  codex: RootSchema.optional(),
+  claude: RootSchema.optional(),
   antigravity: RootSchema.optional(),
   state: RootSchema,
   deploy: RootSchema,
   backup: RootSchema,
 });
 export type InstallRoots = z.infer<typeof InstallRootsSchema>;
+
+/** The recorded roots own the product selection, including legacy dual/triple-product plans. */
+export function installationProducts(roots: InstallRoots): Product[] {
+  return products.filter((product) => roots[product] !== undefined);
+}
 
 export const TargetStateSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("absent") }),
@@ -138,7 +144,7 @@ const runId = z.string().regex(runIdPattern);
 
 export const InstallPlanSchema = z
   .strictObject({
-    version: z.union([z.literal(5), z.literal(6)]),
+    version: z.union([z.literal(5), z.literal(6), z.literal(7)]),
     createdAt: z.iso.datetime({ precision: 3 }),
     run: z.strictObject({
       id: runId,
@@ -186,8 +192,15 @@ export const InstallPlanSchema = z
     const issue = (message: string) =>
       context.addIssue({ code: "custom", message });
     const { sha256, ...body } = plan;
-    if ((plan.version === 6) !== (plan.roots.antigravity !== undefined))
-      issue("Only V6 plans include an Antigravity root");
+    if (plan.version === 7) {
+      if (!installationProducts(plan.roots).length)
+        issue("V7 plans require at least one product root");
+    } else if (
+      !plan.roots.codex ||
+      !plan.roots.claude ||
+      (plan.version === 6) !== (plan.roots.antigravity !== undefined)
+    )
+      issue("Legacy product roots must match the plan version");
     if (canonicalDigest(body) !== sha256) issue("Plan digest mismatch");
     if (plan.selectedTargets) {
       const keys = plan.targets.map((target) => target.key).sort(bytewise);
@@ -211,14 +224,16 @@ export const InstallPlanSchema = z
     )
       issue("Candidate entries must be sorted, unique and bound");
     const run = plan.run;
+    const privateRun =
+      plan.version === 7
+        ? path.join(plan.roots.state.path, "agents/install", run.id)
+        : path.join(plan.roots.codex?.path ?? "", ".agents-install", run.id);
     if (
       run.directory !== path.join(plan.roots.deploy.path, run.id) ||
       run.plan !== path.join(run.directory, "deployment-plan.json") ||
       run.receipt !== path.join(run.directory, "deployment-receipt.json") ||
-      run.source !==
-        path.join(plan.roots.codex.path, ".agents-install", run.id, "source") ||
-      run.runtime !==
-        path.join(plan.roots.codex.path, ".agents-install", run.id, "runtime")
+      run.source !== path.join(privateRun, "source") ||
+      run.runtime !== path.join(privateRun, "runtime")
     )
       issue("Run paths must derive from the deploy root and run id");
     if (
@@ -323,6 +338,7 @@ export function installPathCollisions(
     return contains(left, right) || contains(right, left);
   };
   const codexWorktree = (directory: string) => {
+    if (!plan.roots.codex) return false;
     const relative = path.relative(
       resolvePath(path.join(plan.roots.codex.path, "worktrees")),
       resolvePath(directory),
@@ -344,6 +360,10 @@ export function installPathCollisions(
     plan.review,
   ];
   const privateRun = path.dirname(plan.run.source);
+  const legacyPrivateRun =
+    plan.roots.codex !== undefined &&
+    path.dirname(privateRun) ===
+      path.join(plan.roots.codex.path, ".agents-install");
   const collisions: string[] = [];
   for (let index = 0; index < protectedPaths.length; index++)
     for (const other of protectedPaths.slice(index + 1))
@@ -357,7 +377,7 @@ export function installPathCollisions(
         (other) =>
           overlaps(root, other) &&
           !(
-            root === plan.roots.codex.path &&
+            root === plan.roots.codex?.path &&
             other === plan.checkout.directory &&
             codexWorktree(other)
           ),
@@ -366,7 +386,12 @@ export function installPathCollisions(
       collisions.push(root);
   if (
     protectedPaths.some((other) => overlaps(privateRun, other)) ||
-    roots.slice(1).some((root) => overlaps(root, privateRun))
+    roots.some(
+      (root) =>
+        overlaps(root, privateRun) &&
+        // V5/V6 recovery storage lives under Codex; public targets remain checked below.
+        !(root === plan.roots.codex?.path && legacyPrivateRun),
+    )
   )
     collisions.push(privateRun);
   for (const target of plan.targets)
@@ -389,7 +414,7 @@ function sameTarget(left: TargetState, right: TargetState): boolean {
  */
 export const InstallReceiptSchema = z
   .strictObject({
-    version: z.union([z.literal(5), z.literal(6)]),
+    version: z.union([z.literal(5), z.literal(6), z.literal(7)]),
     plan: z.strictObject({ path: absolutePath, sha256: digest }),
     run: z.strictObject({ id: runId, directory: absolutePath }),
     // The persistent recovery command is `<node> <installer> rollback --receipt <receipt>`.

@@ -65,7 +65,7 @@ Node 和 Bun 的版本由 [package.json](../package.json) 指定。[tool-version
 
 成员解析器计算当前清单的产品数量。门禁不依赖本文的历史阶段数量。gh-identity 的固定 provider 已退役。它的构建命令也已退役。`.cache/agents-build/` 只保留安装器产物。
 
-安装器的构建命令生成 `.cache/agents-build/install.mjs`。它还生成 Zod、js-yaml 许可证 `install-licenses.txt`。工具安装器从同一已核验归档提取 Node 的唯一顶层许可证。它写到 `.cache/agents-tools/licenses/node-LICENSE`。完整门禁绑定这些文件与固定 Node，作为安装运行副本的输入。安装计划将运行副本放在 Codex 私有安装器目录，状态目录只新增计划、回执和备份。门禁在临时目录重建并比对，也在脱离依赖的位置运行 bundle。缺失或过期失败。
+安装器的构建命令生成 `.cache/agents-build/install.mjs`。它还生成 Zod、js-yaml 许可证 `install-licenses.txt`。工具安装器从同一已核验归档提取 Node 的唯一顶层许可证。它写到 `.cache/agents-tools/licenses/node-LICENSE`。完整门禁绑定这些文件与固定 Node，作为安装运行副本的输入。V7 安装计划在状态根的 `agents/install/<run-id>/` 保存候选和恢复运行副本，仅绑定显式选择的产品。V5/V6 保留 Codex 私有目录的原路径。门禁在临时目录重建并比对，也在脱离依赖的位置运行 bundle。缺失或过期失败。
 
 安装器只把已验证的候选原子替换到 `.cache/agents-tools/bin/`。归档缓存每次重新校验摘要。随后它流式读取唯一的目标成员并检查版本。已有可执行文件不能仅凭版本输出绕过归档验证。损坏缓存、目录或链接目标、未知格式及版本不匹配都会失败。失败工具的旧目标保持原样。先前已成功准备的工具和有效下载缓存保留。
 

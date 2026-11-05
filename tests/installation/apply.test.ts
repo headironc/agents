@@ -30,7 +30,12 @@ import {
   readTargetState,
 } from "../../scripts/install-state.ts";
 import { canonicalDigest } from "../../scripts/source.ts";
-import { expectedTargets, installFixture, link } from "./fixtures.ts";
+import {
+  expectedTargets,
+  installFixture,
+  legacyPlan,
+  link,
+} from "./fixtures.ts";
 
 function outcome(result: {
   status: number | null;
@@ -43,6 +48,7 @@ function outcome(result: {
     verified?: boolean;
     unreadable?: string[];
     candidate?: { sha256: string };
+    products?: string[];
   };
 }
 
@@ -59,6 +65,195 @@ function refusal(action: () => unknown) {
   }
   return assert.fail("Expected installation to be refused");
 }
+
+for (const product of ["codex", "claude", "antigravity"] as const) {
+  test(`${product}-only installation and standalone recovery preserve every unselected product`, (t) => {
+    const f = installFixture(t, { realRuntime: true, products: [product] });
+    const roots = {
+      codex: path.join(f.home, ".codex"),
+      claude: path.join(f.home, ".claude"),
+      antigravity: path.join(f.home, ".gemini/antigravity-cli"),
+    };
+    const selected = roots[product];
+    const unselected = (["codex", "claude", "antigravity"] as const).filter(
+      (name) => name !== product,
+    );
+    const before = new Map<string, ReturnType<typeof readTargetState>>();
+    try {
+      for (const name of unselected) {
+        const root = roots[name];
+        mkdirSync(path.join(root, "skills/gh"), {
+          recursive: true,
+          mode: 0o700,
+        });
+        writeFileSync(path.join(root, "skills/gh/personal.txt"), name);
+        chmodSync(root, 0o500);
+        before.set(name, readTargetState(root));
+      }
+      mkdirSync(path.join(selected, "skills/gh"), { recursive: true });
+      writeFileSync(
+        path.join(selected, "skills/gh/original.txt"),
+        "restore this tree\n",
+      );
+      const original = readTargetState(path.join(selected, "skills/gh"));
+      const environment =
+        product === "codex"
+          ? { CLAUDE_CONFIG_DIR: "invalid-unselected-claude" }
+          : { CODEX_HOME: "invalid-unselected-codex" };
+      const unchanged = () => {
+        for (const name of unselected)
+          assert.deepEqual(readTargetState(roots[name]), before.get(name));
+      };
+      const { review, plan } = f.planned(
+        ["--adopt", `${product}:gh`],
+        environment,
+      );
+      const expected = expectedTargets(
+        f.home,
+        plan.run.source,
+        undefined,
+        undefined,
+        [product],
+      );
+      assert.deepEqual(
+        plan.targets.map((target) => [target.path, target.source]),
+        expected,
+      );
+      unchanged();
+      rmSync(f.checkout, { recursive: true, force: true });
+      const applied = outcome(f.cli(["apply", "--plan", review], environment));
+      assert.equal(applied.status, "installed");
+      assert.deepEqual(applied.products, [product]);
+      for (const [target, source] of expected)
+        assert.deepEqual(readTargetState(target), readTargetState(source));
+      unchanged();
+      rmSync(plan.run.source, { recursive: true, force: true });
+      unlinkSync(review);
+      const verified = outcome(
+        f.cli(["verify", "--receipt", plan.run.receipt], environment),
+      );
+      assert.equal(verified.verified, true);
+      assert.deepEqual(verified.products, [product]);
+      const status = outcome(f.cli(["status"], environment));
+      assert.equal(status.status, "installed");
+      assert.deepEqual(status.products, [product]);
+      const rolledBack = spawnSync(
+        path.join(plan.run.runtime, "node"),
+        [
+          path.join(plan.run.runtime, "install.mjs"),
+          "rollback",
+          "--receipt",
+          plan.run.receipt,
+        ],
+        {
+          env: { PATH: process.env.PATH, HOME: f.home, ...environment },
+          encoding: "utf8",
+          timeout: 60_000,
+        },
+      );
+      assert.equal(outcome(rolledBack).status, "rolled-back");
+      assert.deepEqual(
+        readTargetState(path.join(selected, "skills/gh")),
+        original,
+      );
+      assert.equal(
+        outcome(f.cli(["verify", "--receipt", plan.run.receipt], environment))
+          .verified,
+        true,
+      );
+      assert.equal(outcome(f.cli(["status"], environment)).status, "none");
+      unchanged();
+    } finally {
+      for (const name of unselected)
+        if (existsSync(roots[name])) chmodSync(roots[name], 0o700);
+    }
+  });
+
+  test(`${product}-only late failure restores selected targets without creating other product roots`, (t) => {
+    const f = installFixture(t, { products: [product] });
+    const root = path.join(
+      f.home,
+      product === "antigravity" ? ".gemini/antigravity-cli" : `.${product}`,
+    );
+    const skills = path.join(root, "skills");
+    mkdirSync(skills, { recursive: true });
+    writeFileSync(path.join(skills, "personal"), "retained\n");
+    const { plan, review } = f.planned();
+    chmodSync(skills, 0o500);
+    try {
+      const result = applyInstallPlan(review, { HOME: f.home });
+      assert.equal(result.status, "failed-rolled-back", JSON.stringify(result));
+      assert.ok(result.steps.restored > 0);
+      assert.deepEqual(result.products, [product]);
+    } finally {
+      chmodSync(skills, 0o700);
+    }
+    for (const target of plan.targets)
+      assert.equal(existsSync(target.path), false, target.path);
+    for (const name of ["codex", "claude", "antigravity"] as const)
+      if (name !== product)
+        assert.equal(
+          existsSync(
+            path.join(f.home, name === "antigravity" ? ".gemini" : `.${name}`),
+          ),
+          false,
+        );
+    assert.equal(
+      readFileSync(path.join(skills, "personal"), "utf8"),
+      "retained\n",
+    );
+    assert.equal(
+      verifyInstallation(plan.run.receipt, { HOME: f.home }).verified,
+      true,
+    );
+  });
+}
+
+for (const version of [5, 6] as const)
+  test(`V${version} plans retain their original roots, records and recovery layout`, (t) => {
+    const f = installFixture(t, {
+      realRuntime: true,
+      products:
+        version === 5
+          ? ["codex", "claude"]
+          : ["codex", "claude", "antigravity"],
+    });
+    const { plan, review } = legacyPlan(f.planned(), version);
+    const original = readFileSync(plan.run.plan);
+    const third = path.join(f.home, ".gemini/antigravity-cli");
+    if (version === 5) {
+      mkdirSync(third, { recursive: true });
+      writeFileSync(path.join(third, "personal.txt"), "not in V5\n");
+    }
+    const thirdBefore = version === 5 ? readTargetState(third) : undefined;
+    const selected =
+      version === 5 ? ["codex", "claude"] : ["codex", "claude", "antigravity"];
+    assert.equal(
+      outcome(f.cli(["apply", "--plan", review])).status,
+      "installed",
+    );
+    assert.equal(readReceipt(plan.run.receipt).version, version);
+    assert.deepEqual(outcome(f.cli(["status"])).products, selected);
+    assert.ok(
+      plan.run.runtime.startsWith(path.join(f.home, ".codex/.agents-install")),
+    );
+    rmSync(f.checkout, { recursive: true, force: true });
+    rmSync(plan.run.source, { recursive: true, force: true });
+    assert.equal(
+      outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+      true,
+    );
+    assert.equal(
+      outcome(f.cli(["rollback", "--receipt", plan.run.receipt])).status,
+      "rolled-back",
+    );
+    assert.equal(
+      outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+      true,
+    );
+    assert.deepEqual(readFileSync(plan.run.plan), original);
+    if (version === 5) assert.deepEqual(readTargetState(third), thirdBefore);
+  });
 
 test("five selected files install and roll back from a Codex worktree without changing unselected targets", (t) => {
   const f = installFixture(t, {
@@ -208,7 +403,7 @@ test("selected review files and complete skills preserve other targets through r
   );
 });
 
-test("V6 applies, reads back and restores Antigravity without touching App settings or unlisted skills", (t) => {
+test("explicit products apply, read back and restore Antigravity without touching App settings or unlisted skills", (t) => {
   const f = installFixture(t, { realRuntime: true });
   const root = path.join(f.home, ".gemini/antigravity-cli");
   const existing = path.join(root, "skills/gh");
@@ -219,13 +414,17 @@ test("V6 applies, reads back and restores Antigravity without touching App setti
   mkdirSync(app, { recursive: true });
   writeFileSync(path.join(app, "settings.json"), "personal\n");
   const { plan, review } = f.planned([
-    "--include-product",
+    "--product",
+    "codex",
+    "--product",
+    "claude",
+    "--product",
     "antigravity",
     "--adopt",
     "antigravity:gh",
   ]);
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
-  assert.equal(readReceipt(plan.run.receipt).version, 6);
+  assert.equal(readReceipt(plan.run.receipt).version, 7);
   for (const target of plan.targets)
     assert.deepEqual(
       readTargetState(target.path),
@@ -260,7 +459,14 @@ test("a late Antigravity failure restores all three products", (t) => {
   const directory = path.join(f.home, ".gemini/antigravity-cli/skills");
   mkdirSync(directory, { recursive: true });
   writeFileSync(path.join(directory, "unmanaged"), "keep\n");
-  const { plan, review } = f.planned(["--include-product", "antigravity"]);
+  const { plan, review } = f.planned([
+    "--product",
+    "codex",
+    "--product",
+    "claude",
+    "--product",
+    "antigravity",
+  ]);
   chmodSync(directory, 0o500);
   try {
     const result = applyInstallPlan(review, { HOME: f.home });
@@ -281,9 +487,16 @@ test("a late Antigravity failure restores all three products", (t) => {
   );
 });
 
-test("V6 rollback retains third-party Antigravity changes and restores other products", (t) => {
+test("rollback retains third-party Antigravity changes and restores other selected products", (t) => {
   const f = installFixture(t, { realRuntime: true });
-  const { plan, review } = f.planned(["--include-product", "antigravity"]);
+  const { plan, review } = f.planned([
+    "--product",
+    "codex",
+    "--product",
+    "claude",
+    "--product",
+    "antigravity",
+  ]);
   outcome(f.cli(["apply", "--plan", review]));
   const target = path.join(
     f.home,
@@ -307,7 +520,14 @@ for (const product of ["codex", "claude", "antigravity"] as const)
       product === "antigravity" ? ".gemini/antigravity-cli" : `.${product}`,
     );
     mkdirSync(root, { recursive: true });
-    const { plan, review } = f.planned(["--include-product", "antigravity"]);
+    const { plan, review } = f.planned([
+      "--product",
+      "codex",
+      "--product",
+      "claude",
+      "--product",
+      "antigravity",
+    ]);
     assert.equal(
       applyInstallPlan(review, { HOME: f.home }).status,
       "installed",
@@ -454,7 +674,7 @@ test("a late Claude failure restores both products and only its own empty direct
   );
 });
 
-test("V4 plans are rejected by the V5 installer", (t) => {
+test("V4 plans are rejected by the current installer", (t) => {
   const f = installFixture(t);
   const { review } = f.planned();
   const bytes = JSON.parse(readFileSync(review, "utf8"));

@@ -1,8 +1,8 @@
 # 交付与使用指南
 
-本仓库默认向 Codex 与 Claude Code 交付 Skills 及必要依赖。显式选入时增加 Antigravity CLI 的通用技能。Codex 另接收指令、模型选择政策和 Rust/SQL 偏好。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
+本仓库按产品交付 Skills 及必要依赖。安装支持 Codex、Claude Code 和 Antigravity CLI。安装计划没有默认产品，只向明确选中的产品交付内容。Codex 另接收指令、模型选择政策和 Rust/SQL 偏好。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
 
-按任务查阅：[阅读与采用](#阅读与采用)列出文档入口，[交付目录](#交付目录)说明源码布局。[双端安装](#双端安装)给出计划、应用与恢复步骤，[验证能说明什么](#验证能说明什么)列出证据边界。各技能的使用说明见本页对应章节。
+按任务查阅：[阅读与采用](#阅读与采用)列出文档入口，[交付目录](#交付目录)说明源码布局。[产品选择与安装](#产品选择与安装)给出计划、应用与恢复步骤，[验证能说明什么](#验证能说明什么)列出证据边界。各技能的使用说明见本页对应章节。
 
 ## 阅读与采用
 
@@ -23,7 +23,7 @@
 | 发现项目资料或执行项目检查 | [project-guide](../delivery/skills/project-guide/SKILL.md) | 共享技能；按目标版本发现权威来源与原生检查，报告实际覆盖及缺口；来源与演练边界见[登记](skill-sources.md#project-guide) |
 | 维护规则与工具绑定 | [登记维护](tooling.md#仓库登记维护)、[工具调用](../delivery/policy/tool-contracts.md) | inventory、owner 索引和 consumer bindings 各自承担不同职责；只登记已交付能力 |
 
-其他仓库使用这些源码时，项目指令必须明确引用实际位置。复制一个路径名不会使文件自动加载。当前检查保留工具归属和消费者绑定验证。两平台 CI 结果见 [README](../README.md)。安装器提供[计划、应用与恢复](#双端安装)。实际替换个人配置仍必须逐次授权。交付目录只是可检查的候选，不切换个人配置。
+其他仓库使用这些源码时，项目指令必须明确引用实际位置。复制一个路径名不会使文件自动加载。当前检查保留工具归属和消费者绑定验证。两平台 CI 结果见 [README](../README.md)。安装器提供[计划、应用与恢复](#产品选择与安装)。实际替换个人配置仍必须逐次授权。交付目录只是可检查的候选，不切换个人配置。
 
 ### 规则放置与实施范围
 
@@ -174,30 +174,34 @@ run 保持原工作目录，只清理本次分配的 scratch 及归属目录。�
 
 [维护工具语言偏好](../delivery/AGENTS.md#code-preferences)面向新写工具，默认选择 TypeScript。它服从目标仓库明确的语言和运行环境要求。它不要求迁移已有工具或改写业务代码。本仓库另有几项固定选择，由 [AGENTS.md](../AGENTS.md) 单独规定。选择包括固定 Node、Bash 下载启动器。上游 Python 工具也保留。
 
-## 双端安装
+## 产品选择与安装
 
-安装器已交付 plan、apply、verify 和 rollback。默认计划将所选 Skills 及必要依赖复制到 Codex 与 Claude Code，Codex 另接收专属成员。显式传入 `--include-product antigravity` 时增加 Antigravity CLI，生成 V6 计划；默认继续生成 V5 双端计划。在候选源码上完成构建和完整门禁后生成计划。未提交改动由门禁报告的源码身份绑定：
+安装器已交付 plan、apply、verify 和 rollback。plan 必须至少传入一个 `--product`，值为 `codex`、`claude` 或 `antigravity`。重复该参数可明确选择多个产品；没有默认双端安装。缺少选择、无效值或重复产品均返回参数错误，不创建计划。旧 `--include-product` 参数不再接受。在候选源码上完成构建和完整门禁后生成 V7 计划。未提交改动由门禁报告的源码身份绑定：
 
 ```bash
 umask 077
 .cache/agents-tools/bin/bun run build:install
 mkdir -p .cache/reports
 bash scripts/check.sh all --report .cache/reports/check.json
-bash scripts/install.sh plan --source "$PWD" --report .cache/reports/check.json \
+bash scripts/install.sh plan --product codex --source "$PWD" --report .cache/reports/check.json \
   --output /path/outside/checkout/agents-plan.json
 ```
 
-选入 Antigravity CLI 时，在同一 plan 命令后增加 `--include-product antigravity`。目标根固定为 `$HOME/.gemini/antigravity-cli`，只发布下表成员。安装器不创建 Plugin，也不写 `settings.json`、发现 manifest、hooks、MCP 或规则入口。该根的 `skills/` 由 CLI 自动发现，App 不读取。已有 CLI 专属或共享目录中的同名技能可能影响优先级；实际来源通过 `/skills` 核对，见[官方发现规则](https://antigravity.google/docs/customization-discovery?tab=cli)。
+上例只选择 Codex。改为 `--product claude` 或 `--product antigravity` 可单独选择另一产品。两端安装使用 `--product codex --product claude`；三端安装再加 `--product antigravity`。计划只记录选中产品的根，并仅核对这些产品的变量和目标。未选产品的目录、权限和既有安装保持原状；无效的未选产品变量也不阻止计划。
+
+Antigravity CLI 的目标根固定为 `$HOME/.gemini/antigravity-cli`，只发布下表成员。安装器不创建 Plugin，也不写 `settings.json`、发现 manifest、hooks、MCP 或规则入口。该根的 `skills/` 由 CLI 自动发现，App 不读取。已有 CLI 专属或共享目录中的同名技能可能影响优先级；实际来源通过 `/skills` 核对，见[官方发现规则](https://antigravity.google/docs/customization-discovery?tab=cli)。
 
 仅更新部分受管目标时，重复传入 `--target KEY` 指定完整目标集合。KEY 与下述接管名称相同，例如 `--target codex:policy/review.md --target codex:gh`。选择接受已选产品的受管文件和完整技能目录，拒绝重复、未知名称及技能内部文件路径。技能目录沿用完整备份、替换、回读和回滚，不拆分安装内部成员。未传时沿用整批计划。`--target` 不替代 `--adopt`；已有差异目标仍须明确接管。调用者按当前任务核对完整依赖，安装器不自动加入其他目标。未选目标不读取内容、不要求接管，也不修改权限。完整源码检查与冻结快照仍覆盖原候选。
 
 目标选择写入计划的 `selectedTargets`，并与实际目标集合严格匹配。apply、verify 和 rollback 均只处理计划目标。`status` 同时展示该选择，不把部分交付称为整批安装。旧 V5/V6 计划没有该字段时保持原语义；不支持所选目标的旧安装器会拒绝计划，恢复使用本计划绑定的运行副本。
 
-报告必须来自同一平台和固定 Node 的完整通过的 `all`。检出 HEAD 必须等于报告基线，源码字节必须与报告一致。计划记录本机稳定标识：Linux 取 `/etc/machine-id`，macOS 取 `sysctl -n kern.uuid`。取不到即拒绝。apply、verify、rollback 均核对该标识。主机名变更只在 verify 中报告。报告绑定的被忽略文件同样阻止计划。V5 运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，只保存计划与回执。候选和恢复运行副本位于 `${CODEX_HOME:-$HOME/.codex}/.agents-install/<run-id>/`。计划另在 `--output` 写出同字节审阅副本。它只读公开目标，但会建立私有安装器目录。
+报告必须来自同一平台和固定 Node 的完整通过的 `all`。检出 HEAD 必须等于报告基线，源码字节必须与报告一致。计划记录本机稳定标识：Linux 取 `/etc/machine-id`，macOS 取 `sysctl -n kern.uuid`。取不到即拒绝。apply、verify、rollback 均核对该标识。主机名变更只在 verify 中报告。报告绑定的被忽略文件同样阻止计划。
+
+运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，保存计划与回执。V7 的候选和恢复运行副本位于同一状态根的 `agents/install/<run-id>/`，独立于产品目录。计划另在 `--output` 写出同字节审阅副本。计划不写公开目标内容。为核对文件系统的大小写别名和共享祖先，会建立选中产品缺失的根及祖先。计划成功后保留这些目录和私有安装器目录。规划阶段准备的根不列入 apply 创建的目录，rollback 保留这些根。计划失败时只清理本次建立的目录；祖先仍为空时才移除。既有目录及权限保持原状。
 
 已有链接，包括指向旧部署快照的链接，都必须用 `--adopt KEY` 显式接管。悬空链接、普通文件和已有目录同样如此。接管文件或目录时，目标及目录成员必须由安装用户拥有。复制备份无法恢复其他用户的所有权，计划会报告 `backup-owner-unrestorable`。已交付内容与新候选完全一致时列为不变。KEY 见[安装目标](#安装目标与接管)。未列入清单的名称只以路径列在 `reported` 中；安装器不读取其内容。
 
-新入口同时接受 V5 双端与 V6 三端记录。V5 记录不含 Antigravity 根，恢复时不推导第三端目标；V6 绑定该根，回执版本与计划一致。公开目标为普通文件或完整技能目录。入口拒绝 V4 及更早版本的 apply、verify 和 rollback，不转换记录或清理旧材料。原 V4 运行副本和必要材料仍在时，可用原回执提供的恢复命令。`status` 不识别这些旧回执；部署目录中仍有旧回执时报告 `indeterminate`，并在 `unreadable` 中列出路径。这一限制在新目标验证通过后仍存在。
+新入口同时接受 V5 双端、V6 三端与 V7 显式选择记录。V5/V6 保留原先的产品集合及 Codex 根下的 `.agents-install/<run-id>/` 恢复路径，不迁移或扩大旧记录。V5 不推导第三端目标；各版本回执与计划版本一致。公开目标为普通文件或完整技能目录。入口拒绝 V4 及更早版本的 apply、verify 和 rollback，不转换记录或清理旧材料。原 V4 运行副本和必要材料仍在时，可用原回执提供的恢复命令。`status` 不识别这些旧回执；部署目录中仍有旧回执时报告 `indeterminate`，并在 `unreadable` 中列出路径。这一限制在新目标验证通过后仍存在。
 
 参数错误返回 2。缺口以 JSON `gaps` 输出并返回 1，此时不建立运行目录。源、报告、根目录与目标的读取问题也列为缺口。候选目标超出记录大小限制时报告 `source-unreadable`。权限问题同样一次列出。计划写入中途失败只删除本次创建的运行目录、私有候选和审阅副本。新建上级目录仅在仍为空时删除。
 
@@ -241,13 +245,13 @@ Codex 交付七个完整顶层技能包，十六个内容入口参与验证。Cl
 
 Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`，共五个顶层包及五个入口。它只接收三份公共合同和三个配套工具，不接收 Codex 规则、模型路线、设计工作流或配置片段。wechatide 的执行器只接受 `Codex` 与 `ClaudeCode`，本片不向 Antigravity 发布。清单支持按固定顺序列出 `codex,claude,antigravity` 的子集；历史 `shared` 仅表示 Codex 与 Claude，不自动扩张。
 
-默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。选入 Antigravity CLI 时增加上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于 Codex 根的 `worktrees/` 子目录内，或在所有产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
+Codex 与 Claude 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。选择 Antigravity CLI 时使用上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
-adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `claude:gh`；其他成员使用 `codex:AGENTS.md`、`claude:policy/writing.md` 等相对路径。一个 KEY 只接管对应产品的目标。裸技能名、未知或未使用的 KEY 均拒绝。任一产品的根、权限或接管缺口阻止整个计划。清单外名称仅报告，保留原值。
+adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `claude:gh`；其他成员使用 `codex:AGENTS.md`、`claude:policy/writing.md` 等相对路径。一个 KEY 只接管对应产品的目标。裸技能名、未知、未选产品或未使用的 KEY 均拒绝。任一选中产品的根、权限或接管缺口阻止整个计划。清单外名称仅报告，保留原值。
 
 ### 安装记录与恢复边界
 
-报告只证明已记录的检查，不授予安装权限。候选绑定源码字节、完整报告与固定运行副本。复制前后及计划冻结时均核对身份。候选冻结后不原地更新。私有运行副本包含固定 Node、安装 bundle 和许可证，由 Codex 私有目录承载本次计划的恢复。Claude 与 Antigravity 的公开内容不依赖该目录，但恢复命令依赖它。缺失、损坏或平台不符时拒绝，不联网修复。
+报告只证明已记录的检查，不授予安装权限。候选绑定源码字节、完整报告与固定运行副本。复制前后及计划冻结时均核对身份。候选冻结后不原地更新。私有运行副本包含固定 Node、安装 bundle 和许可证。V7 由状态目录承载恢复，单产品安装也不依赖其他产品根。V5/V6 仍依赖记录中的 Codex 私有目录。公开内容不依赖恢复目录，恢复命令依赖该目录。缺失、损坏或平台不符时拒绝，不联网修复。
 
 持久计划是恢复依据，审阅副本只是同字节副本。应用前核对同次持久计划，再把其身份写入回执。审阅副本随后缺失不影响 verify 或 rollback。持久计划损坏、移动或被链接替换时拒绝。工具不扫描其他运行来猜测替代记录。计划与回执字段由 `scripts/install-records.ts` 唯一定义。结构验证不替代主机、路径与当前目标核对。
 
@@ -259,7 +263,7 @@ adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `claude:gh`；�
 
 ## 既有安装快照过渡
 
-逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果；V5 与 V6 运行目录均位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的受支持计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和该计划的每个目标，不读取候选源码。无法读取或不受支持的回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。默认双端计划不卸载先前的 Antigravity 安装；status 只证明选中计划的目标，未被该计划列出的旧成员保持原样。合并源码不会自动更新已安装目标。
+逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果。V5/V6/V7 运行目录均位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的受支持计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。V7 的 plan、apply、verify 和 rollback，以及新入口的 status，通过 JSON `products` 展示实际产品集合。计划的 `roots` 中仅记录选中产品的根，由这些根唯一拥有该选择。旧运行副本保持原有输出格式。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和该计划的每个目标，不读取候选源码。无法读取或不受支持的回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。新计划不卸载未选产品的既有安装；status 只证明当前计划的目标，未被该计划列出的旧成员保持原样。合并源码不会自动更新已安装目标。
 
 个人安装形态只有一种，没有 managed 模式或 bot 入口目标。`~/.agents/github-app/` 不在安装范围内，本地 bot 凭据提供器已退役。个人安装不交付 App 私钥或本地令牌签发入口。旧项目审查关卡及其签发入口已移除，不属于当前源码或个人安装目标。
 

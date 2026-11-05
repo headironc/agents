@@ -12,6 +12,7 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -19,10 +20,15 @@ import {
 import os from "node:os";
 import path from "node:path";
 import type { TestContext } from "node:test";
+import type { Product } from "../../scripts/delivery.ts";
 import { CheckReportSchema } from "../../scripts/check-report.ts";
 import { InstallPlanSchema } from "../../scripts/install-records.ts";
 import type { InstallPlan } from "../../scripts/install-records.ts";
-import { listSourcePaths, readSourceIdentity } from "../../scripts/source.ts";
+import {
+  canonicalDigest,
+  listSourcePaths,
+  readSourceIdentity,
+} from "../../scripts/source.ts";
 import { fixtureEnvironment, repositoryRoot } from "../validation/fixtures.ts";
 
 // Expected targets follow the installation target table in docs/usage.md, not planner output.
@@ -43,6 +49,13 @@ export const skills = {
     "gh-identity",
     "project-guide",
     "wechatide",
+  ],
+  antigravity: [
+    "alibabacloud-find-skills",
+    "alibabacloud-sms-send-short-message",
+    "gh",
+    "gh-identity",
+    "project-guide",
   ],
 };
 export const policies = [
@@ -77,12 +90,14 @@ export function expectedTargets(
   snapshot: string,
   codex = `${home}/.codex`,
   claude = `${home}/.claude`,
+  selected: Product[] = ["codex", "claude"],
 ): [string, string][] {
   const pair = (target: string, link: string): [string, string] => [
     target,
     link,
   ];
-  return [
+  const antigravity = `${home}/.gemini/antigravity-cli`;
+  const all = [
     pair(`${codex}/README.md`, `${snapshot}/delivery/README.md`),
     ...policies.map((name) =>
       pair(
@@ -112,7 +127,29 @@ export function expectedTargets(
     ...skills.claude.map((name) =>
       pair(`${claude}/skills/${name}`, `${snapshot}/delivery/skills/${name}`),
     ),
+    ...claudePolicies.map((name) =>
+      pair(
+        `${antigravity}/policy/${name}.md`,
+        `${snapshot}/delivery/policy/${name}.md`,
+      ),
+    ),
+    ...tools.map((name) =>
+      pair(
+        `${antigravity}/tools/${name}`,
+        `${snapshot}/delivery/tools/${name}`,
+      ),
+    ),
+    ...skills.antigravity.map((name) =>
+      pair(
+        `${antigravity}/skills/${name}`,
+        `${snapshot}/delivery/skills/${name}`,
+      ),
+    ),
   ];
+  const roots = { codex, claude, antigravity };
+  return all.filter(([target]) =>
+    selected.some((product) => target.startsWith(`${roots[product]}/`)),
+  );
 }
 
 export const exists = (file: string) =>
@@ -127,7 +164,12 @@ export function link(target: string, file: string): void {
 /** A committed checkout, passing report and temporary HOME; the fake runtime only answers the plan probes. */
 export function installFixture(
   t: TestContext,
-  options: { realRuntime?: boolean; home?: string; worktree?: string } = {},
+  options: {
+    realRuntime?: boolean;
+    home?: string;
+    worktree?: string;
+    products?: Product[];
+  } = {},
 ) {
   const base = realpathSync(
     mkdtempSync(path.join(os.tmpdir(), "agents-install-")),
@@ -274,6 +316,13 @@ export function installFixture(
     ...cli(
       [
         "plan",
+        // Existing two-product cases explicitly request both; CLI tests bypass this helper.
+        ...(extra.includes("--product")
+          ? []
+          : (options.products ?? ["codex", "claude"]).flatMap((product) => [
+              "--product",
+              product,
+            ])),
         "--source",
         source,
         "--report",
@@ -340,4 +389,42 @@ export function treeState(root: string): unknown[] {
         stat.isFile() ? readFileSync(path.join(root, name), "utf8") : null,
       ];
     });
+}
+
+/** Materialize a legacy fixture's recorded layout; never migrate a user's deployment records. */
+export function legacyPlan(
+  prepared: { plan: InstallPlan; review: string },
+  version: 5 | 6,
+): { plan: InstallPlan; review: string } {
+  const plan = structuredClone(prepared.plan);
+  assert.ok(plan.roots.codex && plan.roots.claude);
+  assert.equal(plan.roots.antigravity !== undefined, version === 6);
+  const previous = path.dirname(plan.run.source);
+  const privateRun = path.join(
+    plan.roots.codex.path,
+    ".agents-install",
+    plan.run.id,
+  );
+  directory(path.dirname(privateRun));
+  renameSync(previous, privateRun);
+  plan.version = version;
+  plan.run.source = path.join(privateRun, "source");
+  plan.run.runtime = path.join(privateRun, "runtime");
+  for (const file of plan.runtime.files)
+    file.path = path.join(plan.run.runtime, path.basename(file.path));
+  for (const target of plan.targets)
+    target.source = path.join(
+      privateRun,
+      path.relative(previous, target.source),
+    );
+  plan.newDirectories = plan.newDirectories.filter((file) => !exists(file));
+  const { sha256: _digest, ...body } = plan;
+  plan.sha256 = canonicalDigest(body);
+  InstallPlanSchema.parse(plan);
+  const bytes = JSON.stringify(plan);
+  chmodSync(plan.run.plan, 0o600);
+  writeFileSync(plan.run.plan, bytes);
+  chmodSync(plan.run.plan, 0o400);
+  writeFileSync(prepared.review, bytes);
+  return { plan, review: prepared.review };
 }
