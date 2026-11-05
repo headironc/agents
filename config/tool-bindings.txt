@@ -1,5 +1,7 @@
 agents-tool-bindings-v1
 binding	delivery/policy/models.md	instructions	task-temp	delivery/policy/tool-contracts.md	read-before-use	defined
+binding	delivery/policy/models.md	instructions	codex-sessions	delivery/policy/codex-sessions.md	read-before-use	defined
+binding	scripts/codex-sessions.ts	script	codex-sessions	delivery/policy/codex-sessions.md	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	bash	scripts/check.ts	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	bun	scripts/check.ts	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	node	scripts/check.ts	read-before-use	defined

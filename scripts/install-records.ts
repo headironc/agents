@@ -25,7 +25,7 @@ const absolutePath = z
 
 /** Adoption names one product's target, never both copies of a shared member. */
 export const adoptKeyPattern =
-  /^(?:codex|claude|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|rust-lints\.toml))$/;
+  /^(?:codex|claude|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|codex-sessions\.toml|rust-lints\.toml))$/;
 const adoptKey = z.string().regex(adoptKeyPattern);
 
 /** Build outputs and host tool files copied into each persistent runtime. */
