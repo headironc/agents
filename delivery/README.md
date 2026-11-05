@@ -14,7 +14,7 @@
 
 [任务起点](policy/models.md#task-start-and-execution-routing)在创建任务会话或组织执行前触发。该处衔接需求、授权、模型路线、会话、工作区及适用 Goal。普通短任务留在当前会话。复杂调查与关键判断、已定设计下的完整实现、界面操作及设计稿各有适用路线。模型偏好不扩大权限；Goal 创建另核明确授权及全文回读。首次组织或关键输入变化时读取相关小节，复用未变规则和证据。
 
-[本机开发](policy/models.md#local-development)统一执行位置，保留前后端、设计和验收职责。[Desktop 能力核对](policy/models.md#desktop-capabilities)优先复用已有工具及未变证据。某执行者缺入口时，安排有对应本机能力的阶段执行者。依赖与平台缺口沿工作区及检查规则处理，不回退 dev 开发。
+[开发设备选择](policy/models.md#local-development)绑定 Human 明确选定的实际宿主，可用 Mac 或 SSH 连接的原生 Linux。前后端、设计和验收保留原职责。[Desktop 能力核对](policy/models.md#desktop-capabilities)复用实际执行者的工具及未变证据。[委派与验收](policy/models.md#delegation-and-acceptance)按实际方向验证发送或读取路径；缺入口时，使用双方可达的既有结果路径。依赖与平台缺口沿工作区及检查规则处理，不擅自换设备，也不把安装成功当作平台兼容证据。
 
 [模型选择](policy/models.md#current-defaults)分别维护 Codex 职责映射与[外部路线模型偏好](policy/models.md#route-model-preferences)。按任务需要选择获准路线及适任模型，核实际标识、effort 和可用能力。持续选择按原始采用范围复用。创建接口的模型和档位字段分别判断，不因默认值存在就省略已允许参数。
 

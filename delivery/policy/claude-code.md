@@ -2,7 +2,7 @@
 
 Contract subject: `claude-code`.
 
-本合同拥有 Claude Code 的公共调用、结果与日志规则。可选委派、模型及授权由[模型政策](models.md#claude-code-and-deepseek-delegation)定义。开发执行遵循[仅本机开发](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。仅在选用本客户端时，按任务选择只读、有界执行或显式设计模式。设计稿默认路线见[任务起点](models.md#task-start-and-execution-routing)，可编辑结果与视觉验收见[设计工作流](../skills/figma-design-workflow/SKILL.md)。先核对实际 CLI 版本、实际接收端点及有效参数。
+本合同拥有 Claude Code 的公共调用、结果与日志规则。可选委派、模型及授权由[模型政策](models.md#claude-code-and-deepseek-delegation)定义。开发执行遵循[开发设备选择](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。仅在选用本客户端时，按任务选择只读、有界执行或显式设计模式。设计稿默认路线见[任务起点](models.md#task-start-and-execution-routing)，可编辑结果与视觉验收见[设计工作流](../skills/figma-design-workflow/SKILL.md)。先核对实际 CLI 版本、实际接收端点及有效参数。
 
 模型接口只允许 DeepSeek 官方与 OpenCode 官方服务。负责人在这两者中选择满足任务需要的路线，合适时复用当前配置，无须逐次请示。`https://api.deepseek.com/anthropic` 是 DeepSeek 官方 Anthropic 兼容端点。OpenCode 路线按其官方 API 文档核对实际地址。第三方转发或自建兼容地址不因使用同一模型名而进入允许范围。核对本次实际接收端点、凭据来源、模型和 effort，不显示密钥或鉴权头。客户端名及响应模型名不证明实际上游身份。材料、操作及更窄的用户限制继续适用。扩大接收方范围必须有用户明确决定。
 
