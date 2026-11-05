@@ -8,6 +8,7 @@ import {
   realpathSync,
   readdirSync,
   rmSync,
+  unlinkSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -259,6 +260,167 @@ test("unknown delivery retains exact target and lock; recover reads without repl
   assert.equal(f.calls.filter((c) => c.method === "thread/start").length, 1);
 });
 
+test("an unresolved create also prevents a new write to its known child", async (t) => {
+  const f = fixture(t);
+  f.loseTurn();
+  await assert.rejects(f.create(), OutcomeUnknown);
+  await assert.rejects(
+    f.run({
+      type: "send",
+      requestId: nextId,
+      threadId: worker,
+      message: "Continue",
+    }),
+    /creation is unresolved/,
+  );
+  assert.equal(f.calls.filter((c) => c.method === "turn/start").length, 1);
+  assert.deepEqual(
+    readdirSync(f.root).sort(),
+    [`${coordinator}.lock`, `${requestId}.jsonl`].sort(),
+  );
+  await f.run({ type: "recover", requestId });
+  // The original owner has read the terminal result before removing its exact creation lock.
+  unlinkSync(path.join(f.root, `${coordinator}.lock`));
+  await assert.rejects(
+    f.run({
+      type: "send",
+      requestId: nextId,
+      threadId: worker,
+      message: "Continue",
+    }),
+    OutcomeUnknown,
+  );
+  assert.equal(f.calls.filter((c) => c.method === "turn/start").length, 2);
+});
+
+test("failed post-submit readback retains the creation lock for its known child", async (t) => {
+  const f = fixture(t);
+  await assert.rejects(
+    execute(
+      requestSchema.parse({
+        version: 1,
+        context,
+        operation: {
+          type: "create",
+          requestId,
+          title: "Worker",
+          message: "Bounded work",
+          sandbox: "read-only",
+        },
+      }),
+      f.receipts,
+      async (method, params) => {
+        if (
+          method === "thread/read" &&
+          (params as { threadId: string }).threadId === worker
+        )
+          throw new OutcomeUnknown("Readback connection lost");
+        return f.rpc(method, params);
+      },
+    ),
+    OutcomeUnknown,
+  );
+  assert.equal(f.receipts.read(requestId).stage, "needs-readback");
+  assert.equal(
+    readFileSync(path.join(f.root, `${coordinator}.lock`), "utf8"),
+    requestId,
+  );
+  await assert.rejects(
+    f.run({
+      type: "send",
+      requestId: nextId,
+      threadId: worker,
+      message: "Continue",
+    }),
+    /creation is unresolved/,
+  );
+  assert.equal(f.calls.filter((c) => c.method === "turn/start").length, 1);
+});
+
+test("rename and archive recheck idle state after obtaining their target lock", async (t) => {
+  for (const type of ["rename", "archive"] as const) {
+    const f = fixture(t);
+    await f.create();
+    let interleaved = false;
+    const rpc = async (method: string, params?: object) => {
+      const result = await f.rpc(method, params);
+      if (
+        !interleaved &&
+        method === "thread/read" &&
+        (params as { threadId: string }).threadId === worker
+      ) {
+        interleaved = true;
+        await f.run({
+          type: "send",
+          requestId: nextId,
+          threadId: worker,
+          message: "New work",
+        });
+        f.setActive();
+      }
+      return result;
+    };
+    await assert.rejects(
+      execute(
+        requestSchema.parse({
+          version: 1,
+          context,
+          operation: {
+            type,
+            requestId: "01a1ab97-2999-7fe0-8553-37ecedc0f2b3",
+            threadId: worker,
+            ...(type === "rename"
+              ? { title: "Accepted" }
+              : { acceptance: "Prior result" }),
+          },
+        }),
+        f.receipts,
+        rpc,
+      ),
+      /must be idle/,
+    );
+    assert.equal(interleaved, true);
+    assert.equal(
+      f.calls.filter((c) => c.method === "thread/archive").length,
+      0,
+    );
+    assert.equal(
+      f.calls.filter((c) => c.method === "thread/name/set").length,
+      1,
+    );
+    assert.equal(
+      readdirSync(f.root).some((name) => name.endsWith(".lock")),
+      false,
+    );
+  }
+});
+
+test("uppercase UUID inputs remain discoverable through create, list and read", async (t) => {
+  const f = fixture(t);
+  const request = requestSchema.parse({
+    version: 1,
+    context: { ...context, coordinator: coordinator.toUpperCase() },
+    operation: {
+      type: "create",
+      requestId: requestId.toUpperCase(),
+      title: "Worker",
+      message: "Bounded work",
+      sandbox: "read-only",
+    },
+  });
+  await execute(request, f.receipts, f.rpc);
+  assert.equal(f.receipts.read(requestId.toUpperCase()).requestId, requestId);
+  const listed = (await f.run({ type: "list" })) as {
+    threads: { id: string }[];
+  };
+  assert.deepEqual(
+    listed.threads.map((thread) => thread.id),
+    [worker],
+  );
+  await f.run({ type: "read", threadId: worker.toUpperCase() });
+  assert.equal(f.calls.at(-1)!.params.threadId, worker);
+});
+
 test("read pages actual items; continue preserves runtime settings; rename/archive read back the result", async (t) => {
   const f = fixture(t);
   await f.create();
@@ -449,6 +611,56 @@ test(
       "initialized",
       "thread/loaded/list",
     ]);
+  },
+);
+
+test(
+  "socket paths reach the exact listener without URL percent encoding",
+  { timeout: 10_000 },
+  async (t) => {
+    const f = fixture(t);
+    const listeners = ["control socket.sock", "control%20socket.sock"].map(
+      (name) => {
+        const server = createServer();
+        const ws = new WebSocketServer({ server });
+        const listener = { server, ws, connections: 0, name };
+        ws.on("connection", (socket) => {
+          listener.connections++;
+          socket.on("message", (bytes) => {
+            const request = JSON.parse(bytes.toString());
+            if (request.id)
+              socket.send(
+                JSON.stringify({ id: request.id, result: { userAgent: name } }),
+              );
+          });
+        });
+        return listener;
+      },
+    );
+    for (const listener of listeners) {
+      listener.server.listen(path.join(f.root, listener.name));
+      await once(listener.server, "listening");
+    }
+    const client = new AppServer(path.join(f.root, "control socket.sock"));
+    try {
+      assert.deepEqual(await client.initialize(), {
+        userAgent: "control socket.sock",
+      });
+      assert.deepEqual(
+        listeners.map((listener) => listener.connections),
+        [1, 0],
+      );
+    } finally {
+      client.close();
+      await Promise.all(
+        listeners.map(
+          ({ ws, server }) =>
+            new Promise<void>((resolve) =>
+              ws.close(() => server.close(() => resolve())),
+            ),
+        ),
+      );
+    }
   },
 );
 

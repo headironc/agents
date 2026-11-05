@@ -286,9 +286,9 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | 目标类别 | 安装位置 | 候选来源 |
 | --- | --- | --- |
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
-| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code,antigravity}.md` | `delivery/policy/` 对应八个文件 |
+| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,codex-sessions,claude-code,antigravity}.md` | `delivery/policy/` 对应九个文件 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
-| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应三个文件 |
+| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应四个文件 |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
 | Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
 | Claude 按需参考 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/policy/{writing,tool-contracts,review}.md` | 同一份 `delivery/policy/` 公共合同 |

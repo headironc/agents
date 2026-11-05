@@ -19,13 +19,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
+import { createConnection } from "node:net";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import WebSocket from "ws";
 import { z } from "zod";
 
-const uuid = z.uuid();
+const uuid = z.uuid().transform((value) => value.toLowerCase());
 const absolute = z
   .string()
   .refine(path.isAbsolute, "Expected an absolute path");
@@ -131,10 +132,11 @@ export class AppServer {
   >();
 
   constructor(socket: string) {
-    if (/[?#:]/.test(socket)) throw new Error("Unsupported Unix socket path");
     if (!statSync(socket).isSocket())
       throw new Error("Target is not an existing Unix socket");
-    this.socket = new WebSocket(`ws+unix://${socket}:/`, {
+    this.socket = new WebSocket("ws://localhost/", {
+      // Pass the filesystem path directly; URL parsing can encode a different socket name.
+      createConnection: () => createConnection({ path: socket }),
       handshakeTimeout: 5000,
       maxPayload: 4 * 1024 * 1024,
       perMessageDeflate: false,
@@ -281,6 +283,7 @@ export class Receipts {
   }
 
   read(id: string): Receipt {
+    id = uuid.parse(id);
     const lines = readPrivate(this.file(id)).trim().split("\n");
     const events = lines.map((line) => eventSchema.parse(JSON.parse(line)));
     const first = events[0]!;
@@ -299,6 +302,28 @@ export class Receipts {
     return readdirSync(this.directory)
       .filter((name) => /^[0-9a-f-]{36}\.jsonl$/.test(name))
       .map((name) => this.read(name.slice(0, -6)));
+  }
+
+  assertCreationSettled(threadId: string): void {
+    for (const receipt of this.all()) {
+      if (receipt.operation !== "create" || receipt.threadId !== threadId)
+        continue;
+      const lock = path.join(
+        this.directory,
+        `${receipt.context.coordinator}.lock`,
+      );
+      let owner: string;
+      try {
+        owner = readPrivate(lock);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
+      }
+      if (owner === receipt.requestId)
+        throw new Error(
+          "Child creation is unresolved; recover the original request before another write",
+        );
+    }
   }
 
   begin(request: Request): Receipt {
@@ -361,6 +386,7 @@ export class Receipts {
   }
 
   lock(threadId: string, requestId: string): () => void {
+    requestId = uuid.parse(requestId);
     const file = path.join(this.directory, `${uuid.parse(threadId)}.lock`);
     const descriptor = openSync(
       file,
@@ -550,15 +576,19 @@ export async function execute(
     if (op.threadId === binding.coordinator && op.type !== "send")
       throw new Error("This operation cannot change the coordinator");
     target = await checked(op.threadId);
-    if (
-      ["rename", "archive"].includes(op.type) &&
-      !["idle", "notLoaded"].includes(target.status.type)
-    )
-      throw new Error("Thread must be idle before renaming or archival");
   }
   const unlock = receipts.lock(target?.id ?? binding.coordinator, op.requestId);
   let receipt: Receipt;
   try {
+    if (target) {
+      receipts.assertCreationSettled(target.id);
+      target = await checked(target.id);
+      if (
+        ["rename", "archive"].includes(op.type) &&
+        !["idle", "notLoaded"].includes(target.status.type)
+      )
+        throw new Error("Thread must be idle before renaming or archival");
+    }
     receipt = receipts.begin(request);
   } catch (error) {
     unlock();
@@ -695,13 +725,14 @@ export async function execute(
         throw new OutcomeUnknown("Archive readback did not confirm the target");
       receipt = receipts.update(receipt, "confirmed");
     }
-    known = true;
-    return {
+    const result = {
       receipt,
       ...(receipt.threadId && op.type !== "archive"
         ? { thread: await checked(receipt.threadId) }
         : {}),
     };
+    known = true;
+    return result;
   } catch (error) {
     // Even an RPC rejection may follow a partial multi-step operation. Never repeat implicitly.
     receipts.update(receipt, "needs-readback");
