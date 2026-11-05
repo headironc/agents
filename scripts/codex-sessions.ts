@@ -96,7 +96,8 @@ const threadSchema = z
     cwd: z.string(),
     projectId: z.string().nullable(),
     status: z.object({ type: z.string() }).passthrough(),
-    parentThreadId: z.string().nullable().optional(),
+    parentThreadId: z.string().nullable(),
+    forkedFromId: z.string().nullable(),
   })
   .passthrough();
 type Thread = z.infer<typeof threadSchema>;
@@ -425,33 +426,84 @@ export async function execute(
   rpc: Rpc,
 ): Promise<unknown> {
   const { context: binding, operation: op } = request;
-  const read = async (threadId: string) =>
-    threadSchema.parse(
+  const read = async (threadId: string) => {
+    const thread = threadSchema.parse(
       z
         .object({ thread: z.unknown() })
         .parse(await rpc("thread/read", { threadId, includeTurns: false }))
         .thread,
     );
+    if (thread.id !== threadId)
+      throw new OutcomeUnknown(
+        "Thread readback changed the requested identity",
+      );
+    return thread;
+  };
   const coordinator = await read(binding.coordinator);
   if (coordinator.cwd !== binding.cwd)
     throw new Error("Coordinator cwd does not match this binding");
   const records = receipts.all().filter((r) => sameBinding(r.context, binding));
-  const owned = (threadId: string) => {
-    if (
-      !receipts
-        .all()
-        .some(
-          (r) =>
-            sameBinding(r.context, binding) &&
-            r.operation === "create" &&
-            r.threadId === threadId,
-        )
-    )
+  const createdHere = new Set<string>();
+  const owned = async (threadId: string) => {
+    if (createdHere.has(threadId)) return;
+    const creation = receipts
+      .all()
+      .find(
+        (r) =>
+          sameBinding(r.context, binding) &&
+          r.operation === "create" &&
+          r.threadId === threadId,
+      );
+    if (!creation)
       throw new Error("Thread is not a child created under this binding");
+    // Local receipts are writable references. Require the original input retained by the server.
+    const page = z.object({ data: z.array(z.unknown()) }).parse(
+      await rpc("thread/items/list", {
+        threadId,
+        limit: 1,
+        sortDirection: "asc",
+      }),
+    );
+    const first = z
+      .object({
+        turnId: z.string(),
+        item: z.object({
+          type: z.literal("functionCallOutput"),
+          name: z.literal("agents_coordination"),
+          namespace: z.null(),
+          output: z.string(),
+        }),
+      })
+      .safeParse(page.data[0]);
+    let material: Record<string, unknown> | undefined;
+    if (first.success) {
+      try {
+        material = JSON.parse(first.data.item.output);
+      } catch {
+        /* Reject without exposing another thread's input. */
+      }
+    }
+    if (
+      !first.success ||
+      !material ||
+      material.source !== "agent" ||
+      material.coordinator !== binding.coordinator ||
+      material.authorizationReference !== binding.authorization ||
+      material.requestId !== creation.requestId ||
+      (creation.turnId !== undefined && first.data.turnId !== creation.turnId)
+    )
+      throw new Error(
+        "Server provenance does not confirm this child; inspect the original creation without replaying",
+      );
   };
   const checked = async (threadId: string): Promise<Thread> => {
-    if (threadId !== binding.coordinator) owned(threadId);
+    if (threadId !== binding.coordinator) await owned(threadId);
     const thread = await read(threadId);
+    if (
+      threadId !== binding.coordinator &&
+      (thread.parentThreadId != null || thread.forkedFromId != null)
+    )
+      throw new Error("Expected an independent child, not copied lineage");
     if (
       thread.cwd !== binding.cwd ||
       thread.projectId !== coordinator.projectId
@@ -627,8 +679,17 @@ export async function execute(
       receipt = receipts.update(receipt, "created", {
         threadId: created.thread.id,
       });
-      if (created.thread.parentThreadId != null)
-        throw new Error("Expected an independent thread");
+      if (
+        created.thread.parentThreadId != null ||
+        created.thread.forkedFromId != null ||
+        created.thread.id === binding.coordinator ||
+        created.thread.cwd !== binding.cwd ||
+        created.thread.projectId !== coordinator.projectId
+      )
+        throw new OutcomeUnknown(
+          "Created thread does not match the independent bound target",
+        );
+      createdHere.add(created.thread.id);
       await rpc("thread/name/set", {
         threadId: created.thread.id,
         name: op.title,
@@ -746,7 +807,6 @@ export async function main(args: string[]): Promise<void> {
   const { values } = parseArgs({
     args,
     options: {
-      request: { type: "string" },
       "request-json": { type: "string" },
       receipts: { type: "string" },
       help: { type: "boolean" },
@@ -760,19 +820,13 @@ export async function main(args: string[]): Promise<void> {
   }
   if (values.help) {
     console.log(
-      "codex-sessions --request PRIVATE_JSON --receipts PRIVATE_DIRECTORY\nConnect only to the existing Unix socket in the request. Actions: status, list, read, recover, create, send, rename, archive.\nWrites require a new UUID requestId. Reuse recover after an unknown result; never resend.\nMessages always use external tool output, never Human input. See policy/codex-sessions.md.",
+      "codex-sessions --request-json LITERAL_JSON --receipts PRIVATE_DIRECTORY\nConnect only to the existing Unix socket in the request. Actions: status, list, read, recover, create, send, rename, archive.\nWrites require a new UUID requestId. Reuse recover after an unknown result; never resend.\nMessages always use external tool output, never Human input. Request files are unsupported: inspected literal arguments bind approval to execution. See policy/codex-sessions.md.",
     );
     return;
   }
-  if (
-    (!values.request && !values["request-json"]) ||
-    (values.request && values["request-json"]) ||
-    !values.receipts
-  )
-    throw new Error(
-      "Expected exactly one of --request / --request-json and --receipts; use --help",
-    );
-  const body = values["request-json"] ?? readPrivate(values.request!);
+  if (!values["request-json"] || !values.receipts)
+    throw new Error("Expected --request-json and --receipts; use --help");
+  const body = values["request-json"];
   if (Buffer.byteLength(body) > 2 * 1024 * 1024)
     throw new Error("Request exceeds 2 MiB");
   const request = requestSchema.parse(JSON.parse(body));

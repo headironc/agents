@@ -80,7 +80,7 @@ Mac/dev 示例沿已配置的 SSH 入口连接 dev 托管 app-server，开发在
 
 明确授权后，可使用交付的 `tools/codex-sessions.mjs` 作为现有 app-server 的受限客户端。调用参数、收据及未知写恢复见[工具合同](../delivery/policy/codex-sessions.md)。它只管理绑定协调者创建的独立线程，代理消息保留 external tool output 来源。源码交付不证明某台机器已安装、App 可见、reviewer 已加载政策，或断线后模型仍推进；这些事实分别实测。不启动另一 server、复制会话库或接管旧业务聊天。
 
-请求示例中的路径、UUID 和授权引用由实际任务绑定。先准备 0700 收据目录与 0600 请求文件，再调用固定 Node 和交付工具；不要把示例引用当成授权。
+请求示例中的路径、UUID 和授权引用由实际任务绑定。先准备 0700 收据目录，再用 `--request-json` 字面参数调用固定 Node 和交付工具。入口不读取可在审批后替换的请求文件；不要把示例引用当成授权。
 
 ```json
 {
