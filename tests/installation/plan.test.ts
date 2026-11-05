@@ -66,6 +66,25 @@ test("the CLI requires an explicit nonempty unique product selection before crea
   assert.match(help.stderr, /explicit selection required/);
 });
 
+test("bounded Codex session targets form a selectable partial delivery", (t) => {
+  const f = installFixture(t);
+  const keys = [
+    "codex:tools/codex-sessions.mjs",
+    "codex:policy/codex-sessions.md",
+    "codex:capability/codex-sessions.toml",
+  ];
+  const { plan } = f.planned([
+    "--product",
+    "codex",
+    ...keys.flatMap((key) => ["--target", key]),
+  ]);
+  assert.deepEqual(
+    plan.targets.map((target) => target.key).sort(),
+    keys.sort(),
+  );
+  assert.deepEqual(plan.selectedTargets?.slice().sort(), keys);
+});
+
 test("product roots record each explicit subset in canonical order and exclude every other product", (t) => {
   const f = installFixture(t);
   for (const selected of [

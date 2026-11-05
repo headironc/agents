@@ -65,6 +65,7 @@ export const policies = [
   "rust",
   "sql",
   "models",
+  "codex-sessions",
   "claude-code",
   "antigravity",
 ];
@@ -74,6 +75,7 @@ export const tools = ["check-ids.mjs", "check-prose.mjs", "task-temp.mjs"];
 export const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
   ["codex.toml", "delivery/capability/codex.toml"],
+  ["codex-sessions.toml", "delivery/capability/codex-sessions.toml"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
 ];
 export const runtimeInputs = [
@@ -107,6 +109,10 @@ export function expectedTargets(
     ),
     ...tools.map((name) =>
       pair(`${codex}/tools/${name}`, `${snapshot}/delivery/tools/${name}`),
+    ),
+    pair(
+      `${codex}/tools/codex-sessions.mjs`,
+      `${snapshot}/delivery/tools/codex-sessions.mjs`,
     ),
     ...capability.map(([name, source]) =>
       pair(`${codex}/capability/${name}`, `${snapshot}/${source}`),

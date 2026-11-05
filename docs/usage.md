@@ -78,6 +78,29 @@ Mac/dev 示例沿已配置的 SSH 入口连接 dev 托管 app-server，开发在
 
 #### dev 主协调与 Mac 本地协调示例
 
+明确授权后，可使用交付的 `tools/codex-sessions.mjs` 作为现有 app-server 的受限客户端。调用参数、收据及未知写恢复见[工具合同](../delivery/policy/codex-sessions.md)。它只管理绑定协调者创建的独立线程，代理消息保留 external tool output 来源。源码交付不证明某台机器已安装、App 可见、reviewer 已加载政策，或断线后模型仍推进；这些事实分别实测。不启动另一 server、复制会话库或接管旧业务聊天。
+
+请求示例中的路径、UUID 和授权引用由实际任务绑定。先准备 0700 收据目录与 0600 请求文件，再调用固定 Node 和交付工具；不要把示例引用当成授权。
+
+```json
+{
+  "version": 1,
+  "context": {
+    "socket": "/srv/codex/app-server-control/app-server-control.sock",
+    "cwd": "/srv/project",
+    "coordinator": "01900000-0000-7000-8000-000000000001",
+    "authorization": "Original Human chat and turn reference"
+  },
+  "operation": {
+    "type": "create",
+    "requestId": "01900000-0000-7000-8000-000000000002",
+    "title": "Authorized worker",
+    "message": "Inspect the assigned result within the original scope.",
+    "sandbox": "read-only"
+  }
+}
+```
+
 仅在明确采用这一拓扑时，由 dev 主协调持有总体任务安排、依赖、交付进度和原始操作句柄。保留各原操作的执行 owner 与目标。Mac 本地协调负责分配给它的 Mac 专属设计、浏览器、桌面验收及本地工作负责人。业务判断和验收职责仍沿项目规则。该示例不要求所有项目采用 dev 主协调，也不迁移已有任务。
 
 dev 主协调不假定能读取 Mac App 聊天。Mac 在线时沿既有 Mac→dev SSH 领取安排并主动回报，报告进入绑定的 dev 会话或既有结果入口。CLI 使用 dev 实际 server 内的目标标识。正式采用前验证投递、接续、送达和结果读取；帮助、SSH 连通或后台运行都不证明这条回报路径已部署。

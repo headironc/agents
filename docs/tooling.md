@@ -153,6 +153,8 @@ Actions 日志与 job 结论提供托管结果。JSON 报告仅供诊断，不�
 
 ## 仓库登记维护
 
+Codex 专属 `codex-sessions` 从 TypeScript 打包为独立工具，使用固定 `ws` 的标准 Unix WebSocket 传输，不加载可选 native 扩展。安装清单与门禁覆盖工具、调用合同和可审查的政策片段。回归覆盖目标隔离、external tool output、未知写锁、命名与归档读回及真实 Unix WebSocket fixture；fixture 不调用模型，不证明真实 App、reviewer 或断线行为。真实服务验收沿当前任务授权保留原件，不进入自动门禁。
+
 本节只供仓库维护，不随公共工具契约发布。安装后的调用者按需读取[工具约束](../delivery/policy/tool-contracts.md)。
 
 | 清单 | 职责 |

@@ -12,11 +12,13 @@
     "node": "26.8.1"
   },
   "dependencies": {
+    "ws": "8.22.0",
     "zod": "4.6.6"
   },
   "devDependencies": {
     "@openai/codex": "0.160.0",
     "@types/node": "26.6.4",
+    "@types/ws": "8.18.2",
     "js-yaml": "5.4.2",
     "markdownlint": "0.41.1",
     "markdownlint-cli2": "0.23.3",

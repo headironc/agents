@@ -13,7 +13,14 @@ export const memberCategories = [
 export const products = ["codex", "claude", "antigravity"] as const;
 export type Product = (typeof products)[number];
 const sharedPolicies = ["writing", "tool-contracts", "review"];
-const codexPolicies = ["rust", "sql", "models", "claude-code", "antigravity"];
+const codexPolicies = [
+  "rust",
+  "sql",
+  "models",
+  "codex-sessions",
+  "claude-code",
+  "antigravity",
+];
 // Deployed executables a consuming project runs directly, published beside the rules they enforce.
 // Kept in name order, so a new entry lands in one place and the plan stays comparable.
 const tools: [string, string][] = [
@@ -27,6 +34,7 @@ const tools: [string, string][] = [
 const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
   ["codex.toml", "delivery/capability/codex.toml"],
+  ["codex-sessions.toml", "delivery/capability/codex-sessions.toml"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
 ];
 
@@ -79,6 +87,13 @@ export function publicMembers(
         product,
         relative: `tools/${name}`,
         source,
+      });
+    if (product === "codex")
+      members.push({
+        category: "tool",
+        product,
+        relative: "tools/codex-sessions.mjs",
+        source: "delivery/tools/codex-sessions.mjs",
       });
   }
   for (const [name, source] of capability)

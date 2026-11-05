@@ -5,11 +5,13 @@
     "": {
       "name": "agents",
       "dependencies": {
+        "ws": "8.22.0",
         "zod": "4.6.6",
       },
       "devDependencies": {
         "@openai/codex": "0.160.0",
         "@types/node": "26.6.4",
+        "@types/ws": "8.18.2",
         "js-yaml": "5.4.2",
         "markdownlint": "0.41.1",
         "markdownlint-cli2": "0.23.3",
@@ -157,6 +159,13 @@
       "",
       {},
       "sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==",
+    ],
+
+    "@types/ws": [
+      "@types/ws@8.18.2",
+      "",
+      { "dependencies": { "@types/node": "*" } },
+      "sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==",
     ],
 
     "@typescript/typescript-aix-ppc64": [
@@ -1460,6 +1469,19 @@
         "dependencies": { "@types/unist": "^3.0.0", "unist-util-is": "^6.0.0" },
       },
       "sha512-goh1s1TBrqSqukSc8wrjwWhL0hiJxgA8m4kFxGlQ+8FYQ3C/m11FcTs4YYem7V664AhHVvgoQLk890Ssdsr2IQ==",
+    ],
+
+    "ws": [
+      "ws@8.22.0",
+      "",
+      {
+        "peerDependencies": {
+          "bufferutil": "^4.0.1",
+          "utf-8-validate": ">=5.0.2",
+        },
+        "optionalPeers": ["bufferutil", "utf-8-validate"],
+      },
+      "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==",
     ],
 
     "zod": [
