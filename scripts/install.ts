@@ -36,6 +36,7 @@ import { readCurrentInstallation } from "./install-current.ts";
 import {
   adoptKeyPattern,
   InstallPlanSchema,
+  installationProducts,
   installPathCollisions,
   runtimeFiles,
 } from "./install-records.ts";
@@ -65,7 +66,8 @@ import {
 import type { Gap } from "./install-state.ts";
 import { readSkillEntries } from "./skills.ts";
 import type { SkillEntry } from "./skills.ts";
-import { publicMembers } from "./delivery.ts";
+import { products, publicMembers } from "./delivery.ts";
+import type { Product } from "./delivery.ts";
 import {
   canonicalDigest,
   listSourcePaths,
@@ -75,7 +77,8 @@ import type { SourceEntry } from "./source.ts";
 
 const closureCheck = "Installer build closure";
 const usage = [
-  "Usage: install.sh plan --source DIR --report FILE --output PLAN [--target KEY]... [--adopt KEY]... [--include-product antigravity]",
+  "Usage: install.sh plan --product PRODUCT [--product PRODUCT]... --source DIR --report FILE --output PLAN [--target KEY]... [--adopt KEY]...",
+  "       PRODUCT: codex | claude | antigravity (explicit selection required)",
   "       install.sh apply --plan PLAN",
   "       install.sh verify --receipt RECEIPT",
   "       install.sh rollback --receipt RECEIPT",
@@ -99,7 +102,7 @@ type PlanArguments = {
   output: string;
   adopt: string[];
   targets: string[];
-  includeAntigravity: boolean;
+  products: Product[];
 };
 
 export function parsePlanArguments(args: string[]): PlanArguments {
@@ -111,23 +114,26 @@ export function parsePlanArguments(args: string[]): PlanArguments {
   const values = new Map<string, string>();
   const adopt: string[] = [];
   const targets: string[] = [];
-  let includeAntigravity = false;
+  const selected: Product[] = [];
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]!;
     const value = args[index + 1];
     if (
       name !== "--adopt" &&
       name !== "--target" &&
-      name !== "--include-product" &&
+      name !== "--product" &&
       !Object.hasOwn(options, name)
     )
       throw new UsageError(`Unknown argument: ${name}`);
     if (value === undefined || value === "" || value.startsWith("--"))
       throw new UsageError(`Missing value: ${name}`);
-    if (name === "--include-product") {
-      if (value !== "antigravity" || includeAntigravity)
+    if (name === "--product") {
+      if (
+        !products.includes(value as Product) ||
+        selected.includes(value as Product)
+      )
         throw new UsageError(`Invalid or repeated product: ${value}`);
-      includeAntigravity = true;
+      selected.push(value as Product);
     } else if (name === "--adopt" || name === "--target") {
       const selected = name === "--adopt" ? adopt : targets;
       if (!adoptKeyPattern.test(value) || selected.includes(value))
@@ -141,6 +147,10 @@ export function parsePlanArguments(args: string[]): PlanArguments {
   }
   for (const name of ["source", "report", "output"])
     if (!values.has(name)) throw new UsageError(`Missing --${name}`);
+  if (!selected.length)
+    throw new UsageError(
+      "Missing --product: select codex, claude or antigravity explicitly",
+    );
   const resolved = (name: string) => path.resolve(values.get(name)!);
   return {
     source: resolved("source"),
@@ -148,7 +158,7 @@ export function parsePlanArguments(args: string[]): PlanArguments {
     output: resolved("output"),
     adopt: adopt.sort(bytewise),
     targets: targets.sort(bytewise),
-    includeAntigravity,
+    products: products.filter((product) => selected.includes(product)),
   };
 }
 
@@ -627,7 +637,7 @@ export function planInstallation(
       : attempt(gaps, { code: "source-manifest-invalid", path: source }, () =>
           readSkillEntries(source),
         );
-  const roots = resolveInstallRoots(environment, gaps, args.includeAntigravity);
+  const roots = resolveInstallRoots(environment, gaps, args.products);
   const report = readReport(args.report, gaps);
   if (!source || !entries || !roots || !report) throw new PlanBlocked(gaps);
   block();
@@ -651,7 +661,7 @@ export function planInstallation(
   const createdAt = new Date().toISOString();
   const id = `${createdAt.replace(/[-:.]/g, "")}-${checkout.commit.slice(0, 12)}`;
   const directory = path.join(roots.deploy.path, id);
-  const privateRun = path.join(roots.codex.path, ".agents-install", id);
+  const privateRun = path.join(roots.state.path, "agents/install", id);
   const run = {
     id,
     directory,
@@ -692,6 +702,14 @@ export function planInstallation(
   const outputDirectories = new Set<string>();
   inspectParents(run.directory, uid, gaps, outputDirectories);
   inspectParents(privateRun, uid, gaps, outputDirectories);
+  const productDirectories = new Set<string>();
+  for (const product of installationProducts(roots))
+    inspectParents(
+      path.join(roots[product]!.path, ".agents-path-check"),
+      uid,
+      gaps,
+      productDirectories,
+    );
   if (lstatIfExists(privateRun))
     gaps.push({ code: "private-run-exists", path: privateRun });
   inspectParents(path.join(roots.backup.path, id), uid, gaps, new Set());
@@ -779,7 +797,24 @@ export function planInstallation(
     runCreated = true;
     mkdirSync(privateRun, { mode: 0o700 });
     privateCreated = true;
-    // New roots now have physical identities; case aliases may not have existed at preflight.
+    // Prepare selected roots so their filesystem aliases and shared ancestors are settled before
+    // freezing the missing target directories. Never create an unselected product's root.
+    for (const parent of [...productDirectories].sort(bytewise)) {
+      if (lstatIfExists(parent)) {
+        inspectParents(
+          path.join(parent, ".agents-path-check"),
+          uid,
+          gaps,
+          new Set(),
+        );
+        block();
+      } else {
+        mkdirSync(parent, { mode: 0o700 });
+        createdParents.push(parent);
+      }
+      checkCollisions();
+      block();
+    }
     checkCollisions();
     block();
     for (const entry of candidate)
@@ -822,7 +857,7 @@ export function planInstallation(
       report.report.platform,
     );
     const body = {
-      version: args.includeAntigravity ? 6 : 5,
+      version: 7,
       createdAt,
       run,
       review: args.output,
@@ -867,6 +902,7 @@ export function planInstallation(
       targets.filter((target) => target.action === action).length;
     return {
       status: "planned",
+      products: installationProducts(roots),
       run: id,
       plan: run.plan,
       review: args.output,
@@ -944,6 +980,7 @@ type InstallationStatus = {
   checkout?: { directory: string; commit: string } | undefined;
   candidate?: { sha256: string } | undefined;
   selectedTargets?: string[] | undefined;
+  products?: Product[] | undefined;
   // `ahead` is what the baseline commit has and the checkout's HEAD does not. Zero means the
   // baseline is on this line of history and `behind` is a distance; anything else means the two
   // diverged and `behind` is one side of that, not a number to close.
@@ -1033,6 +1070,7 @@ function installationStatus(
       commit: plan.checkout.commit,
     },
     candidate: { sha256: plan.candidate.sha256 },
+    products: installationProducts(plan.roots),
     ...(plan.selectedTargets ? { selectedTargets: plan.selectedTargets } : {}),
     repository: comparedWith(plan),
   };

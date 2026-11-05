@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import type { Stats } from "node:fs";
 import path from "node:path";
+import type { Product } from "./delivery.ts";
 import { isNormalizedAbsolute } from "./install-records.ts";
 import type {
   InstallRoots,
@@ -181,10 +182,10 @@ export function attempt<T>(
 }
 
 /**
- * Resolves every root, and says which ones the environment named unusably.
+ * Resolves shared storage and the recorded or explicitly selected product roots.
  *
  * Each gap carries the root it was found under, so a caller that rests on some roots and not others
- * can tell them apart by ownership rather than by reading a code string. And every root is resolved
+ * can tell them apart by ownership rather than by reading a code string. Each selected root is resolved
  * whatever the others did: one unusable variable used to abandon the whole result, which left a
  * caller unable to see that a different root had moved.
  *
@@ -193,7 +194,7 @@ export function attempt<T>(
 export function inspectRoots(
   environment: NodeJS.ProcessEnv,
   gaps: Gap[],
-  includeAntigravity = false,
+  selected: readonly Product[],
 ): { roots: InstallRoots; unusable: RootName[] } | undefined {
   const home = environment.HOME ?? "";
   if (!isNormalizedAbsolute(home)) {
@@ -258,9 +259,19 @@ export function inspectRoots(
     unusable,
     roots: {
       home: root("home", home, "HOME"),
-      codex: select("codex", "CODEX_HOME", path.join(home, ".codex")),
-      claude: select("claude", "CLAUDE_CONFIG_DIR", path.join(home, ".claude")),
-      ...(includeAntigravity
+      ...(selected.includes("codex")
+        ? { codex: select("codex", "CODEX_HOME", path.join(home, ".codex")) }
+        : {}),
+      ...(selected.includes("claude")
+        ? {
+            claude: select(
+              "claude",
+              "CLAUDE_CONFIG_DIR",
+              path.join(home, ".claude"),
+            ),
+          }
+        : {}),
+      ...(selected.includes("antigravity")
         ? {
             antigravity: root(
               "antigravity",
@@ -289,9 +300,9 @@ export function inspectRoots(
 export function resolveInstallRoots(
   environment: NodeJS.ProcessEnv,
   gaps: Gap[],
-  includeAntigravity = false,
+  selected: readonly Product[],
 ): InstallRoots | undefined {
-  const inspected = inspectRoots(environment, gaps, includeAntigravity);
+  const inspected = inspectRoots(environment, gaps, selected);
   return inspected && !inspected.unusable.length ? inspected.roots : undefined;
 }
 

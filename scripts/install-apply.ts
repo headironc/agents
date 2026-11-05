@@ -20,7 +20,11 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { InstallPlanSchema, InstallReceiptSchema } from "./install-records.ts";
+import {
+  InstallPlanSchema,
+  InstallReceiptSchema,
+  installationProducts,
+} from "./install-records.ts";
 import type {
   InstallPlan,
   InstallReceipt,
@@ -97,7 +101,8 @@ function readRecord(
     value !== null &&
     "version" in value &&
     value.version !== 5 &&
-    value.version !== 6
+    value.version !== 6 &&
+    value.version !== 7
   ) {
     throw new RecordVersionError(`Unsupported ${code} version: ${physical}`);
   }
@@ -264,7 +269,7 @@ function checkHost(
   const inspected = inspectRoots(
     environment,
     problems,
-    plan.roots.antigravity !== undefined,
+    installationProducts(plan.roots),
   );
   for (const [name, root] of Object.entries(inspected?.roots ?? {})) {
     if (!root) continue;
@@ -773,6 +778,7 @@ function summarize(plan: InstallPlan, receipt: InstallReceipt) {
     status: receipt.status,
     run: plan.run.id,
     receipt: plan.run.receipt,
+    products: installationProducts(plan.roots),
     steps: {
       applied: steps("applied"),
       pending: steps("pending"),
@@ -944,6 +950,7 @@ export function verifyInstallation(
   return {
     status: receipt.status,
     verified: unique.length === 0,
+    products: installationProducts(plan.roots),
     run: plan.run.id,
     receipt: plan.run.receipt,
     ...(renamed ? { hostname: renamed } : {}),
