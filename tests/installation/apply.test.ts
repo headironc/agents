@@ -29,7 +29,7 @@ import {
   machineIdentity,
   readTargetState,
 } from "../../scripts/install-state.ts";
-import { canonicalDigest } from "../../scripts/source.ts";
+import { canonicalDigest, readSourceEntries } from "../../scripts/source.ts";
 import {
   expectedTargets,
   installFixture,
@@ -45,6 +45,7 @@ function outcome(result: {
   assert.equal(result.status, 0, result.stderr + result.stdout);
   return JSON.parse(result.stdout) as {
     status: string;
+    run?: string;
     verified?: boolean;
     unreadable?: string[];
     candidate?: { sha256: string };
@@ -254,6 +255,91 @@ for (const version of [5, 6] as const)
     assert.deepEqual(readFileSync(plan.run.plan), original);
     if (version === 5) assert.deepEqual(readTargetState(third), thirdBefore);
   });
+
+test("retired Codex targets remain recoverable from a V7 record", (t) => {
+  const f = installFixture(t, { realRuntime: true, products: ["codex"] });
+  const members = [
+    ["policy", "policy/codex-sessions.md"],
+    ["tool", "tools/codex-sessions.mjs"],
+    ["capability", "capability/codex-sessions.toml"],
+  ] as const;
+  const codex = path.join(f.home, ".codex");
+  for (const [, relative] of members)
+    mkdirSync(path.dirname(path.join(codex, relative)), { recursive: true });
+
+  // Recreate the retired members in a synthetic frozen plan without using the active manifest.
+  const { plan, review } = f.planned([
+    "--target",
+    "codex:capability/codex.toml",
+  ]);
+  assert.equal(plan.version, 7);
+  plan.targets = members.map(([category, relative], order) => {
+    const source = path.join(plan.run.source, "delivery", relative);
+    mkdirSync(path.dirname(source), { recursive: true });
+    writeFileSync(source, `Historical ${relative}\n`, { mode: 0o600 });
+    return {
+      order,
+      kind: "file",
+      category,
+      product: "codex",
+      key: `codex:${relative}`,
+      path: path.join(codex, relative),
+      source,
+      installed: readTargetState(source),
+      before: { type: "absent" },
+      action: "create",
+      adopted: false,
+      backup: null,
+    };
+  });
+  plan.selectedTargets = plan.targets.map((target) => target.key).sort();
+  plan.candidate.entries = readSourceEntries(plan.run.source, [
+    ...plan.candidate.entries.map((entry) => entry.path),
+    ...members.map(([, relative]) => `delivery/${relative}`),
+  ]);
+  plan.candidate.sha256 = canonicalDigest(plan.candidate.entries);
+  const { sha256: _digest, ...body } = plan;
+  const bytes = JSON.stringify({ ...body, sha256: canonicalDigest(body) });
+  chmodSync(plan.run.plan, 0o600);
+  writeFileSync(plan.run.plan, bytes);
+  chmodSync(plan.run.plan, 0o400);
+  writeFileSync(review, bytes);
+
+  assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
+  for (const target of plan.targets)
+    assert.deepEqual(readTargetState(target.path), target.installed);
+  const before = outcome(f.cli(["status"]));
+  assert.equal(before.status, "installed");
+  assert.equal(before.run, plan.run.id);
+  assert.deepEqual(before.unreadable, []);
+
+  const next = f.planned(["--target", "codex:capability/codex.toml"]);
+  assert.equal(
+    outcome(f.cli(["apply", "--plan", next.review])).status,
+    "installed",
+  );
+  const after = outcome(f.cli(["status"]));
+  assert.equal(after.status, "installed");
+  assert.equal(after.run, next.plan.run.id);
+  assert.deepEqual(after.unreadable, []);
+
+  rmSync(plan.run.source, { recursive: true, force: true });
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+  assert.equal(
+    outcome(f.cli(["rollback", "--receipt", plan.run.receipt])).status,
+    "rolled-back",
+  );
+  for (const target of plan.targets)
+    assert.equal(existsSync(target.path), false, target.key);
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", next.plan.run.receipt])).verified,
+    true,
+  );
+  assert.equal(readFileSync(plan.run.plan, "utf8"), bytes);
+});
 
 test("five selected files install and roll back from a Codex worktree without changing unselected targets", (t) => {
   const f = installFixture(t, {

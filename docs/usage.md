@@ -66,60 +66,25 @@
 
 ### Mac 与 dev 的结果回传
 
-[委派政策](../delivery/policy/models.md#delegation-and-acceptance)拥有结果路径与接纳。分派时绑定实际客户端、目录、候选和唯一写者。区分界面或 controller 与执行宿主及 server。另核会话 host/thread。辨别运行实例时，再核实际 `CODEX_HOME` 和控制 socket。明确发送或读取入口、结果位置及主动取回者。入口存在、权限、连通和任务接续分别核实。相同账号、版本和规则安装不单独证明共享会话或工具。
+[委派政策](../delivery/policy/models.md#delegation-and-acceptance)拥有结果路径和接纳。[官方跨设备协作规则](../delivery/policy/models.md#official-codex-coordination-across-devices)说明会话选择、宿主权限及接任后的报告目标。分派前核实际 server、会话、目录、候选和唯一写者。界面所在设备不决定任务在哪台机器执行。
 
-Mac/dev 示例沿已配置的 SSH 入口连接 dev 托管 app-server，开发在 dev 已选目录执行。连接路线仍按 Human 当前选择，不要求所有远程开发都用 SSH。Mac 可作为 dev 会话的 Desktop 界面。原有 Mac 会话仍归原 server，不因界面显示 dev 而迁移。角色与职责沿项目规则分配，不由界面位置决定。
-
-派发前按所选路径核实每个必要方向的读取或投递能力。Desktop 的 hostId 工具不保证能管理任意终端 CLI 会话。列表为空时核查询范围，不把过滤结果当全部会话不存在。若目标会话不能管理，改用授权内已有且双方可用的结果路径。Git、PR 和 CI 只证明实际产物，不证明 Mac 会话的实时进度或未提交 WIP。不要默认新建台账文件。没有可行路径时先解决路径，再派依赖任务；独立授权工作继续。不要用“协调者主动读取”掩盖方向不可达。
-
-[官方远程连接](https://learn.chatgpt.com/docs/remote-connections)另提供云端中继，供受支持客户端访问主机。官方配对、SSH 连接和显式端点连接分别核实。配对成功不证明已打开或执行 dev 项目，也不证明消息已跨主机送达。Desktop 控制端接入 dev，无须同时开启 Mac CLI daemon 的受控主机功能。SSH 与云端入口可能连接同一套后台；不同入口不提供写者隔离。云端路线和网络区域未测时，保留未知，不由连接名称推断流量位置。
-
-[官方 CLI 说明](https://learn.chatgpt.com/docs/cli/reference)列出原生 `codex queue` 和 `--remote`。默认连接所在机器的会话服务，另一 server 的 UUID 不会自动选择跨主机端点。显式远端路线另核实际版本、端点和权限。不要由 CLI 支持 `ws`、`wss` 或 `unix` 端点，推导 Desktop 接受任意端点。VPN 只提供网络连通，不单独提供客户端入口。[开发命令说明](https://learn.chatgpt.com/docs/developer-commands?surface=cli)指出，`--resume` 失败可能仅警告，命令仍成功退出。入队、任务接续、结果送达和接纳分别确认。新增 MCP、监听器、认证、隧道、反向 SSH 或同步会话存储，各自核实授权。本流程不依赖新建这些设施。
+[官方远程连接](https://learn.chatgpt.com/docs/remote-connections)让受支持的客户端控制 dev 会话。Mac 作为控制端时，无须同时开启 Mac CLI daemon 的受控主机功能。SSH、显式端点和 Remote Control 分别核实；它们可能连接同一后台。配对成功后，另核实际打开的会话及执行目录。Mac 原有本地会话仍归原 server。
 
 #### dev 主协调与 Mac 本地协调示例
 
-明确授权后，可使用交付的 `tools/codex-sessions.mjs` 作为现有 app-server 的受限客户端。调用参数、收据及未知写恢复见[工具合同](../delivery/policy/codex-sessions.md)。它只管理绑定协调者创建的独立线程，代理消息保留 external tool output 来源。源码交付不证明某台机器已安装、App 可见、reviewer 已加载政策，或断线后模型仍推进；这些事实分别实测。不启动另一 server、复制会话库或接管旧业务聊天。
+仅在明确采用这项分工时，由 dev 持总体安排、阶段条件及原始句柄。若原始授权覆盖 Goal，由 dev 主协调设置并回读完整目标。Mac 本地协调负责已分配的设备专属阶段。两端按各自操作范围准备审批政策；若新会话依赖获准更新的 `auto_review.extra_policy`，先写入并回读，再核新会话的实际配置。保存结果不能代替真实 reviewer 的输入或决策。
 
-请求示例中的路径、UUID 和授权引用由实际任务绑定。先准备 0700 收据目录，再用 `--request-json` 字面参数调用固定 Node 和交付工具。入口不读取可在审批后替换的请求文件；不要把示例引用当成授权。
+要求 Mac 和 iPhone 都能接任或继续时，使用 dev 官方 app-server 上的官方交互会话。可从支持显式端点的交互 CLI 连接原 Unix socket；实际端点、权限及沙箱审批按本机核对。用同一会话 ID 在要求的客户端打开并验证继续入口。`codex exec` 适合后台任务。即使能按 ID 接续，也不能据此保证会话进入手机普通列表。
 
-```json
-{
-  "version": 1,
-  "context": {
-    "socket": "/srv/codex/app-server-control/app-server-control.sock",
-    "cwd": "/srv/project",
-    "coordinator": "01900000-0000-7000-8000-000000000001",
-    "authorization": "Original Human chat and turn reference"
-  },
-  "operation": {
-    "type": "create",
-    "requestId": "01900000-0000-7000-8000-000000000002",
-    "title": "Authorized worker",
-    "message": "Inspect the assigned result within the original scope.",
-    "sandbox": "read-only"
-  }
-}
-```
+| 方向 | 入口与读回 |
+| --- | --- |
+| dev 派单，Mac 领取 | 用双方可达的既有任务或 PR 记录安排；Mac 本地负责人读原任务并确认领取。dev CLI 不以 Remote Control 设备标识直发 Mac 本地会话。 |
+| Mac 回报 dev | 若 App 提供已验证的发送入口，Mac 本地会话向现任协调者的实际 host 与会话 ID 主动报告。核原目标实际收到，负责人再读证据并接纳。 |
+| dev 工作会话回报 | 在同一 server 使用已授权且已核对目标的原生队列或既有结果路径。[官方 CLI 说明](https://learn.chatgpt.com/docs/cli/reference)列出 `codex queue` 与 `--remote`；[开发命令说明](https://learn.chatgpt.com/docs/developer-commands?surface=cli)说明 `--resume` 失败可能仅警告。入队、接续、送达和接纳分别确认。 |
 
-仅在明确采用这一拓扑时，由 dev 主协调持有总体任务安排、依赖、交付进度和原始操作句柄。保留各原操作的执行 owner 与目标。Mac 本地协调负责分配给它的 Mac 专属设计、浏览器、桌面验收及本地工作负责人。业务判断和验收职责仍沿项目规则。该示例不要求所有项目采用 dev 主协调，也不迁移已有任务。
+离线时在约定入口保留就绪或阻塞结果。恢复后先读最新有效指令、候选与原句柄，再补报；未知发送先回读原目标。正式接任经两方确认后，更新约定入口中的现任 host 和会话 ID。在途操作保留原目标与观察者。会话打开、CLI 退出或 daemon 在线不证明模型继续推进。
 
-dev 主协调不假定能读取 Mac App 聊天。Mac 在线时沿既有 Mac→dev SSH 领取安排并主动回报，报告进入绑定的 dev 会话或既有结果入口。CLI 使用 dev 实际 server 内的目标标识。正式采用前验证投递、接续、送达和结果读取；帮助、SSH 连通或后台运行都不证明这条回报路径已部署。
-
-| 方向 | 已约定入口与责任 | 确认范围 |
-| --- | --- | --- |
-| dev 安排，Mac 领取 | dev 主协调在绑定入口保留安排；Mac 在线经 SSH 读取，并报告接单 | 以实际领取和接单结果确认，不假定 dev 能推送或读取 Mac 聊天 |
-| Mac 向 dev 回报 | Mac 经 SSH 向 dev 目标发送完成或阻塞报告，附 exact Git revision、证据位置和覆盖限制 | 入队、唤醒、送达、读取和接纳分别核实；未知发送先回读同一目标 |
-| dev 工作会话向主协调回报 | 沿实际验证过的同 server 投递或结果读取入口 | 同 server 不单独证明工具、权限或目标会话可用 |
-
-发送能力缺失时，使用双方已验证的既有结果路径。既不要求 Human 逐条中继，也不默认建立桥接设施。只有 Mac→dev 连通时，不将它反推为 dev→Mac App 可读。缺少可行的领取和回报路径时，先解决具体路径，再派依赖任务。
-
-Mac 合盖或不可达后，dev 保留最后确认状态。没有新证据时，不推断 Mac 任务已完成、失败或进程已停止。dev 与其工作者继续授权内的独立工作；真实依赖 Mac 结果的步骤等待回报。不要为读取休眠 Mac 默认开启 Mac SSH 服务、反向 SSH、复制凭据或会话库，或恢复云端 Remote Control。
-
-Mac 恢复后，先经 SSH 读取 dev 当前任务、候选、有效指令和原始句柄。再核本地原任务的实际状态及未知外部写，补交结果。未知发送先回读 dev 原目标，避免重复报告。不要重复派工、用过期 Mac 记录回滚总体进度，或自动取得主协调权。源码仍通过准确 Git 版本集成，报告不搬运未提交 WIP 拼装候选。
-
-活跃协调沿原句柄有界等待或紧凑读取。主协调不活跃时，负责人继续授权内工作并保留 ready/blocked 结果。不承诺离线通知、永久监控或自动接纳，也不为跟踪本任务创建定时 automation。主机、daemon 或持久终端存活，不证明模型协调会话正在运行或会在断连、重启后恢复。实际部署验收分别覆盖 Mac 断连后 dev 推进并接收结果、Mac 重连补报、未知写不重试，以及单一主协调归属。
-
-上述方式是协作约定。CLI 帮助与静态检查不证明完整跨主机模型行为。实际会话管理和双向通信仍以对应运行证据为准。[远程连接中的 handoff](https://learn.chatgpt.com/docs/remote-connections#hand-off-a-chat-between-hosts) 会移动会话与 Git 状态，并打断活动回合。handoff 不能作为普通消息总线。
+[官方会话 handoff](https://learn.chatgpt.com/docs/remote-connections#hand-off-a-chat-between-hosts) 会移动会话和 Git 状态，并打断活动回合。日常跨端控制、报告送达和负责人接任分别验收。静态规则检查不证明这些真实行为。
 
 ## 微信项目配置、DevTools 初始化、编译、诊断、预览、项目列表、自动化、云开发与安装诊断
 
@@ -286,9 +251,9 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | 目标类别 | 安装位置 | 候选来源 |
 | --- | --- | --- |
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
-| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,codex-sessions,claude-code,antigravity}.md` | `delivery/policy/` 对应九个文件 |
+| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code,antigravity}.md` | `delivery/policy/` 对应八个文件 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
-| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应四个文件 |
+| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应三个文件 |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
 | Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
 | Claude 按需参考 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/policy/{writing,tool-contracts,review}.md` | 同一份 `delivery/policy/` 公共合同 |
@@ -319,6 +284,8 @@ adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `claude:gh`；�
 安装测试独立列出目标，不从计划输出生成预期。测试覆盖旧链接接管、目录接管、漂移、故障、中断、冲突，以及移走候选快照和检出后的回读与恢复。真实安装后仍须核对文件、完整技能目录、工具入口及客户端加载。未实际验证的产品保持未验证。
 
 ## 既有安装快照过渡
+
+自研会话客户端、合同和专属审批片段已退出新交付。新计划只报告现存的清单外文件，不接管或卸载。旧计划继续通过其绑定的安装器和原恢复材料读回与恢复。退役不改写旧计划、回执、恢复快照或会话记录。
 
 逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果。V5/V6/V7 运行目录均位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的受支持计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。V7 的 plan、apply、verify 和 rollback，以及新入口的 status，通过 JSON `products` 展示实际产品集合。计划的 `roots` 中仅记录选中产品的根，由这些根唯一拥有该选择。旧运行副本保持原有输出格式。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和该计划的每个目标，不读取候选源码。无法读取或不受支持的回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。新计划不卸载未选产品的既有安装；status 只证明当前计划的目标，未被该计划列出的旧成员保持原样。合并源码不会自动更新已安装目标。
 

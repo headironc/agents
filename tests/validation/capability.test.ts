@@ -19,7 +19,6 @@ const bun = path.join(root, ".cache/agents-tools/bin/bun");
  */
 const fragments = [
   "delivery/capability/codex.toml",
-  "delivery/capability/codex-sessions.toml",
   "delivery/capability/rust-lints.toml",
 ];
 

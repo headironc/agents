@@ -23,10 +23,19 @@ const absolutePath = z
   .string()
   .refine(isNormalizedAbsolute, "Expected a normalized absolute path");
 
-/** Adoption names one product's target, never both copies of a shared member. */
+// Old plans can name the retired codex-sessions fragment. New selections are checked against the
+// current delivery manifest separately; keeping the record syntax does not publish the fragment.
 export const adoptKeyPattern =
   /^(?:codex|claude|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|codex-sessions\.toml|rust-lints\.toml))$/;
 const adoptKey = z.string().regex(adoptKeyPattern);
+
+// These V7 member identities are needed to read old records before dispatching to their runtime.
+// Only the active delivery manifest is used to select targets when creating a plan.
+const retiredV7CodexMembers = [
+  ["policy", "policy/codex-sessions.md"],
+  ["tool", "tools/codex-sessions.mjs"],
+  ["capability", "capability/codex-sessions.toml"],
+] as const;
 
 /** Build outputs and host tool files copied into each persistent runtime. */
 export const installerBuildFiles = [
@@ -255,6 +264,16 @@ export const InstallPlanSchema = z
       )
     )
       issue("Adopted keys must be sorted and unique");
+    const fileMembers = publicMembers([]);
+    if (plan.version === 7) {
+      for (const [category, relative] of retiredV7CodexMembers)
+        fileMembers.push({
+          product: "codex",
+          category,
+          relative,
+          source: `delivery/${relative}`,
+        });
+    }
     plan.targets.forEach((target, index) => {
       const inside = (root: string, file: string) => {
         const relative = path.relative(root, file);
@@ -272,8 +291,9 @@ export const InstallPlanSchema = z
           ? /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
             ? { relative, source: `delivery/${relative}` }
             : undefined
-          : publicMembers([], target.product).find(
+          : fileMembers.find(
               (member) =>
+                member.product === target.product &&
                 member.category === target.category &&
                 member.relative === relative,
             );

@@ -19,7 +19,6 @@ export const testPaths = {
     "tests/check-ids.test.mjs",
     "tests/bundle-tools.test.ts",
     "tests/task-temp.test.ts",
-    "tests/codex-sessions.test.ts",
     "tests/validation/capability.test.ts",
     "tests/validation/refs.test.ts",
     "tests/installation/build.test.ts",
@@ -65,7 +64,6 @@ export const requiredRepositoryPaths = [
     "check-ids.mjs",
     "bundle-tools.ts",
     "task-temp.ts",
-    "codex-sessions.ts",
     "check-refs.ts",
     "check-codex-loader.ts",
   ].map((name) => `scripts/${name}`),
@@ -74,8 +72,7 @@ export const requiredRepositoryPaths = [
   "delivery/tools/check-prose.mjs",
   "delivery/tools/check-ids.mjs",
   "delivery/tools/task-temp.mjs",
-  "delivery/tools/codex-sessions.mjs",
-  ...["README.md", "codex.toml", "codex-sessions.toml", "rust-lints.toml"].map(
+  ...["README.md", "codex.toml", "rust-lints.toml"].map(
     (name) => `delivery/capability/${name}`,
   ),
   ...[
@@ -87,7 +84,6 @@ export const requiredRepositoryPaths = [
   "docs/skill-sources.md",
   "delivery/policy/writing.md",
   "delivery/policy/models.md",
-  "delivery/policy/codex-sessions.md",
   "delivery/policy/review.md",
   "delivery/policy/claude-code.md",
   "delivery/policy/antigravity.md",

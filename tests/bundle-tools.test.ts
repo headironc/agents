@@ -114,10 +114,6 @@ const samples: Record<
     prepare?: (directory: string) => void;
   }
 > = {
-  "scripts/codex-sessions.ts": {
-    args: () => ["--help"],
-    status: 0,
-  },
   "scripts/task-temp.ts": {
     args: () => ["scan", "--root", "."],
     status: 0,
