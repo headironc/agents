@@ -16,10 +16,6 @@ import path from "node:path";
 
 export const bundledTools = [
   {
-    source: "scripts/codex-sessions.ts",
-    product: "delivery/tools/codex-sessions.mjs",
-  },
-  {
     source: "scripts/task-temp.ts",
     product: "delivery/tools/task-temp.mjs",
   },
@@ -60,17 +56,7 @@ export function renderTool(
   // live assertions in the shipped file, absent from the one under review.
   const result = spawnSync(
     bun,
-    [
-      "build",
-      tool.source,
-      "--target=node",
-      "--production",
-      "--minify",
-      "--define",
-      'process.env.WS_NO_BUFFER_UTIL="1"',
-      "--define",
-      'process.env.WS_NO_UTF_8_VALIDATE="1"',
-    ],
+    ["build", tool.source, "--target=node", "--production", "--minify"],
     {
       cwd: root,
       encoding: "utf8",
@@ -92,11 +78,7 @@ export function renderTool(
     `// source=${tool.source}`,
     `// source_sha256=${digest}`,
   ].join("\n");
-  const notices =
-    tool.source === "scripts/codex-sessions.ts"
-      ? `/* Third-party licenses\n${["ws", "zod"].map((name) => `${name}\n${readFileSync(path.join(root, "node_modules", name, "LICENSE"), "utf8")}`).join("\n")}*/\n`
-      : "";
-  return `${SHEBANG}${header}\n${notices}${bundle.slice(SHEBANG.length)}`;
+  return `${SHEBANG}${header}\n${bundle.slice(SHEBANG.length)}`;
 }
 
 export function renderTools(

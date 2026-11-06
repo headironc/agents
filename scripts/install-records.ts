@@ -23,7 +23,8 @@ const absolutePath = z
   .string()
   .refine(isNormalizedAbsolute, "Expected a normalized absolute path");
 
-/** Adoption names one product's target, never both copies of a shared member. */
+// Old plans can name the retired codex-sessions fragment. New selections are checked against the
+// current delivery manifest separately; keeping the record syntax does not publish the fragment.
 export const adoptKeyPattern =
   /^(?:codex|claude|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|codex-sessions\.toml|rust-lints\.toml))$/;
 const adoptKey = z.string().regex(adoptKeyPattern);

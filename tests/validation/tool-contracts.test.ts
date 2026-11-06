@@ -16,7 +16,6 @@ test("core inventory has the independently expected delivered subjects and valid
     "id-check",
     "ref-check",
     "task-temp",
-    "codex-sessions",
     "aliyun-sms",
     "wechatide",
     "wechatide-call",
@@ -113,8 +112,7 @@ test("every delivered consumer has its independently expected binding and declar
     ],
     "delivery/policy/tool-contracts.md": ["rg", "jq", "curl", "git", "openssh"],
     "delivery/policy/claude-code.md": ["claude-code"],
-    "delivery/policy/models.md": ["claude-code", "task-temp", "codex-sessions"],
-    "scripts/codex-sessions.ts": ["codex-sessions"],
+    "delivery/policy/models.md": ["claude-code", "task-temp"],
     "delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md":
       ["curl"],
     "delivery/skills/alibabacloud-find-skills/references/verification-method.md":

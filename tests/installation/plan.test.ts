@@ -66,23 +66,34 @@ test("the CLI requires an explicit nonempty unique product selection before crea
   assert.match(help.stderr, /explicit selection required/);
 });
 
-test("bounded Codex session targets form a selectable partial delivery", (t) => {
+test("new Codex plans report retired session files without claiming them", (t) => {
   const f = installFixture(t);
   const keys = [
     "codex:tools/codex-sessions.mjs",
     "codex:policy/codex-sessions.md",
     "codex:capability/codex-sessions.toml",
   ];
-  const { plan } = f.planned([
-    "--product",
-    "codex",
-    ...keys.flatMap((key) => ["--target", key]),
-  ]);
+  const retired = keys.map((key) => path.join(f.home, ".codex", key.slice(6)));
+  for (const file of retired) {
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "previous installation\n");
+  }
+  const { plan } = f.planned(["--product", "codex"]);
+  for (const file of retired) {
+    assert.ok(plan.reported.some((entry) => entry === file));
+    assert.ok(plan.targets.every((target) => target.path !== file));
+    assert.equal(readFileSync(file, "utf8"), "previous installation\n");
+  }
   assert.deepEqual(
-    plan.targets.map((target) => target.key).sort(),
-    keys.sort(),
+    f.gaps(
+      f.plan([
+        "--product",
+        "codex",
+        ...keys.flatMap((key) => ["--target", key]),
+      ]),
+    ),
+    keys.toSorted().map((key) => ({ code: "invalid-target", key })),
   );
-  assert.deepEqual(plan.selectedTargets?.slice().sort(), keys);
 });
 
 test("product roots record each explicit subset in canonical order and exclude every other product", (t) => {

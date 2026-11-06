@@ -6,11 +6,13 @@
 | --- | --- | --- |
 | `AGENTS.md` | Codex 行为规则 | [规则入口](AGENTS.md) |
 | `policy/` | 任务组织、模型路线、会话、工作区、Goal 与协作收尾，以及 Rust、SQL、评审、写作、工具参考 | [任务与协作](policy/models.md)、[辅助调用](policy/claude-code.md)、[Rust](policy/rust.md)、[SQL](policy/sql.md)、[评审](policy/review.md)、[写作](policy/writing.md)、[工具](policy/tool-contracts.md) |
-| `tools/` | 文档检查器、任务临时目录，以及受权会话客户端 | [工具契约](policy/tool-contracts.md)的对应小节 |
+| `tools/` | 文档检查器、任务临时目录与遗留扫描 | [工具契约](policy/tool-contracts.md)的对应小节 |
 | `capability/` | 推荐的产品与项目配置 | [能力配置说明](capability/README.md) |
 | `skills/` | 完整技能目录 | 各目录中的 `SKILL.md` |
 
 规则入口说明各份按需参考的加载条件。工具的调用方式、选项与退出码见[工具契约](policy/tool-contracts.md)。
+
+[官方跨设备协作](policy/models.md#official-codex-coordination-across-devices)说明交互会话、后台任务和报告路径的选择。是否采用由 Human 决定；安装规则不会开启服务或改变产品配置。
 
 [任务起点](policy/models.md#task-start-and-execution-routing)在创建任务会话或组织执行前触发。该处衔接需求、授权、模型路线、会话、工作区及适用 Goal。普通短任务留在当前会话。复杂调查与关键判断、已定设计下的完整实现、界面操作及设计稿各有适用路线。模型偏好不扩大权限；Goal 创建另核明确授权及全文回读。首次组织或关键输入变化时读取相关小节，复用未变规则和证据。
 
