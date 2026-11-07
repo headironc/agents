@@ -156,7 +156,7 @@ DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现
 
 当前成员与产品归属以[清单](../config/personal-skills.txt)为准。旧流程技能只保留历史来源，不继续安装。写作和工具参考属于公共 `policy/` 路径的成员。安装来源与限制见[安装快照过渡](#既有安装快照过渡)。
 
-[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权。先核实[受限的依赖更新豁免](../delivery/policy/review.md#dependency-updates)，保留适用检查和合并边界。可信自动化提交的低风险清单／锁文件更新经机械核验后适用例外。人工更新、主版本升级、兼容代码及资格未知项走正常审查。仍需 AI 审查时，常规提供方与 Cubic 额度不足时的替代由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。选定方按[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式 `@` 请求。已有有效覆盖或请求时复用；不要依赖 PR 事件自动触发。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)只负责 `headironc` 的身份就绪与认证恢复。`cladiron[bot]` 与其固定 provider 已于 2026-09-18 退役。GitHub App 凭据能力与安装状态见[安装快照过渡](#既有安装快照过渡)。
+[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权。先核实[受限的依赖更新豁免](../delivery/policy/review.md#dependency-updates)与[纯原生 Sketch 设计稿豁免](../delivery/policy/review.md#pure-sketch-design-slices)，保留适用检查和合并边界。可信自动化提交的低风险清单／锁文件更新，以及已采用该例外的项目中经机械与本机独立验收核实的纯 `.sketch` 设计稿切片适用例外。人工依赖更新、主版本升级、混入可执行或越界改动的切片及资格未知项走正常审查。仍需 AI 审查时，常规提供方与 Cubic 额度不足时的替代由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。选定方按[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式 `@` 请求。已有有效覆盖或请求时复用；不要依赖 PR 事件自动触发。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)只负责 `headironc` 的身份就绪与认证恢复。`cladiron[bot]` 与其固定 provider 已于 2026-09-18 退役。GitHub App 凭据能力与安装状态见[安装快照过渡](#既有安装快照过渡)。
 
 ## 规则与技能维护
 
