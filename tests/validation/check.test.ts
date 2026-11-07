@@ -43,6 +43,7 @@ const expectedTestPaths = {
     "tests/validation/skills.test.ts",
     "tests/validation/pre-commit.test.ts",
     "delivery/skills/alibabacloud-sms-send-short-message/tests/send-sms.test.mjs",
+    "delivery/skills/sketch-native/tests/sketch-native.test.mjs",
     "delivery/skills/wechatide/tests/call.test.mjs",
     "delivery/skills/wechatide/tests/check-install.test.mjs",
     "tests/check-prose.test.mjs",
@@ -118,6 +119,13 @@ const required = [
   "delivery/policy/claude-code.md",
   "delivery/policy/antigravity.md",
   "delivery/skills/figma-design-workflow/SKILL.md",
+  "delivery/skills/sketch-native/SKILL.md",
+  "delivery/skills/sketch-native/references/sketch-json-schema.md",
+  "delivery/skills/sketch-native/scripts/measure-coretext.swift",
+  "delivery/skills/sketch-native/scripts/coretext_measure.py",
+  "delivery/skills/sketch-native/scripts/sketch_offline_audit.py",
+  "delivery/skills/sketch-native/scripts/sketch_mcp_roundtrip.py",
+  "delivery/skills/sketch-native/scripts/sketch_export_manifest.py",
   "delivery/skills/gh/SKILL.md",
   "delivery/skills/gh/references/extended-commands.md",
   "delivery/skills/gh/references/operations.md",
@@ -243,7 +251,7 @@ test("Codex loader accepts a temporary root reached through a symlink", (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(
     result.stdout,
-    /Codex loaded AGENTS\.md and 16 delivered skills; model policy is available on demand/,
+    /Codex loaded AGENTS\.md and 17 delivered skills; model policy is available on demand/,
   );
 });
 
@@ -522,8 +530,8 @@ test("repository and all gates register each official product validator", async 
   ] as const) {
     const specs = await checkSpecs([...groups], "all");
     for (const [product, name] of [
-      ["codex", "Codex skill validation: 16 entries"],
-      ["claude", "Claude skill validation: 15 entries"],
+      ["codex", "Codex skill validation: 17 entries"],
+      ["claude", "Claude skill validation: 16 entries"],
       ["antigravity", "Antigravity skill validation: 5 entries"],
     ]) {
       const selected = specs.filter((spec) => spec.name === name);
@@ -647,6 +655,13 @@ test("the real checker refuses every missing R5 delivery member before execution
   for (const file of [
     "delivery/skills/gh-identity/SKILL.md",
     "delivery/skills/figma-design-workflow/SKILL.md",
+    "delivery/skills/sketch-native/SKILL.md",
+    "delivery/skills/sketch-native/references/sketch-json-schema.md",
+    "delivery/skills/sketch-native/scripts/measure-coretext.swift",
+    "delivery/skills/sketch-native/scripts/coretext_measure.py",
+    "delivery/skills/sketch-native/scripts/sketch_offline_audit.py",
+    "delivery/skills/sketch-native/scripts/sketch_mcp_roundtrip.py",
+    "delivery/skills/sketch-native/scripts/sketch_export_manifest.py",
     "delivery/skills/gh-identity/references/auth-readiness.md",
     "delivery/skills/gh/references/workflow-authorization.md",
     "docs/skill-sources.md",
