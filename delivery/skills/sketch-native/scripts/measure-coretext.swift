@@ -207,9 +207,13 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
     if let rawRuns = item.runs {
         for r in rawRuns where r.length > 0 {
             let rSize = CGFloat(max(1.0, r.fontSize ?? item.fontSize))
+            let rHasFontName = !(r.fontName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let rHasUIUsage = !(r.uiUsage ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let effectiveRunFontName: String? = (rHasFontName || rHasUIUsage) ? r.fontName : item.fontName
+            let effectiveRunUIUsage: String? = (rHasFontName || rHasUIUsage) ? r.uiUsage : item.uiUsage
             let (rFont, _) = createResolvedFont(
-                fontName: r.fontName ?? item.fontName,
-                uiUsage: r.uiUsage ?? item.uiUsage,
+                fontName: effectiveRunFontName,
+                uiUsage: effectiveRunUIUsage,
                 size: rSize
             )
             let rLH = defaultSingleLineHeight(font: rFont, explicitLineHeight: r.lineHeight ?? item.lineHeight)

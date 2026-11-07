@@ -1837,6 +1837,27 @@ out_path.write_bytes(webp)
     ]);
     assert.equal(verifyRes.status, 0, verifyRes.stdout);
 
+    // 4b. Verify --verify-only fails when --no-webp is used against a baseline manifest that has webpSha256
+    const verifyNoWebpRes = runPython(PY_EXPORT, [
+      "--sketch",
+      cleanSketch,
+      "--output-dir",
+      outDir,
+      "--sketchtool",
+      mockSketchtool,
+      "--no-webp",
+      "--manifest",
+      manifestPath,
+      "--verify-only",
+    ]);
+    assert.equal(verifyNoWebpRes.status, 1);
+    const verifyNoWebpReport = JSON.parse(verifyNoWebpRes.stdout);
+    assert.ok(
+      verifyNoWebpReport.manifestMismatches.some(
+        (m) => m.type === "render_mismatch",
+      ),
+    );
+
     // 5. Verify --verify-only detects deleted artboard / missing scale entry present in baseline manifest
     const manifestWithExtra = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     manifestWithExtra.renders.push({
@@ -2356,6 +2377,77 @@ try:
     assert probe_after == probe_before, f"FD leaked: before={probe_before}, after={probe_after}"
 finally:
     os.close(dir_fd)
+
+import coretext_measure as cm
+
+# Verify Run 2 with explicit named font clears inherited uiUsage from Run 1
+mixed_layer = {
+    "_class": "text",
+    "do_objectID": "t-mixed",
+    "name": "MixedFontText",
+    "textBehaviour": 1,
+    "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+    "attributedString": {
+        "string": "9:41 标题",
+        "attributes": [
+            {
+                "location": 0,
+                "length": 5,
+                "attributes": {
+                    "MSAttributedStringFontAttribute": {
+                        "attributes": {"NSCTFontUIUsageAttribute": "CTFontRegularUsage", "size": 14}
+                    }
+                },
+            },
+            {
+                "location": 5,
+                "length": 2,
+                "attributes": {
+                    "MSAttributedStringFontAttribute": {
+                        "attributes": {"name": "PingFangSC-Semibold", "size": 16}
+                    }
+                },
+            },
+        ],
+    },
+}
+mixed_spec = cm._extract_text_layer_spec(mixed_layer, {})
+assert mixed_spec["runs"][0]["uiUsage"] == "CTFontRegularUsage", mixed_spec
+assert mixed_spec["runs"][1]["fontName"] == "PingFangSC-Semibold", mixed_spec
+assert mixed_spec["runs"][1]["uiUsage"] is None, mixed_spec
+
+# Verify horizontal Row Stack with alignItems == 3 (Stretch) updates non-text sibling height to inner_h
+stretch_row = {
+    "_class": "group",
+    "frame": {"x": 0, "y": 0, "width": 300, "height": 20},
+    "groupLayout": {
+        "_class": "MSImmutableFlexGroupLayout",
+        "flexDirection": 0,
+        "alignItems": 3,
+        "verticalSizing": 1,
+        "padding": 0,
+    },
+    "layers": [
+        {"_class": "rectangle", "name": "BgBar", "isVisible": True, "frame": {"x": 120, "y": 0, "width": 80, "height": 20}},
+        {"_class": "text", "name": "Label", "isVisible": True, "textBehaviour": 1, "frame": {"x": 0, "y": 0, "width": 100, "height": 40}},
+    ],
+}
+cm._reflow_vertical_flex_group(stretch_row)
+assert stretch_row["frame"]["height"] == 40, stretch_row
+assert stretch_row["layers"][0]["frame"]["height"] == 40, stretch_row["layers"][0]
+
+# Verify SymbolInstance without overrides is collected when its master contains a textBehaviour == 1 text layer
+master_with_auto = {
+    "_class": "symbolMaster",
+    "do_objectID": "m-1",
+    "symbolID": "sym-1",
+    "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+    "layers": [
+        {"_class": "text", "do_objectID": "mt-1", "isVisible": True, "textBehaviour": 1, "frame": {"x": 0, "y": 0, "width": 200, "height": 20}}
+    ],
+}
+auto_paths = cm._collect_master_auto_text_paths(master_with_auto, {"sym-1": master_with_auto}, [])
+assert auto_paths == ["mt-1"], auto_paths
 `,
         tmpDir,
       ],

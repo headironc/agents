@@ -1356,6 +1356,15 @@ def run_export_and_manifest(
                     prev.get("sha256") != cur["sha256"]
                     or prev.get("width") != cur["width"]
                     or prev.get("height") != cur["height"]
+                    or bool(prev.get("webpSha256") or prev.get("webpPath"))
+                    != bool(cur.get("webpSha256") or cur.get("webpPath"))
+                    or (
+                        (
+                            prev.get("webpSha256") is not None
+                            or cur.get("webpSha256") is not None
+                        )
+                        and prev.get("webpSha256") != cur.get("webpSha256")
+                    )
                 ):
                     manifest_mismatches.append(
                         {

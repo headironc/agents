@@ -392,6 +392,10 @@ def _extract_text_layer_spec(
             continue
         fd, ps, kn = _extract_font_and_para_from_attrs(candidate_attrs)
         if fd:
+            if fd.get("name") and not fd.get("NSCTFontUIUsageAttribute"):
+                font_desc.pop("NSCTFontUIUsageAttribute", None)
+            elif fd.get("NSCTFontUIUsageAttribute") and not fd.get("name"):
+                font_desc.pop("name", None)
             font_desc.update({k: v for k, v in fd.items() if v is not None})
         if ps:
             para_style.update({k: v for k, v in ps.items() if v is not None})
@@ -421,12 +425,20 @@ def _extract_text_layer_spec(
             sub_lh = sub_para.get("maximumLineHeight") or sub_para.get(
                 "minimumLineHeight"
             )
+            sub_has_name = bool(sub_font.get("name"))
+            sub_has_usage = bool(sub_font.get("NSCTFontUIUsageAttribute"))
+            if sub_has_name or sub_has_usage:
+                run_font_name = sub_font.get("name")
+                run_ui_usage = sub_font.get("NSCTFontUIUsageAttribute")
+            else:
+                run_font_name = font_name
+                run_ui_usage = ui_usage
             runs.append(
                 {
                     "location": loc,
                     "length": length,
-                    "fontName": sub_font.get("name", font_name),
-                    "uiUsage": sub_font.get("NSCTFontUIUsageAttribute", ui_usage),
+                    "fontName": run_font_name,
+                    "uiUsage": run_ui_usage,
                     "fontSize": float(sub_font.get("size", font_size)),
                     "lineHeight": (
                         float(sub_lh)
@@ -499,6 +511,52 @@ def _find_layer_by_id(
             if found is not None:
                 return found
     return None
+
+
+def _collect_master_auto_text_paths(
+    master: Dict[str, Any],
+    symbol_masters: Dict[str, Dict[str, Any]],
+    inst_overrides: List[Dict[str, Any]],
+) -> List[str]:
+    """Collect override paths for all participating auto-height (textBehaviour == 1) text layers in master."""
+    swap_map: Dict[str, str] = {}
+    for ov in inst_overrides:
+        if not isinstance(ov, dict):
+            continue
+        ov_name = str(ov.get("overrideName", ""))
+        if ov_name.endswith("_symbolID") and isinstance(ov.get("value"), str):
+            swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
+
+    auto_paths: List[str] = []
+
+    def walk_master(
+        node: Dict[str, Any],
+        prefix: str,
+        visited: set[str],
+    ) -> None:
+        for ch in node.get("layers") or []:
+            if not isinstance(ch, dict) or not _participates_in_flex_flow(ch):
+                continue
+            ch_id = str(ch.get("do_objectID", ""))
+            if not ch_id:
+                continue
+            ch_path = f"{prefix}/{ch_id}" if prefix else ch_id
+            ch_cls = ch.get("_class")
+            if ch_cls == "text" and int(ch.get("textBehaviour", 0) or 0) == 1:
+                auto_paths.append(ch_path)
+            elif ch_cls == "symbolInstance":
+                eff_sym = swap_map.get(ch_path, str(ch.get("symbolID", "")))
+                if not eff_sym or eff_sym.lower() == "none":
+                    continue
+                nested_m = symbol_masters.get(eff_sym)
+                if nested_m is not None and eff_sym not in visited:
+                    walk_master(nested_m, ch_path, visited | {eff_sym})
+            elif ch.get("layers"):
+                walk_master(ch, ch_path, visited)
+
+    root_sym_id = str(master.get("symbolID") or master.get("do_objectID") or "")
+    walk_master(master, "", {root_sym_id} if root_sym_id else set())
+    return auto_paths
 
 
 def _collect_master_static_leaf_intervals(
@@ -652,6 +710,17 @@ def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
                     c_frame["y"] = round(top_pad + (inner_h - ch_h) / 2.0, 2)
                 elif align_items == 2:
                     c_frame["y"] = round(container_h - bottom_pad - ch_h, 2)
+                elif align_items == 3:
+                    c_frame["y"] = round(top_pad, 2)
+                    is_auto_text = child.get("_class") == "text" and int(
+                        child.get("textBehaviour", 0) or 0
+                    ) in (0, 1)
+                    if not is_auto_text:
+                        c_frame["height"] = round(inner_h, 2)
+                        if (child.get("groupLayout") or {}).get(
+                            "_class"
+                        ) == "MSImmutableFlexGroupLayout":
+                            _reflow_vertical_flex_group(child)
         if isinstance(g_frame, dict) and vertical_sizing == 1:
             return new_row_h - old_row_h
         return 0.0
@@ -848,6 +917,14 @@ def _audit_and_rebake_members(
                         entry = path_overrides.setdefault(ov_path, {})
                         entry["textStyleID"] = str(ov.get("value", ""))
                         entry.setdefault("primaryOverrideName", ov_name)
+
+                for auto_path in _collect_master_auto_text_paths(
+                    master, symbol_masters, inst_overrides
+                ):
+                    if auto_path not in path_overrides:
+                        path_overrides[auto_path] = {
+                            "primaryOverrideName": f"{auto_path}_defaultText"
+                        }
 
                 for override_path, ov_info in path_overrides.items():
                     resolved_target = _resolve_nested_override_text_layer(
