@@ -777,6 +777,16 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
     const tsReport = JSON.parse(tsAuditRes.stdout);
     assert.equal(tsReport.driftCount, 1);
     assert.equal(tsReport.drifts[0].bakedHeight, 70);
+
+    // Verify --rebake rejects paths under a symlinked ancestor directory
+    const symParent = path.join(tmpDir, "sym-parent");
+    fs.symlinkSync(tmpDir, symParent);
+    const symRebakeRes = runPython(PY_MEASURE, [
+      "--sketch",
+      path.join(symParent, "ts.sketch"),
+      "--rebake",
+    ]);
+    assert.notEqual(symRebakeRes.status, 0);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -817,6 +827,39 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
           },
         ],
       },
+    });
+    // Also include a NavBar/Back symbolMaster containing destinationArtboardID: "back" instantiated on Detail artboard (should NOT trigger FLOW-START-ARTBOARD-BACK-TRAP)
+    cleanSpecWithBizTime[
+      "pages/20000000-0000-4000-8000-000000000001.json"
+    ].layers.push({
+      _class: "symbolMaster",
+      do_objectID: "30000000-0000-4000-8000-000000000088",
+      symbolID: "90000000-0000-4000-8000-000000000088",
+      name: "NavBar/Back",
+      frame: { _class: "rect", x: 0, y: 200, width: 375, height: 44 },
+      layers: [
+        {
+          _class: "MSImmutableHotspotLayer",
+          do_objectID: "30000000-0000-4000-8000-000000000089",
+          name: "HotSpot/NavBack",
+          frame: { _class: "rect", x: 16, y: 0, width: 48, height: 44 },
+          flow: {
+            _class: "MSImmutableFlowConnection",
+            do_objectID: "30000000-0000-4000-8000-000000000090",
+            destinationArtboardID: "back",
+          },
+        },
+      ],
+    });
+    cleanSpecWithBizTime[
+      "pages/20000000-0000-4000-8000-000000000001.json"
+    ].layers[2].layers.push({
+      _class: "symbolInstance",
+      do_objectID: "50000000-0000-4000-8000-000000000088",
+      symbolID: "90000000-0000-4000-8000-000000000088",
+      name: "DetailNavBar",
+      frame: { _class: "rect", x: 0, y: 44, width: 375, height: 44 },
+      overrideValues: [],
     });
     fs.writeFileSync(cleanBuilder, JSON.stringify(cleanSpecWithBizTime));
     buildSyntheticSketch(cleanSketch, cleanBuilder);
@@ -1278,7 +1321,10 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
                 overrideID: "30000000-0000-4000-8000-000000000002_stringValue",
                 text: null,
                 overrideValue: state.mutatedText1,
-                borderThickness: 2,
+                borderThickness: 3,
+                borderColor: "#1f6bf5ff",
+                focusBorderThickness: 3,
+                focusBorderColor: "#1f6bf5ff",
               },
               {
                 editIndex: 1,
@@ -1286,7 +1332,10 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
                 overrideID: "30000000-0000-4000-8000-000000000003_stringValue",
                 text: null,
                 overrideValue: state.mutatedText2,
-                borderThickness: 2,
+                borderThickness: 3,
+                borderColor: "#1f6bf5ff",
+                focusBorderThickness: 3,
+                focusBorderColor: "#1f6bf5ff",
               },
             ],
           };
@@ -1320,6 +1369,8 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
           layerID: "40000000-0000-4000-8000-000000000005",
           overrideID: "30000000-0000-4000-8000-000000000002_stringValue",
           overrideValue: "立即认证（已更新）",
+          focusBorderColor: "#1F6BF5",
+          focusBorderThickness: 3,
         },
         {
           layerID: "40000000-0000-4000-8000-000000000005",
@@ -1426,6 +1477,9 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
       driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"]
         .layers[2];
     detailAb.layers.reverse(); // Reordering child layers changes childIDs on detailAb
+    // Also mutate SymbolInstance.symbolID on SubmitButtonFocus
+    driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"].layers[1].layers[1].layers[0].symbolID =
+      "81000000-0000-4000-8000-000000000003";
     const driftedDocSpecPath = path.join(tmpDir, "drifted-doc-spec.json");
     fs.writeFileSync(driftedDocSpecPath, JSON.stringify(driftedDocSpec));
     buildSyntheticSketch(driftedDocSketch, driftedDocSpecPath);
@@ -1451,6 +1505,11 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     assert.ok(
       diffOut.unexpectedDrifts.some(
         (d) => d.layerID === "81000000-0000-4000-8000-000000000004",
+      ),
+    );
+    assert.ok(
+      diffOut.unexpectedDrifts.some(
+        (d) => d.layerID === "40000000-0000-4000-8000-000000000005" && d.after.symbolID === "81000000-0000-4000-8000-000000000003",
       ),
     );
     assert.ok(
@@ -1531,6 +1590,39 @@ test("sketch_export_manifest.py exports 1x/2x PNG, lossless WebP, and verifies .
           },
         ],
       },
+    });
+    // Also include a NavBar/Back symbolMaster containing destinationArtboardID: "back" instantiated on Detail artboard (should NOT trigger FLOW-START-ARTBOARD-BACK-TRAP)
+    cleanSpecWithBizTime[
+      "pages/20000000-0000-4000-8000-000000000001.json"
+    ].layers.push({
+      _class: "symbolMaster",
+      do_objectID: "30000000-0000-4000-8000-000000000088",
+      symbolID: "90000000-0000-4000-8000-000000000088",
+      name: "NavBar/Back",
+      frame: { _class: "rect", x: 0, y: 200, width: 375, height: 44 },
+      layers: [
+        {
+          _class: "MSImmutableHotspotLayer",
+          do_objectID: "30000000-0000-4000-8000-000000000089",
+          name: "HotSpot/NavBack",
+          frame: { _class: "rect", x: 16, y: 0, width: 48, height: 44 },
+          flow: {
+            _class: "MSImmutableFlowConnection",
+            do_objectID: "30000000-0000-4000-8000-000000000090",
+            destinationArtboardID: "back",
+          },
+        },
+      ],
+    });
+    cleanSpecWithBizTime[
+      "pages/20000000-0000-4000-8000-000000000001.json"
+    ].layers[2].layers.push({
+      _class: "symbolInstance",
+      do_objectID: "50000000-0000-4000-8000-000000000088",
+      symbolID: "90000000-0000-4000-8000-000000000088",
+      name: "DetailNavBar",
+      frame: { _class: "rect", x: 0, y: 44, width: 375, height: 44 },
+      overrideValues: [],
     });
     fs.writeFileSync(cleanBuilder, JSON.stringify(cleanSpecWithBizTime));
     buildSyntheticSketch(cleanSketch, cleanBuilder);

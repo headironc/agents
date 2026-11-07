@@ -60,45 +60,119 @@ def _is_statusbar_clock_layer(
     return False
 
 
-def _validate_existing_output_target(file_path: Path) -> None:
+def _open_pinned_parent_dir(target_path: Path, create: bool = False) -> Tuple[int, str]:
+    abs_path = Path(os.path.abspath(str(target_path)))
+    parts = [p for p in abs_path.parts if p not in ("", "/")]
+    if not parts:
+        raise RuntimeError(f"Invalid target path: {target_path}")
+    parent_parts, leaf_name = parts[:-1], parts[-1]
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    dir_flag = getattr(os, "O_DIRECTORY", 0)
+    cur_fd = os.open("/", os.O_RDONLY | dir_flag | nofollow)
     try:
-        st = os.lstat(file_path)
+        for idx, part in enumerate(parent_parts):
+            if idx == 0 and part in ("tmp", "var", "etc"):
+                try:
+                    st_link = os.stat(part, dir_fd=cur_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    st_link = None
+                if (
+                    st_link is not None
+                    and stat.S_ISLNK(st_link.st_mode)
+                    and st_link.st_uid == 0
+                ):
+                    priv_fd = os.open(
+                        "private", os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                    )
+                    os.close(cur_fd)
+                    cur_fd = priv_fd
+                    st_priv = os.fstat(cur_fd)
+                    if st_priv.st_uid != 0 or (
+                        st_priv.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+                    ):
+                        raise RuntimeError("Untrusted /private root directory")
+            try:
+                next_fd = os.open(
+                    part, os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                )
+            except FileNotFoundError:
+                if not create:
+                    raise
+                os.mkdir(part, 0o700, dir_fd=cur_fd)
+                next_fd = os.open(
+                    part, os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                )
+            os.close(cur_fd)
+            cur_fd = next_fd
+            st_dir = os.fstat(cur_fd)
+            if not stat.S_ISDIR(st_dir.st_mode):
+                raise RuntimeError(f"Ancestor is not a directory: {part}")
+            if hasattr(os, "getuid") and st_dir.st_uid not in (0, uid):
+                raise RuntimeError(
+                    f"Refusing path with ancestor owned by another user (uid={st_dir.st_uid}): {target_path}"
+                )
+            if (st_dir.st_mode & (stat.S_IWGRP | stat.S_IWOTH)) and not (
+                st_dir.st_mode & stat.S_ISVTX
+            ):
+                raise RuntimeError(
+                    f"Refusing path with group/world-writable ancestor directory: {target_path}"
+                )
+        st_parent = os.fstat(cur_fd)
+        if hasattr(os, "getuid") and st_parent.st_uid != uid and not (
+            st_parent.st_mode & stat.S_ISVTX
+        ):
+            raise RuntimeError(
+                f"Refusing to write inside directory not owned by current user: {target_path.parent}"
+            )
+        return cur_fd, leaf_name
+    except Exception:
+        os.close(cur_fd)
+        raise
+
+
+def _validate_existing_in_dir_fd(
+    dir_fd: int, leaf_name: str, display_path: Path
+) -> None:
+    try:
+        st = os.stat(leaf_name, dir_fd=dir_fd, follow_symlinks=False)
     except FileNotFoundError:
         return
     if stat.S_ISLNK(st.st_mode):
-        raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+        raise RuntimeError(f"Refusing to write to symlinked file: {display_path}")
     if not stat.S_ISREG(st.st_mode):
-        raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+        raise RuntimeError(f"Refusing to overwrite non-regular file: {display_path}")
     if hasattr(os, "getuid") and st.st_uid != os.getuid():
         raise RuntimeError(
-            f"Refusing to overwrite file not owned by current user: {file_path}"
+            f"Refusing to overwrite file not owned by current user: {display_path}"
         )
     if st.st_nlink > 1:
-        raise RuntimeError(f"Refusing to overwrite hard-linked file: {file_path}")
+        raise RuntimeError(f"Refusing to overwrite hard-linked file: {display_path}")
 
 
 def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
-    """Atomically write text to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
-    parent = file_path.parent
-    if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
-        raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
-    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    resolved_parent = parent.resolve() if str(parent) in ("/tmp", "/var") else parent
-    st_parent = os.lstat(resolved_parent)
-    if not stat.S_ISDIR(st_parent.st_mode):
-        raise RuntimeError(f"Output parent is not a directory: {parent}")
-    if hasattr(os, "getuid") and st_parent.st_uid != os.getuid() and not (
-        st_parent.st_mode & stat.S_ISVTX
-    ):
-        raise RuntimeError(
-            f"Refusing to write inside directory not owned by current user: {parent}"
-        )
-    _validate_existing_output_target(file_path)
-    fd, tmp_str = tempfile.mkstemp(
-        prefix=f".{file_path.name}.", suffix=".tmp", dir=str(resolved_parent)
-    )
-    tmp_path = Path(tmp_str)
+    """Atomically write text to file_path via a pinned parent directory descriptor and renameat."""
+    dir_fd, leaf_name = _open_pinned_parent_dir(file_path, create=True)
+    tmp_name: Optional[str] = None
     try:
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        nofollow = getattr(os, "O_NOFOLLOW", 0)
+        fd: Optional[int] = None
+        for _ in range(64):
+            cand = f".{leaf_name}.{os.urandom(8).hex()}.tmp"
+            try:
+                fd = os.open(
+                    cand,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow,
+                    mode,
+                    dir_fd=dir_fd,
+                )
+                tmp_name = cand
+                break
+            except FileExistsError:
+                continue
+        if fd is None or tmp_name is None:
+            raise RuntimeError(f"Failed to allocate temp file for {file_path}")
         try:
             os.fchmod(fd, mode)
             data = text.encode("utf-8")
@@ -107,19 +181,21 @@ def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
             while total < len(view):
                 written = os.write(fd, view[total:])
                 if written <= 0:
-                    raise RuntimeError(f"Short write to {tmp_path}")
+                    raise RuntimeError(f"Short write to {tmp_name}")
                 total += written
             os.fsync(fd)
         finally:
             os.close(fd)
-        _validate_existing_output_target(file_path)
-        os.replace(tmp_path, file_path)
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        os.replace(tmp_name, leaf_name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        tmp_name = None
     finally:
-        if tmp_path.exists() or tmp_path.is_symlink():
+        if tmp_name is not None:
             try:
-                tmp_path.unlink()
+                os.unlink(tmp_name, dir_fd=dir_fd)
             except OSError:
                 pass
+        os.close(dir_fd)
 
 
 def _new_finding(
@@ -715,7 +791,7 @@ def run_offline_audit(
             cls = node.get("_class")
             if cls == "symbolMaster" and node.get("symbolID"):
                 symbol_masters[str(node["symbolID"])] = node
-            if cls in ("artboard", "symbolMaster") and node.get("do_objectID"):
+            if cls == "artboard" and node.get("do_objectID"):
                 aid = str(node["do_objectID"])
                 artboards_by_id[aid] = node
                 artboard_page_map[aid] = pid
@@ -1141,16 +1217,18 @@ def run_offline_audit(
             if isinstance(flow, dict):
                 dest = str(flow.get("destinationArtboardID", ""))
                 maintains_scroll = bool(flow.get("maintainScrollPosition", False))
+                is_in_master = (cur_artboard or {}).get("_class") == "symbolMaster"
                 if dest == "back":
-                    back_flows.append(
-                        {
-                            "pageID": page_id,
-                            "sourceArtboardID": aid,
-                            "layerID": oid,
-                            "layerName": node.get("name"),
-                            "maintainScrollPosition": maintains_scroll,
-                        }
-                    )
+                    if not is_in_master:
+                        back_flows.append(
+                            {
+                                "pageID": page_id,
+                                "sourceArtboardID": aid,
+                                "layerID": oid,
+                                "layerName": node.get("name"),
+                                "maintainScrollPosition": maintains_scroll,
+                            }
+                        )
                 elif dest:
                     if dest not in artboards_by_id:
                         dangling_flows.append(
@@ -1171,7 +1249,7 @@ def run_offline_audit(
                                 layer_id=oid,
                             )
                         )
-                    else:
+                    elif not is_in_master:
                         flow_edges.append(
                             {
                                 "pageID": page_id,
@@ -1182,6 +1260,122 @@ def run_offline_audit(
                                 "maintainScrollPosition": maintains_scroll,
                             }
                         )
+
+            if (
+                cls == "symbolInstance"
+                and (cur_artboard or {}).get("_class") == "artboard"
+            ):
+                inst_sym_id = str(node.get("symbolID", ""))
+                inst_master = symbol_masters.get(inst_sym_id)
+                if inst_master is not None:
+                    inst_ovs = [
+                        ov
+                        for ov in (node.get("overrideValues") or [])
+                        if isinstance(ov, dict)
+                    ]
+                    flow_ov_map: Dict[str, str] = {}
+                    swap_ov_map: Dict[str, str] = {}
+                    for ov in inst_ovs:
+                        ov_name = str(ov.get("overrideName", ""))
+                        if ov_name.endswith("_flowDestination"):
+                            p = ov_name[: -len("_flowDestination")]
+                            v = ov.get("value")
+                            flow_ov_map[p] = "" if v is None else str(v)
+                        elif ov_name.endswith("_symbolID"):
+                            p = ov_name[: -len("_symbolID")]
+                            v = ov.get("value")
+                            swap_ov_map[p] = "" if v is None else str(v)
+
+                    def _walk_inst_flows(
+                        m_node: Dict[str, Any],
+                        prefix: str,
+                        visited_syms: Set[str],
+                    ) -> None:
+                        m_sid = str(m_node.get("symbolID", ""))
+                        if m_sid:
+                            if m_sid in visited_syms:
+                                return
+                            visited_syms = visited_syms | {m_sid}
+                        for ch in m_node.get("layers") or []:
+                            if not isinstance(ch, dict):
+                                continue
+                            ch_id = str(ch.get("do_objectID", ""))
+                            ch_name = str(ch.get("name", ""))
+                            rel_path = f"{prefix}/{ch_id}" if prefix else ch_id
+                            ch_flow = ch.get("flow")
+                            eff_dest = ""
+                            maintains = False
+                            if rel_path in flow_ov_map:
+                                eff_dest = flow_ov_map[rel_path]
+                                if isinstance(ch_flow, dict):
+                                    maintains = bool(
+                                        ch_flow.get("maintainScrollPosition", False)
+                                    )
+                            elif isinstance(ch_flow, dict):
+                                eff_dest = str(
+                                    ch_flow.get("destinationArtboardID", "")
+                                )
+                                maintains = bool(
+                                    ch_flow.get("maintainScrollPosition", False)
+                                )
+                            if eff_dest == "back":
+                                back_flows.append(
+                                    {
+                                        "pageID": page_id,
+                                        "sourceArtboardID": aid,
+                                        "layerID": f"{oid}/{rel_path}",
+                                        "layerName": f"{node.get('name')}/{ch_name}",
+                                        "maintainScrollPosition": maintains,
+                                    }
+                                )
+                            elif eff_dest:
+                                if eff_dest not in artboards_by_id:
+                                    dangling_flows.append(
+                                        {
+                                            "pageID": page_id,
+                                            "sourceArtboardID": aid,
+                                            "layerID": f"{oid}/{rel_path}",
+                                            "destinationArtboardID": eff_dest,
+                                        }
+                                    )
+                                    findings.append(
+                                        _new_finding(
+                                            "flow_and_hotspots",
+                                            "FLOW-DANGLING-DESTINATION",
+                                            f"Flow inside symbolInstance '{node.get('name')}' ({oid}/{rel_path}) targets non-existent destinationArtboardID '{eff_dest}'",
+                                            page_id=page_id,
+                                            artboard_id=aid,
+                                            layer_id=oid,
+                                        )
+                                    )
+                                else:
+                                    flow_edges.append(
+                                        {
+                                            "pageID": page_id,
+                                            "sourceArtboardID": aid,
+                                            "destinationArtboardID": eff_dest,
+                                            "layerID": f"{oid}/{rel_path}",
+                                            "layerName": f"{node.get('name')}/{ch_name}",
+                                            "maintainScrollPosition": maintains,
+                                        }
+                                    )
+                            if ch.get("_class") == "symbolInstance":
+                                sub_sid = swap_ov_map.get(
+                                    rel_path, str(ch.get("symbolID", ""))
+                                )
+                                if sub_sid and sub_sid in symbol_masters:
+                                    _walk_inst_flows(
+                                        symbol_masters[sub_sid],
+                                        rel_path,
+                                        visited_syms,
+                                    )
+                            _walk_inst_flows(
+                                {"layers": ch.get("layers") or []},
+                                prefix,
+                                visited_syms,
+                            )
+
+                    _walk_inst_flows(inst_master, "", set())
 
             next_ancestors = ancestors + [node]
             for child in node.get("layers") or []:

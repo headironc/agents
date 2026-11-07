@@ -73,39 +73,119 @@ def _ensure_private_dir(dir_path: Path, enforce_private_mode: bool = True) -> No
             os.chmod(dir_path, 0o700)
 
 
-def _validate_existing_output_target(file_path: Path) -> None:
+def _open_pinned_parent_dir(target_path: Path, create: bool = False) -> Tuple[int, str]:
+    abs_path = Path(os.path.abspath(str(target_path)))
+    parts = [p for p in abs_path.parts if p not in ("", "/")]
+    if not parts:
+        raise RuntimeError(f"Invalid target path: {target_path}")
+    parent_parts, leaf_name = parts[:-1], parts[-1]
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    dir_flag = getattr(os, "O_DIRECTORY", 0)
+    cur_fd = os.open("/", os.O_RDONLY | dir_flag | nofollow)
     try:
-        st = os.lstat(file_path)
+        for idx, part in enumerate(parent_parts):
+            if idx == 0 and part in ("tmp", "var", "etc"):
+                try:
+                    st_link = os.stat(part, dir_fd=cur_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    st_link = None
+                if (
+                    st_link is not None
+                    and stat.S_ISLNK(st_link.st_mode)
+                    and st_link.st_uid == 0
+                ):
+                    priv_fd = os.open(
+                        "private", os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                    )
+                    os.close(cur_fd)
+                    cur_fd = priv_fd
+                    st_priv = os.fstat(cur_fd)
+                    if st_priv.st_uid != 0 or (
+                        st_priv.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+                    ):
+                        raise RuntimeError("Untrusted /private root directory")
+            try:
+                next_fd = os.open(
+                    part, os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                )
+            except FileNotFoundError:
+                if not create:
+                    raise
+                os.mkdir(part, 0o700, dir_fd=cur_fd)
+                next_fd = os.open(
+                    part, os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                )
+            os.close(cur_fd)
+            cur_fd = next_fd
+            st_dir = os.fstat(cur_fd)
+            if not stat.S_ISDIR(st_dir.st_mode):
+                raise RuntimeError(f"Ancestor is not a directory: {part}")
+            if hasattr(os, "getuid") and st_dir.st_uid not in (0, uid):
+                raise RuntimeError(
+                    f"Refusing path with ancestor owned by another user (uid={st_dir.st_uid}): {target_path}"
+                )
+            if (st_dir.st_mode & (stat.S_IWGRP | stat.S_IWOTH)) and not (
+                st_dir.st_mode & stat.S_ISVTX
+            ):
+                raise RuntimeError(
+                    f"Refusing path with group/world-writable ancestor directory: {target_path}"
+                )
+        st_parent = os.fstat(cur_fd)
+        if hasattr(os, "getuid") and st_parent.st_uid != uid and not (
+            st_parent.st_mode & stat.S_ISVTX
+        ):
+            raise RuntimeError(
+                f"Refusing to write inside directory not owned by current user: {target_path.parent}"
+            )
+        return cur_fd, leaf_name
+    except Exception:
+        os.close(cur_fd)
+        raise
+
+
+def _validate_existing_in_dir_fd(
+    dir_fd: int, leaf_name: str, display_path: Path
+) -> None:
+    try:
+        st = os.stat(leaf_name, dir_fd=dir_fd, follow_symlinks=False)
     except FileNotFoundError:
         return
     if stat.S_ISLNK(st.st_mode):
-        raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+        raise RuntimeError(f"Refusing to write to symlinked file: {display_path}")
     if not stat.S_ISREG(st.st_mode):
-        raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+        raise RuntimeError(f"Refusing to overwrite non-regular file: {display_path}")
     if hasattr(os, "getuid") and st.st_uid != os.getuid():
         raise RuntimeError(
-            f"Refusing to overwrite file not owned by current user: {file_path}"
+            f"Refusing to overwrite file not owned by current user: {display_path}"
         )
     if st.st_nlink > 1:
-        raise RuntimeError(f"Refusing to overwrite hard-linked file: {file_path}")
+        raise RuntimeError(f"Refusing to overwrite hard-linked file: {display_path}")
 
 
 def _write_bytes_nofollow(file_path: Path, data: bytes, mode: int = 0o600) -> None:
-    """Atomically write bytes to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
-    if str(file_path.parent) not in ("/tmp", "/var") and file_path.parent.is_symlink():
-        raise RuntimeError(f"Refusing to write inside symlinked directory: {file_path.parent}")
-    _ensure_private_dir(file_path.parent, enforce_private_mode=False)
-    resolved_parent = (
-        file_path.parent.resolve()
-        if str(file_path.parent) in ("/tmp", "/var")
-        else file_path.parent
-    )
-    _validate_existing_output_target(file_path)
-    fd, tmp_str = tempfile.mkstemp(
-        prefix=f".{file_path.name}.", suffix=".tmp", dir=str(resolved_parent)
-    )
-    tmp_path = Path(tmp_str)
+    """Atomically write bytes to file_path via a pinned parent directory descriptor and renameat."""
+    dir_fd, leaf_name = _open_pinned_parent_dir(file_path, create=True)
+    tmp_name: Optional[str] = None
     try:
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        nofollow = getattr(os, "O_NOFOLLOW", 0)
+        fd: Optional[int] = None
+        for _ in range(64):
+            cand = f".{leaf_name}.{os.urandom(8).hex()}.tmp"
+            try:
+                fd = os.open(
+                    cand,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow,
+                    mode,
+                    dir_fd=dir_fd,
+                )
+                tmp_name = cand
+                break
+            except FileExistsError:
+                continue
+        if fd is None or tmp_name is None:
+            raise RuntimeError(f"Failed to allocate temp file for {file_path}")
         try:
             os.fchmod(fd, mode)
             view = memoryview(data)
@@ -113,19 +193,21 @@ def _write_bytes_nofollow(file_path: Path, data: bytes, mode: int = 0o600) -> No
             while total < len(view):
                 written = os.write(fd, view[total:])
                 if written <= 0:
-                    raise RuntimeError(f"Short write to {tmp_path}")
+                    raise RuntimeError(f"Short write to {tmp_name}")
                 total += written
             os.fsync(fd)
         finally:
             os.close(fd)
-        _validate_existing_output_target(file_path)
-        os.replace(tmp_path, file_path)
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        os.replace(tmp_name, leaf_name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        tmp_name = None
     finally:
-        if tmp_path.exists() or tmp_path.is_symlink():
+        if tmp_name is not None:
             try:
-                tmp_path.unlink()
+                os.unlink(tmp_name, dir_fd=dir_fd)
             except OSError:
                 pass
+        os.close(dir_fd)
 
 
 class SketchMCPClient:
@@ -323,8 +405,11 @@ def _build_lightweight_mutate_js(doc_id: str, edits: List[Dict[str, Any]], page_
             "    const ov = layer.overrides.find(o => String(o.id) === String(edit.overrideID))",
             "    if (ov) { ov.value = edit.overrideValue }",
             "  }",
-            "  if (edit.focusBorderColor) {",
-            "    layer.style.borders = [{ color: edit.focusBorderColor, thickness: edit.focusBorderThickness || 2, position: sketch.Style.BorderPosition.Outside, enabled: true }]",
+            "  if (edit.focusBorderColor || edit.focusBorderThickness !== undefined || edit.borderThickness !== undefined) {",
+            "    const bThickness = edit.focusBorderThickness !== undefined ? edit.focusBorderThickness : (edit.borderThickness !== undefined ? edit.borderThickness : 2)",
+            "    const existingColor = (layer.style && layer.style.borders && layer.style.borders.length > 0 && layer.style.borders[0].color) ? layer.style.borders[0].color : '#1F6BF5ff'",
+            "    const bColor = edit.focusBorderColor || existingColor",
+            "    layer.style.borders = [{ color: bColor, thickness: bThickness, position: sketch.Style.BorderPosition.Outside, enabled: true }]",
             "  }",
             "  applied.push({ layerID: String(layer.id), name: String(layer.name) })",
             "}",
@@ -362,9 +447,11 @@ def _build_lightweight_readback_js(doc_id: str, edits: List[Dict[str, Any]], pag
             "    const ov = layer.overrides.find(o => String(o.id) === String(edit.overrideID))",
             "    ovVal = (ov && ov.value !== undefined && ov.value !== null) ? String(ov.value) : null",
             "  }",
-            "  const borderThickness = (layer.style && layer.style.borders && layer.style.borders.length > 0) ? layer.style.borders[0].thickness : null",
+            "  const firstBorder = (layer.style && layer.style.borders && layer.style.borders.length > 0) ? layer.style.borders[0] : null",
+            "  const borderThickness = firstBorder ? firstBorder.thickness : null",
+            "  const borderColor = (firstBorder && firstBorder.color !== undefined && firstBorder.color !== null) ? String(firstBorder.color) : null",
             "  const layerText = typeof layer.text === 'string' ? layer.text : null",
-            "  readbacks.push({ editIndex, layerID: String(layer.id), overrideID: edit.overrideID || null, text: layerText, overrideValue: ovVal, borderThickness })",
+            "  readbacks.push({ editIndex, layerID: String(layer.id), overrideID: edit.overrideID || null, text: layerText, overrideValue: ovVal, borderThickness, borderColor, focusBorderThickness: borderThickness, focusBorderColor: borderColor })",
             "}",
             "console.log(JSON.stringify({ ok: true, docId: String(doc.id), readbacks }))",
         ]
@@ -548,6 +635,8 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         "text": attr_str.get("string") if attr_str else None,
                         "fontDescriptor": first_font,
                         "textRuns": text_runs,
+                        "symbolID": node.get("symbolID"),
+                        "sharedStyleID": node.get("sharedStyleID"),
                         "overrideValues": node.get("overrideValues"),
                         "borders": (node.get("style") or {}).get("borders"),
                     }
@@ -818,8 +907,40 @@ def run_mcp_roundtrip(
             persistence_verified = False
         if "overrideValue" in edit and rb.get("overrideValue") != edit["overrideValue"]:
             persistence_verified = False
-        if "borderThickness" in edit and rb.get("borderThickness") != edit["borderThickness"]:
-            persistence_verified = False
+        expected_thickness = (
+            edit["focusBorderThickness"]
+            if "focusBorderThickness" in edit
+            else (
+                edit["borderThickness"]
+                if "borderThickness" in edit
+                else (2 if "focusBorderColor" in edit else None)
+            )
+        )
+        if expected_thickness is not None:
+            actual_thickness = rb.get(
+                "focusBorderThickness", rb.get("borderThickness")
+            )
+            if actual_thickness != expected_thickness:
+                persistence_verified = False
+        if "focusBorderColor" in edit:
+            expected_color = str(edit["focusBorderColor"]).strip().lower()
+            actual_color = str(
+                rb.get("focusBorderColor") or rb.get("borderColor") or ""
+            ).strip().lower()
+            expected_norm = (
+                expected_color + "ff"
+                if len(expected_color) == 7 and expected_color.startswith("#")
+                else expected_color
+            )
+            actual_norm = (
+                actual_color + "ff"
+                if len(actual_color) == 7 and actual_color.startswith("#")
+                else actual_color
+            )
+            if not actual_color or (
+                actual_norm != expected_norm and actual_color != expected_color
+            ):
+                persistence_verified = False
 
     screenshot_sha_match = after_sha256 == reopen_sha256
     zero_unexpected_drift = offline_diff["unexpectedDriftCount"] == 0

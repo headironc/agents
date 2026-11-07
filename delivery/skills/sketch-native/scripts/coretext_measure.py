@@ -29,66 +29,157 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 SWIFT_SOURCE = SCRIPT_DIR / "measure-coretext.swift"
 
 
-def _validate_existing_output_target(file_path: Path) -> None:
+def _open_pinned_parent_dir(
+    target_path: Path,
+    create: bool = False,
+    require_user_owned_parent: bool = False,
+) -> Tuple[int, str]:
+    """Walk from '/' with O_DIRECTORY | O_NOFOLLOW to pin the parent directory fd and reject untrusted ancestors."""
+    abs_path = Path(os.path.abspath(str(target_path)))
+    parts = [p for p in abs_path.parts if p not in ("", "/")]
+    if not parts:
+        raise RuntimeError(f"Invalid target path: {target_path}")
+    parent_parts, leaf_name = parts[:-1], parts[-1]
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    dir_flag = getattr(os, "O_DIRECTORY", 0)
+    cur_fd = os.open("/", os.O_RDONLY | dir_flag | nofollow)
     try:
-        st = os.lstat(file_path)
+        for idx, part in enumerate(parent_parts):
+            if idx == 0 and part in ("tmp", "var", "etc"):
+                try:
+                    st_link = os.stat(part, dir_fd=cur_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    st_link = None
+                if (
+                    st_link is not None
+                    and stat.S_ISLNK(st_link.st_mode)
+                    and st_link.st_uid == 0
+                ):
+                    priv_fd = os.open(
+                        "private", os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                    )
+                    os.close(cur_fd)
+                    cur_fd = priv_fd
+                    st_priv = os.fstat(cur_fd)
+                    if st_priv.st_uid != 0 or (
+                        st_priv.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+                    ):
+                        raise RuntimeError("Untrusted /private root directory")
+            try:
+                next_fd = os.open(
+                    part, os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                )
+            except FileNotFoundError:
+                if not create:
+                    raise
+                os.mkdir(part, 0o700, dir_fd=cur_fd)
+                next_fd = os.open(
+                    part, os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                )
+            os.close(cur_fd)
+            cur_fd = next_fd
+            st_dir = os.fstat(cur_fd)
+            if not stat.S_ISDIR(st_dir.st_mode):
+                raise RuntimeError(f"Ancestor is not a directory: {part}")
+            if hasattr(os, "getuid") and st_dir.st_uid not in (0, uid):
+                raise RuntimeError(
+                    f"Refusing path with ancestor owned by another user (uid={st_dir.st_uid}): {target_path}"
+                )
+            if (st_dir.st_mode & (stat.S_IWGRP | stat.S_IWOTH)) and not (
+                st_dir.st_mode & stat.S_ISVTX
+            ):
+                raise RuntimeError(
+                    f"Refusing path with group/world-writable ancestor directory: {target_path}"
+                )
+        st_parent = os.fstat(cur_fd)
+        if hasattr(os, "getuid"):
+            if require_user_owned_parent and st_parent.st_uid != uid:
+                raise RuntimeError(
+                    f"Refusing operation inside directory not owned by current user: {target_path.parent}"
+                )
+            if st_parent.st_uid != uid and not (st_parent.st_mode & stat.S_ISVTX):
+                raise RuntimeError(
+                    f"Refusing to write inside directory not owned by current user: {target_path.parent}"
+                )
+        return cur_fd, leaf_name
+    except Exception:
+        os.close(cur_fd)
+        raise
+
+
+def _validate_existing_in_dir_fd(
+    dir_fd: int, leaf_name: str, display_path: Path
+) -> Optional[os.stat_result]:
+    try:
+        st = os.stat(leaf_name, dir_fd=dir_fd, follow_symlinks=False)
     except FileNotFoundError:
-        return
+        return None
     if stat.S_ISLNK(st.st_mode):
-        raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+        raise RuntimeError(f"Refusing to write to symlinked file: {display_path}")
     if not stat.S_ISREG(st.st_mode):
-        raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+        raise RuntimeError(f"Refusing to overwrite non-regular file: {display_path}")
     if hasattr(os, "getuid") and st.st_uid != os.getuid():
         raise RuntimeError(
-            f"Refusing to overwrite file not owned by current user: {file_path}"
+            f"Refusing to overwrite file not owned by current user: {display_path}"
         )
     if st.st_nlink > 1:
-        raise RuntimeError(f"Refusing to overwrite hard-linked file: {file_path}")
+        raise RuntimeError(f"Refusing to overwrite hard-linked file: {display_path}")
+    return st
+
+
+def _create_temp_in_dir_fd(
+    dir_fd: int, prefix: str, suffix: str, mode: int = 0o600
+) -> Tuple[int, str]:
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    for _ in range(64):
+        token = os.urandom(8).hex()
+        tmp_name = f"{prefix}{token}{suffix}"
+        try:
+            fd = os.open(
+                tmp_name,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow,
+                mode,
+                dir_fd=dir_fd,
+            )
+            os.fchmod(fd, mode)
+            return fd, tmp_name
+        except FileExistsError:
+            continue
+    raise RuntimeError("Failed to allocate exclusive temporary file in pinned directory")
 
 
 def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
-    """Atomically write text to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
-    parent = file_path.parent
-    if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
-        raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
-    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    resolved_parent = parent.resolve() if str(parent) in ("/tmp", "/var") else parent
-    st_parent = os.lstat(resolved_parent)
-    if not stat.S_ISDIR(st_parent.st_mode):
-        raise RuntimeError(f"Output parent is not a directory: {parent}")
-    if hasattr(os, "getuid") and st_parent.st_uid != os.getuid() and not (
-        st_parent.st_mode & stat.S_ISVTX
-    ):
-        raise RuntimeError(
-            f"Refusing to write inside directory not owned by current user: {parent}"
-        )
-    _validate_existing_output_target(file_path)
-    fd, tmp_str = tempfile.mkstemp(
-        prefix=f".{file_path.name}.", suffix=".tmp", dir=str(resolved_parent)
-    )
-    tmp_path = Path(tmp_str)
+    """Atomically write text to file_path via a pinned parent directory descriptor and renameat."""
+    dir_fd, leaf_name = _open_pinned_parent_dir(file_path, create=True)
+    tmp_name: Optional[str] = None
     try:
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        fd, tmp_name = _create_temp_in_dir_fd(
+            dir_fd, f".{leaf_name}.", ".tmp", mode=mode
+        )
         try:
-            os.fchmod(fd, mode)
             data = text.encode("utf-8")
             view = memoryview(data)
             total = 0
             while total < len(view):
                 written = os.write(fd, view[total:])
                 if written <= 0:
-                    raise RuntimeError(f"Short write to {tmp_path}")
+                    raise RuntimeError(f"Short write to {tmp_name}")
                 total += written
             os.fsync(fd)
         finally:
             os.close(fd)
-        _validate_existing_output_target(file_path)
-        os.replace(tmp_path, file_path)
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        os.replace(tmp_name, leaf_name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        tmp_name = None
     finally:
-        if tmp_path.exists() or tmp_path.is_symlink():
+        if tmp_name is not None:
             try:
-                tmp_path.unlink()
+                os.unlink(tmp_name, dir_fd=dir_fd)
             except OSError:
                 pass
+        os.close(dir_fd)
 
 
 def _get_or_compile_swift_binary() -> Optional[Path]:
@@ -592,9 +683,56 @@ def audit_and_rebake_sketch(
     if not sketch_path.exists():
         raise FileNotFoundError(f".sketch file not found: {sketch_path}")
 
-    with zipfile.ZipFile(sketch_path, "r") as zf:
-        members = {name: zf.read(name) for name in zf.namelist()}
+    rebake_dir_fd: Optional[int] = None
+    sketch_leaf: str = sketch_path.name
+    initial_sketch_stat: Optional[os.stat_result] = None
+    try:
+        if rebake:
+            rebake_dir_fd, sketch_leaf = _open_pinned_parent_dir(
+                sketch_path, create=False, require_user_owned_parent=True
+            )
+            initial_sketch_stat = _validate_existing_in_dir_fd(
+                rebake_dir_fd, sketch_leaf, sketch_path
+            )
+            if initial_sketch_stat is None:
+                raise FileNotFoundError(f".sketch file not found: {sketch_path}")
+            src_fd = os.open(
+                sketch_leaf,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=rebake_dir_fd,
+            )
+            with os.fdopen(src_fd, "rb") as src_fh:
+                with zipfile.ZipFile(src_fh, "r") as zf:
+                    members = {name: zf.read(name) for name in zf.namelist()}
+        else:
+            with zipfile.ZipFile(sketch_path, "r") as zf:
+                members = {name: zf.read(name) for name in zf.namelist()}
+        return _audit_and_rebake_members(
+            sketch_path=sketch_path,
+            members=members,
+            rebake=rebake,
+            swift_bin=swift_bin,
+            rebake_dir_fd=rebake_dir_fd,
+            sketch_leaf=sketch_leaf,
+            initial_sketch_stat=initial_sketch_stat,
+        )
+    finally:
+        if rebake_dir_fd is not None:
+            try:
+                os.close(rebake_dir_fd)
+            except OSError:
+                pass
 
+
+def _audit_and_rebake_members(
+    sketch_path: Path,
+    members: Dict[str, bytes],
+    rebake: bool,
+    swift_bin: Optional[str],
+    rebake_dir_fd: Optional[int],
+    sketch_leaf: str,
+    initial_sketch_stat: Optional[os.stat_result],
+) -> Dict[str, Any]:
     doc_data: Dict[str, Any] = {}
     if "document.json" in members:
         doc_data = json.loads(members["document.json"].decode("utf-8"))
@@ -870,38 +1008,16 @@ def audit_and_rebake_sketch(
                 dirty_pages.add(meta["pageFile"])
                 rebaked_layers.append(drift_record)
 
-    if rebake and dirty_pages:
-        st_sketch = os.lstat(sketch_path)
-        if stat.S_ISLNK(st_sketch.st_mode):
-            raise RuntimeError(
-                f"Refusing to rebake symlinked .sketch file: {sketch_path}"
-            )
-        parent_dir = sketch_path.resolve().parent
-        st_parent = os.lstat(parent_dir)
-        if hasattr(os, "getuid") and st_parent.st_uid != os.getuid() and not (
-            st_parent.st_mode & stat.S_ISVTX
-        ):
-            raise RuntimeError(
-                f"Refusing to rebake inside directory not owned by current user: {parent_dir}"
-            )
-        if (st_parent.st_mode & (stat.S_IWGRP | stat.S_IWOTH)) and not (
-            st_parent.st_mode & stat.S_ISVTX
-        ):
-            raise RuntimeError(
-                f"Refusing to rebake inside group/world-writable directory: {parent_dir}"
-            )
+    if rebake and dirty_pages and rebake_dir_fd is not None:
         for page_file in dirty_pages:
             members[page_file] = (
                 json.dumps(pages_data[page_file], ensure_ascii=False, indent=2) + "\n"
             ).encode("utf-8")
-        fd, tmp_zip_str = tempfile.mkstemp(
-            prefix=f".{sketch_path.name}.rebake-",
-            suffix=".tmp",
-            dir=str(parent_dir),
+        fd, tmp_name = _create_temp_in_dir_fd(
+            rebake_dir_fd, f".{sketch_leaf}.rebake-", ".tmp", mode=0o600
         )
-        tmp_zip = Path(tmp_zip_str)
         try:
-            with os.fdopen(fd, "wb") as tmp_fh:
+            with os.fdopen(fd, "w+b") as tmp_fh:
                 with zipfile.ZipFile(
                     tmp_fh, "w", compression=zipfile.ZIP_DEFLATED
                 ) as zout:
@@ -909,18 +1025,35 @@ def audit_and_rebake_sketch(
                         zout.writestr(name, raw)
                 tmp_fh.flush()
                 os.fsync(tmp_fh.fileno())
-            with zipfile.ZipFile(tmp_zip, "r") as zcheck:
-                if zcheck.testzip() is not None:
-                    raise RuntimeError("Rebaked temporary archive failed ZIP integrity check")
-            if stat.S_ISLNK(os.lstat(sketch_path).st_mode):
+                tmp_fh.seek(0)
+                with zipfile.ZipFile(tmp_fh, "r") as zcheck:
+                    if zcheck.testzip() is not None:
+                        raise RuntimeError(
+                            "Rebaked temporary archive failed ZIP integrity check"
+                        )
+            cur_stat = _validate_existing_in_dir_fd(
+                rebake_dir_fd, sketch_leaf, sketch_path
+            )
+            if (
+                cur_stat is None
+                or initial_sketch_stat is None
+                or (cur_stat.st_dev, cur_stat.st_ino)
+                != (initial_sketch_stat.st_dev, initial_sketch_stat.st_ino)
+            ):
                 raise RuntimeError(
-                    f"Refusing to replace symlinked .sketch file: {sketch_path}"
+                    f"Target .sketch file changed during rebake: {sketch_path}"
                 )
-            os.replace(tmp_zip, sketch_path)
+            os.replace(
+                tmp_name,
+                sketch_leaf,
+                src_dir_fd=rebake_dir_fd,
+                dst_dir_fd=rebake_dir_fd,
+            )
+            tmp_name = ""
         finally:
-            if tmp_zip.exists() or tmp_zip.is_symlink():
+            if tmp_name:
                 try:
-                    tmp_zip.unlink()
+                    os.unlink(tmp_name, dir_fd=rebake_dir_fd)
                 except OSError:
                     pass
 

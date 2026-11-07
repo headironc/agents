@@ -142,28 +142,119 @@ def _ensure_private_export_dir(dir_path: Path) -> None:
             )
 
 
-def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
-    """Atomically write text to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
-    parent = file_path.parent
-    if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
-        raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
-    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    resolved_parent = parent.resolve() if str(parent) in ("/tmp", "/var") else parent
-    st_parent = os.lstat(resolved_parent)
-    if not stat.S_ISDIR(st_parent.st_mode):
-        raise RuntimeError(f"Output parent is not a directory: {parent}")
-    if hasattr(os, "getuid") and st_parent.st_uid != os.getuid() and not (
-        st_parent.st_mode & stat.S_ISVTX
-    ):
-        raise RuntimeError(
-            f"Refusing to write inside directory not owned by current user: {parent}"
-        )
-    _validate_existing_output_target(file_path)
-    fd, tmp_str = tempfile.mkstemp(
-        prefix=f".{file_path.name}.", suffix=".tmp", dir=str(resolved_parent)
-    )
-    tmp_path = Path(tmp_str)
+def _open_pinned_parent_dir(target_path: Path, create: bool = False) -> Tuple[int, str]:
+    abs_path = Path(os.path.abspath(str(target_path)))
+    parts = [p for p in abs_path.parts if p not in ("", "/")]
+    if not parts:
+        raise RuntimeError(f"Invalid target path: {target_path}")
+    parent_parts, leaf_name = parts[:-1], parts[-1]
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    dir_flag = getattr(os, "O_DIRECTORY", 0)
+    cur_fd = os.open("/", os.O_RDONLY | dir_flag | nofollow)
     try:
+        for idx, part in enumerate(parent_parts):
+            if idx == 0 and part in ("tmp", "var", "etc"):
+                try:
+                    st_link = os.stat(part, dir_fd=cur_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    st_link = None
+                if (
+                    st_link is not None
+                    and stat.S_ISLNK(st_link.st_mode)
+                    and st_link.st_uid == 0
+                ):
+                    priv_fd = os.open(
+                        "private", os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                    )
+                    os.close(cur_fd)
+                    cur_fd = priv_fd
+                    st_priv = os.fstat(cur_fd)
+                    if st_priv.st_uid != 0 or (
+                        st_priv.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+                    ):
+                        raise RuntimeError("Untrusted /private root directory")
+            try:
+                next_fd = os.open(
+                    part, os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                )
+            except FileNotFoundError:
+                if not create:
+                    raise
+                os.mkdir(part, 0o700, dir_fd=cur_fd)
+                next_fd = os.open(
+                    part, os.O_RDONLY | dir_flag | nofollow, dir_fd=cur_fd
+                )
+            os.close(cur_fd)
+            cur_fd = next_fd
+            st_dir = os.fstat(cur_fd)
+            if not stat.S_ISDIR(st_dir.st_mode):
+                raise RuntimeError(f"Ancestor is not a directory: {part}")
+            if hasattr(os, "getuid") and st_dir.st_uid not in (0, uid):
+                raise RuntimeError(
+                    f"Refusing path with ancestor owned by another user (uid={st_dir.st_uid}): {target_path}"
+                )
+            if (st_dir.st_mode & (stat.S_IWGRP | stat.S_IWOTH)) and not (
+                st_dir.st_mode & stat.S_ISVTX
+            ):
+                raise RuntimeError(
+                    f"Refusing path with group/world-writable ancestor directory: {target_path}"
+                )
+        st_parent = os.fstat(cur_fd)
+        if hasattr(os, "getuid") and st_parent.st_uid != uid and not (
+            st_parent.st_mode & stat.S_ISVTX
+        ):
+            raise RuntimeError(
+                f"Refusing to write inside directory not owned by current user: {target_path.parent}"
+            )
+        return cur_fd, leaf_name
+    except Exception:
+        os.close(cur_fd)
+        raise
+
+
+def _validate_existing_in_dir_fd(
+    dir_fd: int, leaf_name: str, display_path: Path
+) -> None:
+    try:
+        st = os.stat(leaf_name, dir_fd=dir_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(st.st_mode):
+        raise RuntimeError(f"Refusing to write to symlinked file: {display_path}")
+    if not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"Refusing to overwrite non-regular file: {display_path}")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise RuntimeError(
+            f"Refusing to overwrite file not owned by current user: {display_path}"
+        )
+    if st.st_nlink > 1:
+        raise RuntimeError(f"Refusing to overwrite hard-linked file: {display_path}")
+
+
+def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
+    """Atomically write text to file_path via a pinned parent directory descriptor and renameat."""
+    dir_fd, leaf_name = _open_pinned_parent_dir(file_path, create=True)
+    tmp_name: Optional[str] = None
+    try:
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        nofollow = getattr(os, "O_NOFOLLOW", 0)
+        fd: Optional[int] = None
+        for _ in range(64):
+            cand = f".{leaf_name}.{os.urandom(8).hex()}.tmp"
+            try:
+                fd = os.open(
+                    cand,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow,
+                    mode,
+                    dir_fd=dir_fd,
+                )
+                tmp_name = cand
+                break
+            except FileExistsError:
+                continue
+        if fd is None or tmp_name is None:
+            raise RuntimeError(f"Failed to allocate temp file for {file_path}")
         try:
             os.fchmod(fd, mode)
             data = text.encode("utf-8")
@@ -172,19 +263,21 @@ def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
             while total < len(view):
                 written = os.write(fd, view[total:])
                 if written <= 0:
-                    raise RuntimeError(f"Short write to {tmp_path}")
+                    raise RuntimeError(f"Short write to {tmp_name}")
                 total += written
             os.fsync(fd)
         finally:
             os.close(fd)
-        _validate_existing_output_target(file_path)
-        os.replace(tmp_path, file_path)
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        os.replace(tmp_name, leaf_name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        tmp_name = None
     finally:
-        if tmp_path.exists() or tmp_path.is_symlink():
+        if tmp_name is not None:
             try:
-                tmp_path.unlink()
+                os.unlink(tmp_name, dir_fd=dir_fd)
             except OSError:
                 pass
+        os.close(dir_fd)
 
 
 def _can_read_font_file(path: Path) -> bool:
