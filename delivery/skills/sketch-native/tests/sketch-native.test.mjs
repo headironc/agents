@@ -1281,13 +1281,15 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     for n, raw in members.items():
         zout.writestr(n, raw)
 `;
-          spawnSync(
-            "python3",
-            ["-B", "-c", pyMutate, state.workPath || copySketch],
-            {
-              env: PY_ENV,
-            },
-          );
+          if (!state.skipDiskMutate) {
+            spawnSync(
+              "python3",
+              ["-B", "-c", pyMutate, state.workPath || copySketch],
+              {
+                env: PY_ENV,
+              },
+            );
+          }
           replyObj = {
             ok: true,
             topCounts: {
@@ -1451,6 +1453,53 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
       assert.equal(callArgs[0], "-g");
       assert.equal(callArgs[1], "-a");
     }
+
+    // Verify a spoofed server returning matching screenshots/readbacks without mutating private working_copy fails
+    finalState.skipDiskMutate = true;
+    finalState.openCalls = [];
+    fs.writeFileSync(stateFile, JSON.stringify(finalState));
+    const spoofedRes = await runPythonAsync(PY_ROUNDTRIP, [
+      "--sketch",
+      copySketch,
+      "--anchor-id",
+      anchorId,
+      "--edit-spec",
+      JSON.stringify(editSpec),
+      "--output",
+      outReportPath,
+      "--screenshots-dir",
+      shotsDir,
+      "--mcp-url",
+      mcpUrl,
+      "--open-bin",
+      mockOpenBin,
+    ]);
+    assert.equal(spoofedRes.status, 1);
+    const spoofedReport = JSON.parse(fs.readFileSync(outReportPath, "utf8"));
+    assert.equal(spoofedReport.passed, false);
+    assert.equal(
+      spoofedReport.steps.step5OfflineZipDiff.archiveMutationsVerified,
+      false,
+    );
+    // Also verify _verify_mcp_listener_peer rejects non-Sketch listener when require_signed_sketch=True
+    const peerAuthRes = spawnSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import sys
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as r
+try:
+    r._verify_mcp_listener_peer(${JSON.stringify(mcpUrl)}, require_signed_sketch=True)
+    raise AssertionError("Expected non-Sketch listener to be rejected when require_signed_sketch=True")
+except RuntimeError as exc:
+    assert "unauthenticated" in str(exc).lower() or "codesign" in str(exc).lower()
+`,
+      ],
+      { encoding: "utf8", env: PY_ENV },
+    );
+    assert.equal(peerAuthRes.status, 0, peerAuthRes.stderr);
 
     // Verify offline diff catches sharedTextStyle fontDescriptor drift in document.json AND second-run textRuns font drift
     const driftedDocSketch = path.join(tmpDir, "drifted-doc.sketch");

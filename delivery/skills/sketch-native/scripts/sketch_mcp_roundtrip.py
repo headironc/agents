@@ -35,6 +35,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -262,12 +263,142 @@ def _write_bytes_nofollow(file_path: Path, data: bytes, mode: int = 0o600) -> No
         os.close(dir_fd)
 
 
+def _verify_mcp_listener_peer(
+    endpoint: str,
+    sketch_app: str = DEFAULT_SKETCH_APP,
+    require_signed_sketch: bool = True,
+) -> None:
+    """Verify the loopback TCP listener belongs to the current user (and signed Sketch.app when required)."""
+    parsed = urllib.parse.urlparse(endpoint)
+    if parsed.scheme != "http" or (parsed.hostname or "").lower() not in (
+        "localhost",
+        "127.0.0.1",
+        "::1",
+    ):
+        raise RuntimeError(
+            f"Refusing non-loopback or non-HTTP MCP endpoint: {endpoint}"
+        )
+    port = parsed.port or 80
+    lsof_bin = (
+        "/usr/sbin/lsof"
+        if os.path.exists("/usr/sbin/lsof")
+        else shutil.which("lsof")
+    )
+    if not lsof_bin or not hasattr(os, "getuid"):
+        return
+    uid = os.getuid()
+    proc = subprocess.run(
+        [lsof_bin, "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-F", "ucp"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    pids: List[int] = []
+    cur_pid: Optional[int] = None
+    cur_uid: Optional[int] = None
+    for raw_line in (proc.stdout or "").splitlines():
+        if raw_line.startswith("p"):
+            if cur_pid is not None and cur_uid == uid:
+                pids.append(cur_pid)
+            try:
+                cur_pid = int(raw_line[1:].strip())
+            except ValueError:
+                cur_pid = None
+            cur_uid = None
+        elif raw_line.startswith("u"):
+            try:
+                cur_uid = int(raw_line[1:].strip())
+            except ValueError:
+                cur_uid = None
+    if cur_pid is not None and cur_uid == uid:
+        pids.append(cur_pid)
+
+    if not pids:
+        raise RuntimeError(
+            f"Refusing unauthenticated MCP listener on port {port}: no listener owned by current user (uid={uid})"
+        )
+
+    ps_bin = "/bin/ps" if os.path.exists("/bin/ps") else shutil.which("ps")
+    sketch_bundle_real = os.path.realpath(sketch_app)
+    verified_proc = False
+    for pid in pids:
+        if ps_bin:
+            ps_proc = subprocess.run(
+                [ps_bin, "-p", str(pid), "-o", "uid=,comm="],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            line = (ps_proc.stdout or "").strip()
+            if not line:
+                continue
+            parts = line.split(None, 1)
+            if len(parts) < 2:
+                continue
+            try:
+                ps_uid = int(parts[0])
+            except ValueError:
+                continue
+            if ps_uid != uid:
+                continue
+            comm_path = os.path.realpath(parts[1].strip())
+            if require_signed_sketch:
+                if not (
+                    comm_path == sketch_bundle_real
+                    or comm_path.startswith(sketch_bundle_real + os.sep)
+                ):
+                    continue
+                codesign_bin = (
+                    "/usr/bin/codesign"
+                    if os.path.exists("/usr/bin/codesign")
+                    else shutil.which("codesign")
+                )
+                if codesign_bin:
+                    cs_proc = subprocess.run(
+                        [
+                            codesign_bin,
+                            "--verify",
+                            "--deep",
+                            "--strict",
+                            sketch_bundle_real,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        check=False,
+                    )
+                    if cs_proc.returncode != 0:
+                        raise RuntimeError(
+                            f"Refusing MCP listener: Sketch bundle failed codesign verification ({sketch_bundle_real})"
+                        )
+            verified_proc = True
+            break
+        else:
+            verified_proc = True
+            break
+
+    if not verified_proc:
+        raise RuntimeError(
+            f"Refusing unauthenticated MCP listener on port {port}: listener process does not match current user's signed Sketch bundle ({sketch_app})"
+        )
+
+
 class SketchMCPClient:
     """Minimal JSON-RPC 2.0 HTTP/SSE client for Sketch 2026.3 MCP server."""
 
-    def __init__(self, endpoint: str = DEFAULT_MCP_URL, timeout: float = 10.0) -> None:
+    def __init__(
+        self,
+        endpoint: str = DEFAULT_MCP_URL,
+        timeout: float = 10.0,
+        sketch_app: str = DEFAULT_SKETCH_APP,
+        require_signed_sketch: bool = False,
+    ) -> None:
         self.endpoint = endpoint
         self.timeout = timeout
+        self.sketch_app = sketch_app
+        self.require_signed_sketch = require_signed_sketch
         self.session_id: Optional[str] = None
         self._req_id = 0
         self._initialized = False
@@ -279,6 +410,11 @@ class SketchMCPClient:
     def _post_rpc(
         self, method: str, params: Optional[Dict[str, Any]] = None, is_notification: bool = False
     ) -> Dict[str, Any]:
+        _verify_mcp_listener_peer(
+            self.endpoint,
+            sketch_app=self.sketch_app,
+            require_signed_sketch=self.require_signed_sketch,
+        )
         payload: Dict[str, Any] = {"jsonrpc": "2.0", "method": method}
         if not is_notification:
             payload["id"] = self._next_id()
@@ -811,7 +947,13 @@ def run_mcp_roundtrip(
         except Exception:
             expected_archive_doc_id = ""
 
-        client = SketchMCPClient(endpoint=mcp_url)
+        client = SketchMCPClient(
+            endpoint=mcp_url,
+            sketch_app=sketch_app,
+            require_signed_sketch=(
+                open_bin == "open" and sketch_app == DEFAULT_SKETCH_APP
+            ),
+        )
 
         # Step 1: Pre-check :31126/mcp open documents
         precheck = client.run_code(
@@ -1025,6 +1167,40 @@ def run_mcp_roundtrip(
             ):
                 persistence_verified = False
 
+    expected_changes_by_id: Dict[str, Dict[str, Any]] = {
+        str(c.get("layerID", "")): c
+        for c in (offline_diff.get("expectedChanges") or [])
+        if isinstance(c, dict)
+    }
+    archive_mutations_verified = True
+    for edit in edits:
+        if not isinstance(edit, dict):
+            continue
+        lid = str(edit.get("layerID", ""))
+        if not lid:
+            continue
+        change_entry = expected_changes_by_id.get(lid)
+        if not change_entry:
+            archive_mutations_verified = False
+            break
+        after_snap = change_entry.get("after") or {}
+        if "text" in edit and after_snap.get("text") != edit["text"]:
+            archive_mutations_verified = False
+            break
+        if "overrideID" in edit and "overrideValue" in edit:
+            ov_id = str(edit["overrideID"])
+            ov_list = after_snap.get("overrideValues") or []
+            matched_ov = any(
+                isinstance(ov, dict)
+                and str(ov.get("overrideName", "")) == ov_id
+                and ov.get("value") == edit["overrideValue"]
+                for ov in ov_list
+            )
+            if not matched_ov:
+                archive_mutations_verified = False
+                break
+    offline_diff["archiveMutationsVerified"] = archive_mutations_verified
+
     screenshot_sha_match = after_sha256 == reopen_sha256
     zero_unexpected_drift = offline_diff["unexpectedDriftCount"] == 0
     final_slot_clean = (
@@ -1033,6 +1209,7 @@ def run_mcp_roundtrip(
     )
     passed = (
         persistence_verified
+        and archive_mutations_verified
         and screenshot_sha_match
         and zero_unexpected_drift
         and final_slot_clean
