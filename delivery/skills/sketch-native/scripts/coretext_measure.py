@@ -187,7 +187,86 @@ def measure_specs(
     return parsed
 
 
-def _extract_text_layer_spec(layer: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _extract_style_encoded_attrs(style_container: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract encodedAttributes dict from a sharedStyle, style, or textStyle dict."""
+    if not isinstance(style_container, dict):
+        return {}
+    val = style_container.get("value")
+    if isinstance(val, dict):
+        ts = val.get("textStyle")
+        if isinstance(ts, dict) and isinstance(ts.get("encodedAttributes"), dict):
+            return ts["encodedAttributes"]
+        if isinstance(val.get("encodedAttributes"), dict):
+            return val["encodedAttributes"]
+        attr_str = val.get("attributedString")
+        if isinstance(attr_str, dict) and isinstance(attr_str.get("attributes"), list) and attr_str["attributes"]:
+            first = attr_str["attributes"][0]
+            if isinstance(first, dict) and isinstance(first.get("attributes"), dict):
+                return first["attributes"]
+    ts = style_container.get("textStyle")
+    if isinstance(ts, dict) and isinstance(ts.get("encodedAttributes"), dict):
+        return ts["encodedAttributes"]
+    if isinstance(style_container.get("encodedAttributes"), dict):
+        return style_container["encodedAttributes"]
+    return {}
+
+
+def _index_shared_text_styles(
+    doc_data: Optional[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    styles: Dict[str, Dict[str, Any]] = {}
+    if not isinstance(doc_data, dict):
+        return styles
+    for obj in (doc_data.get("layerTextStyles") or {}).get("objects") or []:
+        if isinstance(obj, dict) and obj.get("do_objectID"):
+            styles[str(obj["do_objectID"])] = _extract_style_encoded_attrs(obj)
+    for fts in doc_data.get("foreignTextStyles") or []:
+        if not isinstance(fts, dict):
+            continue
+        local_ss = fts.get("localSharedStyle")
+        if isinstance(local_ss, dict) and local_ss.get("do_objectID"):
+            styles[str(local_ss["do_objectID"])] = _extract_style_encoded_attrs(local_ss)
+        if fts.get("do_objectID") and str(fts["do_objectID"]) not in styles:
+            styles[str(fts["do_objectID"])] = _extract_style_encoded_attrs(
+                local_ss if isinstance(local_ss, dict) else fts
+            )
+    return styles
+
+
+def _extract_font_and_para_from_attrs(
+    attr_dict: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[float]]:
+    if not isinstance(attr_dict, dict):
+        return {}, {}, None
+    raw_font = (
+        attr_dict.get("MSAttributedStringFontAttribute")
+        or attr_dict.get("fontDescriptor")
+        or {}
+    )
+    if isinstance(raw_font, dict) and isinstance(raw_font.get("attributes"), dict):
+        f_desc = dict(raw_font["attributes"])
+    elif isinstance(raw_font, dict):
+        f_desc = dict(raw_font)
+    else:
+        f_desc = {}
+    p_style = (
+        dict(attr_dict["paragraphStyle"])
+        if isinstance(attr_dict.get("paragraphStyle"), dict)
+        else {}
+    )
+    kern = (
+        float(attr_dict["kerning"])
+        if attr_dict.get("kerning") is not None
+        else None
+    )
+    return f_desc, p_style, kern
+
+
+def _extract_text_layer_spec(
+    layer: Dict[str, Any],
+    shared_text_styles: Optional[Dict[str, Dict[str, Any]]] = None,
+    override_style_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     if layer.get("_class") != "text":
         return None
     if int(layer.get("textBehaviour", 0)) != 1:
@@ -201,10 +280,32 @@ def _extract_text_layer_spec(layer: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     text = str(attr_str.get("string", ""))
     attrs_list = attr_str.get("attributes") or []
     first_attr = (attrs_list[0].get("attributes") if attrs_list else {}) or {}
-    font_desc = (
-        first_attr.get("MSAttributedStringFontAttribute") or {}
-    ).get("attributes") or {}
-    para_style = first_attr.get("paragraphStyle") or {}
+
+    style_encoded = _extract_style_encoded_attrs(layer.get("style") or {})
+    shared_sid = str(layer.get("sharedStyleID", "") or "")
+    shared_encoded = (
+        (shared_text_styles or {}).get(shared_sid, {}) if shared_sid else {}
+    )
+    override_encoded = (
+        (shared_text_styles or {}).get(str(override_style_id), {})
+        if override_style_id
+        else {}
+    )
+
+    font_desc: Dict[str, Any] = {}
+    para_style: Dict[str, Any] = {}
+    kerning_val: float = 0.0
+    # Priority: sharedStyle default -> inline layer.style -> attributedString[0] -> override_style_id
+    for candidate_attrs in (shared_encoded, style_encoded, first_attr, override_encoded):
+        if not candidate_attrs:
+            continue
+        fd, ps, kn = _extract_font_and_para_from_attrs(candidate_attrs)
+        if fd:
+            font_desc.update({k: v for k, v in fd.items() if v is not None})
+        if ps:
+            para_style.update({k: v for k, v in ps.items() if v is not None})
+        if kn is not None:
+            kerning_val = kn
 
     font_name = font_desc.get("name")
     ui_usage = font_desc.get("NSCTFontUIUsageAttribute")
@@ -213,42 +314,40 @@ def _extract_text_layer_spec(layer: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "minimumLineHeight"
     )
     para_spacing = float(para_style.get("paragraphSpacing", 0.0) or 0.0)
-    kerning = float(first_attr.get("kerning", 0.0) or 0.0)
+    kerning = kerning_val
 
     runs: List[Dict[str, Any]] = []
-    for attr_entry in attrs_list:
-        if not isinstance(attr_entry, dict):
-            continue
-        loc = int(attr_entry.get("location", 0) or 0)
-        length = int(attr_entry.get("length", 0) or 0)
-        if length <= 0:
-            continue
-        sub_attrs = attr_entry.get("attributes") or {}
-        sub_font = (
-            sub_attrs.get("MSAttributedStringFontAttribute") or {}
-        ).get("attributes") or {}
-        sub_para = sub_attrs.get("paragraphStyle") or {}
-        sub_lh = sub_para.get("maximumLineHeight") or sub_para.get(
-            "minimumLineHeight"
-        )
-        runs.append(
-            {
-                "location": loc,
-                "length": length,
-                "fontName": sub_font.get("name", font_name),
-                "uiUsage": sub_font.get("NSCTFontUIUsageAttribute", ui_usage),
-                "fontSize": float(sub_font.get("size", font_size)),
-                "lineHeight": (
-                    float(sub_lh)
-                    if sub_lh is not None
-                    else (float(line_height) if line_height is not None else None)
-                ),
-                "paragraphSpacing": float(
-                    sub_para.get("paragraphSpacing", para_spacing) or 0.0
-                ),
-                "kerning": float(sub_attrs.get("kerning", kerning) or 0.0),
-            }
-        )
+    if not override_encoded:
+        for attr_entry in attrs_list:
+            if not isinstance(attr_entry, dict):
+                continue
+            loc = int(attr_entry.get("location", 0) or 0)
+            length = int(attr_entry.get("length", 0) or 0)
+            if length <= 0:
+                continue
+            sub_attrs = attr_entry.get("attributes") or {}
+            sub_font, sub_para, sub_kern = _extract_font_and_para_from_attrs(sub_attrs)
+            sub_lh = sub_para.get("maximumLineHeight") or sub_para.get(
+                "minimumLineHeight"
+            )
+            runs.append(
+                {
+                    "location": loc,
+                    "length": length,
+                    "fontName": sub_font.get("name", font_name),
+                    "uiUsage": sub_font.get("NSCTFontUIUsageAttribute", ui_usage),
+                    "fontSize": float(sub_font.get("size", font_size)),
+                    "lineHeight": (
+                        float(sub_lh)
+                        if sub_lh is not None
+                        else (float(line_height) if line_height is not None else None)
+                    ),
+                    "paragraphSpacing": float(
+                        sub_para.get("paragraphSpacing", para_spacing) or 0.0
+                    ),
+                    "kerning": float(sub_kern if sub_kern is not None else kerning),
+                }
+            )
 
     spec_out: Dict[str, Any] = {
         "id": str(layer.get("do_objectID", "")),
@@ -506,6 +605,7 @@ def audit_and_rebake_sketch(
             pages_data[name] = json.loads(raw.decode("utf-8"))
 
     symbol_masters = _index_symbol_masters(pages_data, doc_data)
+    shared_text_styles = _index_shared_text_styles(doc_data)
 
     measure_queue: List[Dict[str, Any]] = []
     targets_meta: List[Dict[str, Any]] = []
@@ -521,7 +621,7 @@ def audit_and_rebake_sketch(
             if node.get("_class") in ("artboard", "symbolMaster")
             else artboard
         )
-        spec = _extract_text_layer_spec(node)
+        spec = _extract_text_layer_spec(node, shared_text_styles)
         if spec is not None:
             measure_queue.append(spec)
             targets_meta.append(
@@ -542,30 +642,47 @@ def audit_and_rebake_sketch(
                 inst_frame = node.get("frame") or {}
                 m_frame = master.get("frame") or {}
                 override_entries: List[Dict[str, Any]] = []
+                path_overrides: Dict[str, Dict[str, Any]] = {}
                 for ov in inst_overrides:
                     if not isinstance(ov, dict):
                         continue
                     ov_name = str(ov.get("overrideName", ""))
-                    if not ov_name.endswith("_stringValue"):
-                        continue
-                    override_path = ov_name[: -len("_stringValue")]
+                    if ov_name.endswith("_stringValue"):
+                        ov_path = ov_name[: -len("_stringValue")]
+                        entry = path_overrides.setdefault(ov_path, {})
+                        entry["stringValue"] = str(ov.get("value", ""))
+                        entry.setdefault("primaryOverrideName", ov_name)
+                    elif ov_name.endswith("_textStyle"):
+                        ov_path = ov_name[: -len("_textStyle")]
+                        entry = path_overrides.setdefault(ov_path, {})
+                        entry["textStyleID"] = str(ov.get("value", ""))
+                        entry.setdefault("primaryOverrideName", ov_name)
+
+                for override_path, ov_info in path_overrides.items():
                     resolved_target = _resolve_nested_override_text_layer(
                         master, override_path, symbol_masters, inst_overrides
                     )
                     if resolved_target is None:
                         continue
                     master_text, master_text_y = resolved_target
-                    m_spec = _extract_text_layer_spec(master_text)
+                    m_spec = _extract_text_layer_spec(
+                        master_text,
+                        shared_text_styles,
+                        override_style_id=ov_info.get("textStyleID"),
+                    )
                     if m_spec is None:
                         continue
                     scale_w = float(inst_frame.get("width", m_spec["width"])) - (
                         float(m_frame.get("width", m_spec["width"])) - m_spec["width"]
                     )
+                    ov_name = str(ov_info["primaryOverrideName"])
                     ov_id = f"{node.get('do_objectID')}::{ov_name}"
                     ov_spec = dict(m_spec)
-                    ov_spec.pop("runs", None)
+                    if "stringValue" in ov_info or "textStyleID" in ov_info:
+                        ov_spec.pop("runs", None)
                     ov_spec["id"] = ov_id
-                    ov_spec["text"] = str(ov.get("value", ""))
+                    if "stringValue" in ov_info:
+                        ov_spec["text"] = str(ov_info["stringValue"])
                     ov_spec["width"] = max(1.0, scale_w)
                     measure_queue.append(ov_spec)
                     override_entries.append(

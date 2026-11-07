@@ -89,6 +89,59 @@ def _validate_existing_output_target(file_path: Path) -> None:
         raise RuntimeError(f"Refusing to overwrite hard-linked file: {file_path}")
 
 
+def _validate_regular_owned_file(file_path: Path) -> None:
+    st = os.lstat(file_path)
+    if stat.S_ISLNK(st.st_mode):
+        raise RuntimeError(f"Refusing to read symlinked file: {file_path}")
+    if not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"Refusing to read non-regular file: {file_path}")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise RuntimeError(
+            f"Refusing to read file not owned by current user: {file_path}"
+        )
+    if st.st_nlink > 1:
+        raise RuntimeError(f"Refusing to read hard-linked file: {file_path}")
+
+
+def _ensure_private_export_dir(dir_path: Path) -> None:
+    if str(dir_path) not in ("/tmp", "/var") and dir_path.is_symlink():
+        raise RuntimeError(f"Refusing symlinked export directory: {dir_path}")
+    if (
+        dir_path.parent != dir_path
+        and str(dir_path.parent) not in ("/tmp", "/var")
+        and dir_path.parent.is_symlink()
+    ):
+        raise RuntimeError(
+            f"Refusing export directory under symlinked parent: {dir_path.parent}"
+        )
+    dir_path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    st = os.lstat(dir_path)
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
+        raise RuntimeError(f"Export path is not a regular directory: {dir_path}")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise RuntimeError(
+            f"Refusing export directory not owned by current user: {dir_path}"
+        )
+    if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise RuntimeError(
+            f"Refusing group- or world-writable export directory: {dir_path}"
+        )
+    for child in dir_path.iterdir():
+        cst = os.lstat(child)
+        if stat.S_ISLNK(cst.st_mode):
+            raise RuntimeError(
+                f"Refusing export directory containing symlink entry: {child}"
+            )
+        if hasattr(os, "getuid") and cst.st_uid != os.getuid():
+            raise RuntimeError(
+                f"Refusing export directory containing foreign-owned entry: {child}"
+            )
+        if stat.S_ISREG(cst.st_mode) and cst.st_nlink > 1:
+            raise RuntimeError(
+                f"Refusing export directory containing hard-linked entry: {child}"
+            )
+
+
 def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
     """Atomically write text to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
     parent = file_path.parent
@@ -215,6 +268,7 @@ def check_pingfang_font_access() -> Dict[str, Any]:
 
 def parse_png_dimensions(png_path: Path) -> Tuple[int, int]:
     """Read pixel width and height directly from a PNG IHDR chunk."""
+    _validate_regular_owned_file(png_path)
     with png_path.open("rb") as fh:
         header = fh.read(24)
     if len(header) >= 24 and header[:8] == b"\x89PNG\r\n\x1a\n" and header[12:16] == b"IHDR":
@@ -224,6 +278,9 @@ def parse_png_dimensions(png_path: Path) -> Tuple[int, int]:
 
 
 def sha256_file(path: Path) -> str:
+    st = os.lstat(path)
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"Refusing to hash non-regular or symlinked file: {path}")
     h = hashlib.sha256()
     with path.open("rb") as fh:
         while True:
@@ -236,7 +293,9 @@ def sha256_file(path: Path) -> str:
 
 def _is_valid_webp_file(webp_path: Path) -> bool:
     """Verify RIFF....WEBP container and ensure payload is not raw PNG bytes."""
-    if not webp_path.exists():
+    try:
+        _validate_regular_owned_file(webp_path)
+    except (FileNotFoundError, RuntimeError):
         return False
     header = webp_path.read_bytes()[:32]
     if len(header) < 21:
@@ -255,7 +314,9 @@ def _is_valid_webp_file(webp_path: Path) -> bool:
 def convert_png_to_lossless_webp(
     png_path: Path, webp_path: Path, cwebp_bin: str = "cwebp"
 ) -> bool:
-    """Convert PNG to lossless WebP using cwebp. Fails explicitly if unavailable or invalid."""
+    """Convert PNG to lossless WebP using cwebp via an exclusive temp file. Fails explicitly if unavailable or invalid."""
+    _validate_regular_owned_file(png_path)
+    _validate_existing_output_target(webp_path)
     resolved = shutil.which(cwebp_bin)
     if not resolved and Path(cwebp_bin).exists():
         resolved = str(Path(cwebp_bin))
@@ -264,21 +325,37 @@ def convert_png_to_lossless_webp(
             f"Lossless WebP encoder '{cwebp_bin}' not found in PATH; install webp (cwebp) or pass --no-webp."
         )
 
-    proc = subprocess.run(
-        [resolved, "-lossless", "-q", "100", str(png_path), "-o", str(webp_path)],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
+    fd, tmp_str = tempfile.mkstemp(
+        prefix=f".{webp_path.name}.", suffix=".webp", dir=str(webp_path.parent)
     )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"cwebp lossless conversion failed (exit {proc.returncode}): {proc.stderr.strip()}"
+    os.fchmod(fd, 0o600)
+    os.close(fd)
+    tmp_webp = Path(tmp_str)
+    try:
+        proc = subprocess.run(
+            [resolved, "-lossless", "-q", "100", str(png_path), "-o", str(tmp_webp)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
-    if not _is_valid_webp_file(webp_path):
-        raise RuntimeError(
-            f"cwebp output at {webp_path} is missing or is not a valid WebP bitstream"
-        )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"cwebp lossless conversion failed (exit {proc.returncode}): {proc.stderr.strip()}"
+            )
+        _validate_regular_owned_file(tmp_webp)
+        if not _is_valid_webp_file(tmp_webp):
+            raise RuntimeError(
+                f"cwebp output at {webp_path} is missing or is not a valid WebP bitstream"
+            )
+        _validate_existing_output_target(webp_path)
+        os.replace(tmp_webp, webp_path)
+    finally:
+        if tmp_webp.exists() or tmp_webp.is_symlink():
+            try:
+                tmp_webp.unlink()
+            except OSError:
+                pass
     return True
 
 
@@ -348,6 +425,7 @@ def inspect_sketch_artboards_and_clocks(
 
 
 def verify_pdf_sfns_regular(pdf_path: Path) -> Dict[str, Any]:
+    _validate_regular_owned_file(pdf_path)
     raw = pdf_path.read_bytes()
     text_latin = raw.decode("latin-1", errors="ignore")
     has_sfns = ".SFNS-Regular" in text_latin or "SFNS-Regular" in text_latin
@@ -374,32 +452,57 @@ def _export_one_artboard_scale(
 ) -> Dict[str, Any]:
     ab_id = artboard["artboardID"]
     scale_dir = out_dir / f"{scale}x"
-    scale_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        sketchtool,
-        "export",
-        "artboards",
-        str(sketch_path),
-        f"--item={ab_id}",
-        f"--scales={scale}",
-        "--formats=png",
-        "--use-id-for-name=YES",
-        f"--output={scale_dir}",
-    ]
-    proc = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=60, check=False
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"sketchtool export artboards failed for {ab_id}@{scale}x: {proc.stderr.strip()}"
-        )
+    _ensure_private_export_dir(scale_dir)
 
-    candidates = sorted(scale_dir.glob(f"{ab_id}*.png"))
-    if not candidates:
-        raise FileNotFoundError(
-            f"sketchtool produced no PNG for artboard {ab_id} in {scale_dir}"
+    allowed_png_names = (f"{ab_id}.png", f"{ab_id}@{scale}x.png")
+    allowed_webp_names = (f"{ab_id}.webp", f"{ab_id}@{scale}x.webp")
+    for child in list(scale_dir.iterdir()):
+        if child.name.startswith(ab_id):
+            if child.name not in allowed_png_names and child.name not in allowed_webp_names:
+                raise RuntimeError(
+                    f"Refusing pre-existing unexpected render entry in export directory: {child}"
+                )
+            _validate_existing_output_target(child)
+
+    stage_dir = Path(tempfile.mkdtemp(prefix=f".stage-{ab_id}-", dir=str(scale_dir)))
+    try:
+        cmd = [
+            sketchtool,
+            "export",
+            "artboards",
+            str(sketch_path),
+            f"--item={ab_id}",
+            f"--scales={scale}",
+            "--formats=png",
+            "--use-id-for-name=YES",
+            f"--output={stage_dir}",
+        ]
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=60, check=False
         )
-    png_path = candidates[0]
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"sketchtool export artboards failed for {ab_id}@{scale}x: {proc.stderr.strip()}"
+            )
+
+        staged_png: Optional[Path] = None
+        for candidate_name in allowed_png_names:
+            cand = stage_dir / candidate_name
+            if cand.exists() or cand.is_symlink():
+                _validate_regular_owned_file(cand)
+                staged_png = cand
+                break
+        if staged_png is None:
+            raise FileNotFoundError(
+                f"sketchtool produced no exact PNG ({allowed_png_names}) for artboard {ab_id} in {stage_dir}"
+            )
+        png_path = scale_dir / staged_png.name
+        _validate_existing_output_target(png_path)
+        os.replace(staged_png, png_path)
+    finally:
+        shutil.rmtree(stage_dir, ignore_errors=True)
+
+    _validate_regular_owned_file(png_path)
     w, h = parse_png_dimensions(png_path)
     png_sha = sha256_file(png_path)
 
@@ -416,6 +519,7 @@ def _export_one_artboard_scale(
     if export_webp:
         webp_path = png_path.with_suffix(".webp")
         convert_png_to_lossless_webp(png_path, webp_path, cwebp_bin=cwebp_bin)
+        _validate_regular_owned_file(webp_path)
         entry["webpPath"] = str(webp_path)
         entry["webpSha256"] = sha256_file(webp_path)
     return entry
@@ -439,7 +543,7 @@ def run_export_and_manifest(
 
     font_access = check_pingfang_font_access()
     artboards, clock_layers = inspect_sketch_artboards_and_clocks(sketch_path)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_private_export_dir(output_dir)
 
     tasks: List[Tuple[Dict[str, Any], str]] = [
         (ab, sc) for ab in artboards for sc in scales
@@ -465,42 +569,52 @@ def run_export_and_manifest(
     clock_pdf_checks: List[Dict[str, Any]] = []
     if verify_clock_pdf and clock_layers:
         pdf_dir = output_dir / "pdf_layers"
-        pdf_dir.mkdir(parents=True, exist_ok=True)
+        _ensure_private_export_dir(pdf_dir)
         for clock in clock_layers:
             lid = clock["layerID"]
-            cmd = [
-                sketchtool,
-                "export",
-                "layers",
-                str(sketch_path),
-                f"--item={lid}",
-                "--formats=pdf",
-                "--use-id-for-name=YES",
-                f"--output={pdf_dir}",
-            ]
-            proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=60, check=False
+            stage_pdf_dir = Path(
+                tempfile.mkdtemp(prefix=f".stage-{lid}-", dir=str(pdf_dir))
             )
-            if proc.returncode != 0:
-                clock_pdf_checks.append(
-                    {
-                        **clock,
-                        "valid": False,
-                        "error": proc.stderr.strip(),
-                    }
+            try:
+                cmd = [
+                    sketchtool,
+                    "export",
+                    "layers",
+                    str(sketch_path),
+                    f"--item={lid}",
+                    "--formats=pdf",
+                    "--use-id-for-name=YES",
+                    f"--output={stage_pdf_dir}",
+                ]
+                proc = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=60, check=False
                 )
-                continue
-            pdf_candidates = sorted(pdf_dir.glob(f"{lid}*.pdf"))
-            if not pdf_candidates:
-                clock_pdf_checks.append(
-                    {
-                        **clock,
-                        "valid": False,
-                        "error": f"No PDF exported for layer {lid}",
-                    }
-                )
-                continue
-            pdf_info = verify_pdf_sfns_regular(pdf_candidates[0])
+                if proc.returncode != 0:
+                    clock_pdf_checks.append(
+                        {
+                            **clock,
+                            "valid": False,
+                            "error": proc.stderr.strip(),
+                        }
+                    )
+                    continue
+                staged_pdf = stage_pdf_dir / f"{lid}.pdf"
+                if not (staged_pdf.exists() or staged_pdf.is_symlink()):
+                    clock_pdf_checks.append(
+                        {
+                            **clock,
+                            "valid": False,
+                            "error": f"No exact PDF ({lid}.pdf) exported for layer {lid}",
+                        }
+                    )
+                    continue
+                _validate_regular_owned_file(staged_pdf)
+                final_pdf = pdf_dir / f"{lid}.pdf"
+                _validate_existing_output_target(final_pdf)
+                os.replace(staged_pdf, final_pdf)
+            finally:
+                shutil.rmtree(stage_pdf_dir, ignore_errors=True)
+            pdf_info = verify_pdf_sfns_regular(final_pdf)
             clock_pdf_checks.append({**clock, **pdf_info})
 
     manifest_mismatches: List[Dict[str, Any]] = []

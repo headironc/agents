@@ -555,6 +555,15 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                     walk(child, oid or parent_id)
 
             walk(data)
+            if member == "document.json" and isinstance(data, dict):
+                doc_oid = str(data.get("do_objectID", "") or "document.json")
+                for fs in data.get("foreignSymbols") or []:
+                    if not isinstance(fs, dict):
+                        continue
+                    fs_oid = str(fs.get("do_objectID", "") or doc_oid)
+                    sm = fs.get("symbolMaster") or fs.get("originalMaster")
+                    if isinstance(sm, dict):
+                        walk(sm, fs_oid)
     return snapshot
 
 

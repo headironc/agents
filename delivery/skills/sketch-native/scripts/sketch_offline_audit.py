@@ -601,11 +601,44 @@ def run_offline_audit(
                 )
             )
 
+    seen_object_ids: Dict[str, str] = {}
+    duplicate_ids: List[Dict[str, str]] = []
+
+    def register_object_id(
+        oid: str,
+        loc_tag: str,
+        page_id: Optional[str] = None,
+        artboard_id: Optional[str] = None,
+    ) -> None:
+        if not oid:
+            return
+        if oid in seen_object_ids:
+            duplicate_ids.append(
+                {"id": oid, "first": seen_object_ids[oid], "second": loc_tag}
+            )
+            findings.append(
+                _new_finding(
+                    "archive_and_ids",
+                    "ID-DUPLICATE-OBJECT-ID",
+                    f"Duplicate do_objectID '{oid}' at {loc_tag} (first seen at {seen_object_ids[oid]})",
+                    page_id=page_id,
+                    artboard_id=artboard_id,
+                    layer_id=oid,
+                )
+            )
+        else:
+            seen_object_ids[oid] = loc_tag
+
+    if doc_data.get("do_objectID"):
+        register_object_id(str(doc_data["do_objectID"]), "document.json:document")
+
     def audit_shared_style_object(st: Dict[str, Any], label_prefix: str) -> None:
         sid = st.get("do_objectID")
-        if sid:
-            shared_style_ids.add(str(sid))
         sname = str(st.get("name", ""))
+        if sid:
+            sid_str = str(sid)
+            shared_style_ids.add(sid_str)
+            register_object_id(sid_str, f"document.json:{label_prefix}:{sname}")
         if sname.startswith("Type/Platform sample/"):
             platform_sample_hits.append({"styleID": sid, "name": sname})
             findings.append(
@@ -633,15 +666,29 @@ def run_offline_audit(
                 local_st = fst.get("localSharedStyle") or {}
                 if isinstance(local_st, dict) and local_st:
                     audit_shared_style_object(local_st, "foreignSharedStyle")
+                fst_oid = str(fst.get("do_objectID", "") or "")
+                if fst_oid and fst_oid != str((local_st or {}).get("do_objectID", "") or ""):
+                    register_object_id(fst_oid, f"document.json:{f_style_key}")
 
     for sw in (doc_data.get("sharedSwatches") or {}).get("objects") or []:
         if isinstance(sw, dict) and sw.get("do_objectID"):
-            swatch_ids.add(str(sw["do_objectID"]))
+            sw_id = str(sw["do_objectID"])
+            swatch_ids.add(sw_id)
+            register_object_id(
+                sw_id, f"document.json:swatch:{sw.get('name', '')}"
+            )
     for fsw in doc_data.get("foreignSwatches") or []:
         if isinstance(fsw, dict):
             local_sw = fsw.get("localSwatch") or {}
             if local_sw.get("do_objectID"):
-                swatch_ids.add(str(local_sw["do_objectID"]))
+                lsw_id = str(local_sw["do_objectID"])
+                swatch_ids.add(lsw_id)
+                register_object_id(
+                    lsw_id, f"document.json:foreignSwatch:{local_sw.get('name', '')}"
+                )
+            fsw_oid = str(fsw.get("do_objectID", "") or "")
+            if fsw_oid and fsw_oid != str(local_sw.get("do_objectID", "") or ""):
+                register_object_id(fsw_oid, "document.json:foreignSwatches")
 
     embedded_foreign_masters: List[Dict[str, Any]] = []
     for fsym in doc_data.get("foreignSymbols") or []:
@@ -653,6 +700,9 @@ def run_offline_audit(
                 if sm.get("do_objectID") or sm.get("symbolID"):
                     symbol_masters[str(sm.get("symbolID") or sm["do_objectID"])] = sm
                 embedded_foreign_masters.append(sm)
+            fsym_oid = str(fsym.get("do_objectID", "") or "")
+            if fsym_oid and fsym_oid != str((sm if isinstance(sm, dict) else {}).get("do_objectID", "") or ""):
+                register_object_id(fsym_oid, "document.json:foreignSymbols")
 
     # Pre-index all symbolMasters and artboards across pages
     artboards_by_id: Dict[str, Dict[str, Any]] = {}
@@ -676,8 +726,6 @@ def run_offline_audit(
         pre_walk(page_obj)
 
     # Walk all pages for ID uniqueness, references, fonts, Flex stacks, Focus Rings, and Flows
-    seen_object_ids: Dict[str, str] = {}
-    duplicate_ids: List[Dict[str, str]] = []
     dangling_symbols: List[Dict[str, Any]] = []
     dangling_styles: List[Dict[str, Any]] = []
     dangling_swatches: List[Dict[str, Any]] = []
@@ -775,22 +823,12 @@ def run_offline_audit(
             cls = str(node.get("_class", ""))
             loc_tag = f"{page_member}:{cls}:{node.get('name', '')}"
             if oid:
-                if oid in seen_object_ids:
-                    duplicate_ids.append(
-                        {"id": oid, "first": seen_object_ids[oid], "second": loc_tag}
-                    )
-                    findings.append(
-                        _new_finding(
-                            "archive_and_ids",
-                            "ID-DUPLICATE-OBJECT-ID",
-                            f"Duplicate do_objectID '{oid}' at {loc_tag} (first seen at {seen_object_ids[oid]})",
-                            page_id=page_id,
-                            artboard_id=(artboard or {}).get("do_objectID"),
-                            layer_id=oid,
-                        )
-                    )
-                else:
-                    seen_object_ids[oid] = loc_tag
+                register_object_id(
+                    oid,
+                    loc_tag,
+                    page_id=page_id,
+                    artboard_id=(artboard or {}).get("do_objectID"),
+                )
 
             cur_artboard = node if cls in ("artboard", "symbolMaster") else artboard
             aid = str((cur_artboard or {}).get("do_objectID", "")) or None

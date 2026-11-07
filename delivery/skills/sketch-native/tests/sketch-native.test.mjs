@@ -728,6 +728,55 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
 
     const rowAudit = runPython(PY_AUDIT, ["--sketch", rowSketch]);
     assert.equal(rowAudit.status, 0, rowAudit.stdout);
+
+    // SymbolInstance _textStyle override (without _stringValue) switching line-height from 22px to 44px is measured with effective style
+    const tsSpec = createCleanSketchSpec({ textHeight: 44, hotspotY: 76 });
+    tsSpec["document.json"].layerTextStyles.objects = [
+      {
+        _class: "sharedStyle",
+        do_objectID: "60000000-0000-4000-8000-000000000044",
+        name: "Button/TallLineHeight",
+        value: {
+          _class: "style",
+          textStyle: {
+            _class: "textStyle",
+            encodedAttributes: {
+              MSAttributedStringFontAttribute: {
+                _class: "fontDescriptor",
+                attributes: { name: "PingFangSC-Medium", size: 16 },
+              },
+              paragraphStyle: {
+                _class: "paragraphStyle",
+                minimumLineHeight: 44,
+                maximumLineHeight: 44,
+                paragraphSpacing: 0,
+              },
+            },
+          },
+        },
+      },
+    ];
+    const tsPage =
+      tsSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    tsPage.layers[0].layers[0].textBehaviour = 1;
+    const tsInst = tsPage.layers[1].layers[1].layers[0];
+    tsInst.overrideValues = [
+      {
+        _class: "overrideValue",
+        overrideName: "30000000-0000-4000-8000-000000000002_textStyle",
+        value: "60000000-0000-4000-8000-000000000044",
+      },
+    ];
+    const tsBuilder = path.join(tmpDir, "ts-spec.json");
+    const tsSketch = path.join(tmpDir, "ts.sketch");
+    fs.writeFileSync(tsBuilder, JSON.stringify(tsSpec));
+    buildSyntheticSketch(tsSketch, tsBuilder);
+
+    const tsAuditRes = runPython(PY_MEASURE, ["--sketch", tsSketch]);
+    assert.equal(tsAuditRes.status, 1);
+    const tsReport = JSON.parse(tsAuditRes.stdout);
+    assert.equal(tsReport.driftCount, 1);
+    assert.equal(tsReport.drifts[0].bakedHeight, 70);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -929,6 +978,25 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
       },
     ];
 
+    // 7. Duplicate do_objectID across two shared styles in document.json
+    badSpec["document.json"].layerTextStyles = {
+      _class: "sharedTextStyleContainer",
+      objects: [
+        {
+          _class: "sharedStyle",
+          do_objectID: "77000000-0000-4000-8000-000000000077",
+          name: "Body/Red",
+          value: { _class: "style" },
+        },
+        {
+          _class: "sharedStyle",
+          do_objectID: "77000000-0000-4000-8000-000000000077",
+          name: "Body/Blue",
+          value: { _class: "style" },
+        },
+      ],
+    };
+
     const badBuilder = path.join(tmpDir, "bad-spec.json");
     const badSketch = path.join(tmpDir, "bad.sketch");
     fs.writeFileSync(badBuilder, JSON.stringify(badSpec));
@@ -943,6 +1011,7 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
     assert.ok(codes.has("FONT-FORBIDDEN-NOTO"));
     assert.ok(codes.has("STYLE-FORBIDDEN-PLATFORM-SAMPLE"));
     assert.ok(codes.has("ARCHIVE-MISSING-REFERENCED-PAGE"));
+    assert.ok(codes.has("ID-DUPLICATE-OBJECT-ID"));
     assert.ok(codes.has("CLOCK-MISSING-CTFONT-REGULAR-USAGE"));
     assert.ok(codes.has("FOCUS-RING-ANCESTOR-CLIPPED"));
     assert.ok(codes.has("FLOW-START-ARTBOARD-BACK-TRAP"));
@@ -959,7 +1028,7 @@ test("sketch_mcp_roundtrip.py executes 6-step non-activating roundtrip with offl
   const workDocId = "10000000-0000-4000-8000-000000000001";
   const copySketch = path.join(tmpDir, "disposable-copy.sketch");
   const specObj = createCleanSketchSpec({ textHeight: 44, hotspotY: 76 });
-  // Include a shared text style in document.json and a second override on the same SymbolInstance
+  // Include a shared text style and an embedded foreignSymbol in document.json, and a second override on the same SymbolInstance
   specObj["document.json"].layerTextStyles.objects = [
     {
       _class: "sharedStyle",
@@ -976,6 +1045,44 @@ test("sketch_mcp_roundtrip.py executes 6-step non-activating roundtrip with offl
             },
           },
         },
+      },
+    },
+  ];
+  specObj["document.json"].foreignSymbols = [
+    {
+      _class: "MSImmutableForeignSymbol",
+      do_objectID: "81000000-0000-4000-8000-000000000001",
+      symbolMaster: {
+        _class: "symbolMaster",
+        do_objectID: "81000000-0000-4000-8000-000000000002",
+        symbolID: "81000000-0000-4000-8000-000000000003",
+        name: "Foreign/Tag",
+        frame: { _class: "rect", x: 0, y: 0, width: 64, height: 24 },
+        layers: [
+          {
+            _class: "text",
+            do_objectID: "81000000-0000-4000-8000-000000000004",
+            name: "ForeignTagLabel",
+            frame: { _class: "rect", x: 4, y: 2, width: 56, height: 20 },
+            attributedString: {
+              _class: "attributedString",
+              string: "认证",
+              attributes: [
+                {
+                  _class: "stringAttribute",
+                  location: 0,
+                  length: 2,
+                  attributes: {
+                    MSAttributedStringFontAttribute: {
+                      _class: "fontDescriptor",
+                      attributes: { name: "PingFangSC-Regular", size: 12 },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
       },
     },
   ];
@@ -1296,6 +1403,10 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
       "document.json"
     ].layerTextStyles.objects[0].value.textStyle.encodedAttributes.MSAttributedStringFontAttribute.attributes.name =
       "Heiti SC";
+    driftedDocSpec[
+      "document.json"
+    ].foreignSymbols[0].symbolMaster.layers[0].attributedString.attributes[0].attributes.MSAttributedStringFontAttribute.attributes.name =
+      "Heiti SC";
     // Add a second run on NoticeCopy in driftedDocSpec while keeping first run identical, and swap child layer order on Detail artboard
     const noticeLayer =
       driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"]
@@ -1335,6 +1446,11 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     assert.ok(
       diffOut.unexpectedDrifts.some(
         (d) => d.layerID === "sharedTextStyle:60000000-0000-4000-8000-000000000001",
+      ),
+    );
+    assert.ok(
+      diffOut.unexpectedDrifts.some(
+        (d) => d.layerID === "81000000-0000-4000-8000-000000000004",
       ),
     );
     assert.ok(
@@ -1615,6 +1731,33 @@ assert res2["accessible"] is True, res2
       { encoding: "utf8", env: PY_ENV },
     );
     assert.equal(fontCheck.status, 0, fontCheck.stderr);
+
+    // 7. Verify pre-existing wildcard symlink (<id>!.png) inside --output-dir is rejected
+    const poisonedDir = path.join(tmpDir, "poisoned-exports");
+    const poisonedScale1 = path.join(poisonedDir, "1x");
+    fs.mkdirSync(poisonedScale1, { recursive: true, mode: 0o700 });
+    const victimPng = path.join(tmpDir, "victim-secret.png");
+    fs.writeFileSync(victimPng, "secret");
+    fs.symlinkSync(
+      victimPng,
+      path.join(
+        poisonedScale1,
+        "40000000-0000-4000-8000-000000000001!.png",
+      ),
+    );
+    const poisonedRes = runPython(PY_EXPORT, [
+      "--sketch",
+      cleanSketch,
+      "--output-dir",
+      poisonedDir,
+      "--sketchtool",
+      mockSketchtool,
+      "--cwebp",
+      mockCwebp,
+      "--scales",
+      "1",
+    ]);
+    assert.notEqual(poisonedRes.status, 0);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
