@@ -501,6 +501,59 @@ def _find_layer_by_id(
     return None
 
 
+def _collect_master_static_leaf_intervals(
+    master: Dict[str, Any],
+    overridden_paths: set[str],
+    symbol_masters: Dict[str, Dict[str, Any]],
+    inst_overrides: List[Dict[str, Any]],
+) -> List[Tuple[float, float, float]]:
+    """Collect (abs_y, height, height) for unmodified visible leaf layers in master."""
+    swap_map: Dict[str, str] = {}
+    for ov in inst_overrides:
+        if not isinstance(ov, dict):
+            continue
+        ov_name = str(ov.get("overrideName", ""))
+        if ov_name.endswith("_symbolID") and isinstance(ov.get("value"), str):
+            swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
+
+    intervals: List[Tuple[float, float, float]] = []
+
+    def walk_master(
+        node: Dict[str, Any],
+        prefix: str,
+        abs_y: float,
+        visited: set[str],
+    ) -> None:
+        for ch in node.get("layers") or []:
+            if not isinstance(ch, dict) or not _participates_in_flex_flow(ch):
+                continue
+            ch_id = str(ch.get("do_objectID", ""))
+            ch_path = f"{prefix}/{ch_id}" if prefix else ch_id
+            if ch_path in overridden_paths:
+                continue
+            ch_frame = ch.get("frame") or {}
+            ch_y = abs_y + float(ch_frame.get("y", 0.0))
+            ch_h = float(ch_frame.get("height", 0.0))
+            ch_cls = ch.get("_class")
+            if ch_cls == "symbolInstance":
+                eff_sym = swap_map.get(ch_path, str(ch.get("symbolID", "")))
+                if not eff_sym or eff_sym.lower() == "none":
+                    continue
+                nested_m = symbol_masters.get(eff_sym)
+                if nested_m is not None and eff_sym not in visited:
+                    walk_master(nested_m, ch_path, ch_y, visited | {eff_sym})
+                elif ch_h > 0.0:
+                    intervals.append((ch_y, ch_h, ch_h))
+            elif ch.get("layers"):
+                walk_master(ch, ch_path, ch_y, visited)
+            elif ch_h > 0.0:
+                intervals.append((ch_y, ch_h, ch_h))
+
+    root_sym_id = str(master.get("symbolID") or master.get("do_objectID") or "")
+    walk_master(master, "", 0.0, {root_sym_id} if root_sym_id else set())
+    return intervals
+
+
 def _resolve_nested_override_text_layer(
     root_master: Dict[str, Any],
     override_path: str,
@@ -837,6 +890,16 @@ def _audit_and_rebake_members(
                         m_layout.get("_class") == "MSImmutableFlexGroupLayout"
                         and int(m_layout.get("verticalSizing", 1)) == 0
                     )
+                    master_is_horiz_flex = (
+                        m_layout.get("_class") == "MSImmutableFlexGroupLayout"
+                        and int(m_layout.get("flexDirection", 0)) == 0
+                    )
+                    static_intervals = _collect_master_static_leaf_intervals(
+                        master,
+                        set(path_overrides.keys()),
+                        symbol_masters,
+                        inst_overrides,
+                    )
                     targets_meta.append(
                         {
                             "kind": "symbolInstanceOverride",
@@ -845,7 +908,9 @@ def _audit_and_rebake_members(
                             "node": node,
                             "ancestors": list(ancestors),
                             "overrides": override_entries,
+                            "staticIntervals": static_intervals,
                             "masterFixedVertical": master_fixed_vert,
+                            "masterIsHorizontalFlex": master_is_horiz_flex,
                             "masterBaseHeight": float(
                                 m_frame.get("height", inst_frame.get("height", 0.0))
                             ),
@@ -913,9 +978,14 @@ def _audit_and_rebake_members(
             if meta.get("masterFixedVertical"):
                 total_delta_text = 0.0
             else:
-                # Merge overlapping vertical bands (e.g., side-by-side text overrides in a horizontal Row)
+                # Merge overlapping vertical bands across both overridden text layers and unmodified siblings
                 # so horizontal siblings take max bottom extent while stacked vertical bands sum deltas.
-                sorted_iv = sorted(ov_intervals, key=lambda t: (t[0], t[0] + t[1]))
+                combined_iv = list(ov_intervals) + list(
+                    meta.get("staticIntervals") or []
+                )
+                sorted_iv = sorted(
+                    combined_iv, key=lambda t: (t[0], -(t[0] + t[1]))
+                )
                 bands: List[List[Tuple[float, float, float]]] = []
                 for y0, old_h, new_h in sorted_iv:
                     if not bands:
@@ -930,9 +1000,14 @@ def _audit_and_rebake_members(
                         bands.append([(y0, old_h, new_h)])
                 total_delta_text = 0.0
                 for band in bands:
-                    old_bottom = max(py + p_old for py, p_old, _ in band)
-                    new_bottom = max(py + p_new for py, _, p_new in band)
-                    total_delta_text += new_bottom - old_bottom
+                    if meta.get("masterIsHorizontalFlex"):
+                        old_band_h = max(p_old for _, p_old, _ in band)
+                        new_band_h = max(p_new for _, _, p_new in band)
+                        total_delta_text += new_band_h - old_band_h
+                    else:
+                        old_bottom = max(py + p_old for py, p_old, _ in band)
+                        new_bottom = max(py + p_new for py, _, p_new in band)
+                        total_delta_text += new_bottom - old_bottom
             expected_h = round(
                 max(1.0, float(meta["masterBaseHeight"]) + total_delta_text), 2
             )

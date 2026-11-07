@@ -103,43 +103,227 @@ def _validate_regular_owned_file(file_path: Path) -> None:
         raise RuntimeError(f"Refusing to read hard-linked file: {file_path}")
 
 
-def _ensure_private_export_dir(dir_path: Path) -> None:
-    if str(dir_path) not in ("/tmp", "/var") and dir_path.is_symlink():
-        raise RuntimeError(f"Refusing symlinked export directory: {dir_path}")
-    if (
-        dir_path.parent != dir_path
-        and str(dir_path.parent) not in ("/tmp", "/var")
-        and dir_path.parent.is_symlink()
-    ):
+def _validate_pinned_dir_fd(dir_fd: int, display_path: Path) -> None:
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    st = os.fstat(dir_fd)
+    if not stat.S_ISDIR(st.st_mode):
+        raise RuntimeError(f"Export path is not a regular directory: {display_path}")
+    if hasattr(os, "getuid") and st.st_uid != uid:
         raise RuntimeError(
-            f"Refusing export directory under symlinked parent: {dir_path.parent}"
-        )
-    dir_path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    st = os.lstat(dir_path)
-    if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
-        raise RuntimeError(f"Export path is not a regular directory: {dir_path}")
-    if hasattr(os, "getuid") and st.st_uid != os.getuid():
-        raise RuntimeError(
-            f"Refusing export directory not owned by current user: {dir_path}"
+            f"Refusing export directory not owned by current user: {display_path}"
         )
     if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
         raise RuntimeError(
-            f"Refusing group- or world-writable export directory: {dir_path}"
+            f"Refusing group- or world-writable export directory: {display_path}"
         )
-    for child in dir_path.iterdir():
-        cst = os.lstat(child)
-        if stat.S_ISLNK(cst.st_mode):
-            raise RuntimeError(
-                f"Refusing export directory containing symlink entry: {child}"
+    dup_fd = os.dup(dir_fd)
+    with os.scandir(dup_fd) as it:
+        for entry in it:
+            try:
+                cst = entry.stat(follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            child_disp = display_path / entry.name
+            if stat.S_ISLNK(cst.st_mode):
+                raise RuntimeError(
+                    f"Refusing export directory containing symlink entry: {child_disp}"
+                )
+            if hasattr(os, "getuid") and cst.st_uid != uid:
+                raise RuntimeError(
+                    f"Refusing export directory containing foreign-owned entry: {child_disp}"
+                )
+            if stat.S_ISREG(cst.st_mode) and cst.st_nlink > 1:
+                raise RuntimeError(
+                    f"Refusing export directory containing hard-linked entry: {child_disp}"
+                )
+
+
+def _open_pinned_export_dir(dir_path: Path) -> int:
+    parent_fd, leaf_name = _open_pinned_parent_dir(dir_path, create=True)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    dir_flag = getattr(os, "O_DIRECTORY", 0)
+    try:
+        try:
+            os.mkdir(leaf_name, 0o700, dir_fd=parent_fd)
+        except FileExistsError:
+            pass
+        try:
+            dir_fd = os.open(
+                leaf_name, os.O_RDONLY | dir_flag | nofollow, dir_fd=parent_fd
             )
-        if hasattr(os, "getuid") and cst.st_uid != os.getuid():
+        except OSError as exc:
             raise RuntimeError(
-                f"Refusing export directory containing foreign-owned entry: {child}"
+                f"Refusing symlinked or non-directory export path: {dir_path}"
+            ) from exc
+    finally:
+        os.close(parent_fd)
+    try:
+        _validate_pinned_dir_fd(dir_fd, dir_path)
+        return dir_fd
+    except Exception:
+        os.close(dir_fd)
+        raise
+
+
+def _open_pinned_subdir(
+    parent_dir_fd: int, sub_name: str, display_path: Path
+) -> int:
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    dir_flag = getattr(os, "O_DIRECTORY", 0)
+    try:
+        os.mkdir(sub_name, 0o700, dir_fd=parent_dir_fd)
+    except FileExistsError:
+        pass
+    try:
+        sub_fd = os.open(
+            sub_name, os.O_RDONLY | dir_flag | nofollow, dir_fd=parent_dir_fd
+        )
+    except OSError as exc:
+        raise RuntimeError(
+            f"Refusing symlinked or non-directory export subdirectory: {display_path}"
+        ) from exc
+    try:
+        _validate_pinned_dir_fd(sub_fd, display_path)
+        return sub_fd
+    except Exception:
+        os.close(sub_fd)
+        raise
+
+
+def _create_pinned_stage_dir(
+    parent_dir_fd: int, prefix: str, display_parent: Path
+) -> Tuple[int, str]:
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    dir_flag = getattr(os, "O_DIRECTORY", 0)
+    for _ in range(64):
+        stage_name = f"{prefix}{os.urandom(8).hex()}"
+        try:
+            os.mkdir(stage_name, 0o700, dir_fd=parent_dir_fd)
+        except FileExistsError:
+            continue
+        try:
+            stage_fd = os.open(
+                stage_name, os.O_RDONLY | dir_flag | nofollow, dir_fd=parent_dir_fd
             )
-        if stat.S_ISREG(cst.st_mode) and cst.st_nlink > 1:
+            _validate_pinned_dir_fd(stage_fd, display_parent / stage_name)
+            return stage_fd, stage_name
+        except Exception:
+            try:
+                os.rmdir(stage_name, dir_fd=parent_dir_fd)
+            except OSError:
+                pass
+            raise
+    raise RuntimeError(
+        f"Failed to allocate staging directory under {display_parent}"
+    )
+
+
+def _cleanup_pinned_stage_dir(
+    parent_dir_fd: int, stage_fd: int, stage_name: str
+) -> None:
+    try:
+        dup_fd = os.dup(stage_fd)
+        with os.scandir(dup_fd) as it:
+            for entry in it:
+                try:
+                    os.unlink(entry.name, dir_fd=stage_fd)
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    finally:
+        try:
+            os.close(stage_fd)
+        except OSError:
+            pass
+        try:
+            os.rmdir(stage_name, dir_fd=parent_dir_fd)
+        except OSError:
+            pass
+
+
+def _read_regular_owned_bytes_at(
+    dir_fd: int,
+    leaf_name: str,
+    display_path: Path,
+    max_bytes: Optional[int] = None,
+) -> bytes:
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    try:
+        fd = os.open(leaf_name, os.O_RDONLY | nofollow, dir_fd=dir_fd)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Refusing to read missing or symlinked file: {display_path}"
+        ) from exc
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
             raise RuntimeError(
-                f"Refusing export directory containing hard-linked entry: {child}"
+                f"Refusing to read non-regular file: {display_path}"
             )
+        if hasattr(os, "getuid") and st.st_uid != uid:
+            raise RuntimeError(
+                f"Refusing to read file not owned by current user: {display_path}"
+            )
+        if st.st_nlink > 1:
+            raise RuntimeError(
+                f"Refusing to read hard-linked file: {display_path}"
+            )
+        chunks: List[bytes] = []
+        remaining = max_bytes
+        while True:
+            to_read = 65536 if remaining is None else min(65536, remaining)
+            if to_read <= 0:
+                break
+            buf = os.read(fd, to_read)
+            if not buf:
+                break
+            chunks.append(buf)
+            if remaining is not None:
+                remaining -= len(buf)
+        return b"".join(chunks)
+    finally:
+        os.close(fd)
+
+
+def _sha256_at(dir_fd: int, leaf_name: str, display_path: Path) -> str:
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    try:
+        fd = os.open(leaf_name, os.O_RDONLY | nofollow, dir_fd=dir_fd)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Refusing to hash missing or symlinked file: {display_path}"
+        ) from exc
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(
+                f"Refusing to hash non-regular file: {display_path}"
+            )
+        if hasattr(os, "getuid") and st.st_uid != uid:
+            raise RuntimeError(
+                f"Refusing to hash file not owned by current user: {display_path}"
+            )
+        if st.st_nlink > 1:
+            raise RuntimeError(
+                f"Refusing to hash hard-linked file: {display_path}"
+            )
+        h = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            h.update(chunk)
+        return h.hexdigest()
+    finally:
+        os.close(fd)
+
+
+def _ensure_private_export_dir(dir_path: Path) -> None:
+    dir_fd = _open_pinned_export_dir(dir_path)
+    os.close(dir_fd)
 
 
 def _open_pinned_parent_dir(target_path: Path, create: bool = False) -> Tuple[int, str]:
@@ -384,13 +568,7 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _is_valid_webp_file(webp_path: Path) -> bool:
-    """Verify RIFF....WEBP container and ensure payload is not raw PNG bytes."""
-    try:
-        _validate_regular_owned_file(webp_path)
-    except (FileNotFoundError, RuntimeError):
-        return False
-    header = webp_path.read_bytes()[:32]
+def _is_valid_webp_header(header: bytes) -> bool:
     if len(header) < 21:
         return False
     if header[:4] != b"RIFF" or header[8:12] != b"WEBP":
@@ -398,57 +576,97 @@ def _is_valid_webp_file(webp_path: Path) -> bool:
     chunk_tag = header[12:16]
     if chunk_tag not in (b"VP8L", b"VP8 ", b"VP8X"):
         return False
-    # VP8L lossless bitstream starts with signature byte 0x2f ('/'), never PNG magic (\x89PNG)
     if chunk_tag == b"VP8L" and (header[20:21] != b"\x2f" or header[20:24] == b"\x89PNG"):
         return False
     return True
 
 
+def _is_valid_webp_file(webp_path: Path) -> bool:
+    """Verify RIFF....WEBP container and ensure payload is not raw PNG bytes."""
+    try:
+        _validate_regular_owned_file(webp_path)
+    except (FileNotFoundError, RuntimeError):
+        return False
+    return _is_valid_webp_header(webp_path.read_bytes()[:32])
+
+
 def convert_png_to_lossless_webp(
-    png_path: Path, webp_path: Path, cwebp_bin: str = "cwebp"
+    png_path: Path,
+    webp_path: Path,
+    cwebp_bin: str = "cwebp",
+    dir_fd: Optional[int] = None,
 ) -> bool:
-    """Convert PNG to lossless WebP using cwebp via an exclusive temp file. Fails explicitly if unavailable or invalid."""
-    _validate_regular_owned_file(png_path)
-    _validate_existing_output_target(webp_path)
+    """Convert PNG to lossless WebP using cwebp via a pinned parent directory descriptor and renameat."""
     resolved = shutil.which(cwebp_bin)
     if not resolved and Path(cwebp_bin).exists():
-        resolved = str(Path(cwebp_bin))
+        resolved = os.path.abspath(str(Path(cwebp_bin)))
     if not resolved:
         raise RuntimeError(
             f"Lossless WebP encoder '{cwebp_bin}' not found in PATH; install webp (cwebp) or pass --no-webp."
         )
+    resolved_abs = os.path.abspath(resolved) if os.path.sep in resolved else resolved
 
-    fd, tmp_str = tempfile.mkstemp(
-        prefix=f".{webp_path.name}.", suffix=".webp", dir=str(webp_path.parent)
-    )
-    os.fchmod(fd, 0o600)
-    os.close(fd)
-    tmp_webp = Path(tmp_str)
+    owns_dir_fd = False
+    if dir_fd is None:
+        dir_fd, webp_leaf = _open_pinned_parent_dir(webp_path, create=False)
+        owns_dir_fd = True
+    else:
+        webp_leaf = webp_path.name
+
+    png_leaf = png_path.name
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    tmp_name: Optional[str] = None
     try:
+        _read_regular_owned_bytes_at(dir_fd, png_leaf, png_path, max_bytes=24)
+        _validate_existing_in_dir_fd(dir_fd, webp_leaf, webp_path)
+        for _ in range(64):
+            cand = f".{webp_leaf}.{os.urandom(8).hex()}.webp"
+            try:
+                tfd = os.open(
+                    cand,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow,
+                    0o600,
+                    dir_fd=dir_fd,
+                )
+                os.fchmod(tfd, 0o600)
+                os.close(tfd)
+                tmp_name = cand
+                break
+            except FileExistsError:
+                continue
+        if tmp_name is None:
+            raise RuntimeError(f"Failed to allocate temp WebP file for {webp_path}")
+
         proc = subprocess.run(
-            [resolved, "-lossless", "-q", "100", str(png_path), "-o", str(tmp_webp)],
+            [resolved_abs, "-lossless", "-q", "100", png_leaf, "-o", tmp_name],
             capture_output=True,
             text=True,
             timeout=30,
             check=False,
+            preexec_fn=lambda: os.fchdir(dir_fd),
         )
         if proc.returncode != 0:
             raise RuntimeError(
                 f"cwebp lossless conversion failed (exit {proc.returncode}): {proc.stderr.strip()}"
             )
-        _validate_regular_owned_file(tmp_webp)
-        if not _is_valid_webp_file(tmp_webp):
+        header = _read_regular_owned_bytes_at(
+            dir_fd, tmp_name, webp_path.parent / tmp_name, max_bytes=32
+        )
+        if not _is_valid_webp_header(header):
             raise RuntimeError(
                 f"cwebp output at {webp_path} is missing or is not a valid WebP bitstream"
             )
-        _validate_existing_output_target(webp_path)
-        os.replace(tmp_webp, webp_path)
+        _validate_existing_in_dir_fd(dir_fd, webp_leaf, webp_path)
+        os.replace(tmp_name, webp_leaf, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        tmp_name = None
     finally:
-        if tmp_webp.exists() or tmp_webp.is_symlink():
+        if tmp_name is not None:
             try:
-                tmp_webp.unlink()
+                os.unlink(tmp_name, dir_fd=dir_fd)
             except OSError:
                 pass
+        if owns_dir_fd:
+            os.close(dir_fd)
     return True
 
 
@@ -691,21 +909,42 @@ def inspect_sketch_artboards_and_clocks(
     return artboards, clock_layers
 
 
-def verify_pdf_sfns_regular(pdf_path: Path) -> Dict[str, Any]:
-    _validate_regular_owned_file(pdf_path)
-    raw = pdf_path.read_bytes()
+def _parse_png_dimensions_at(
+    dir_fd: int, leaf_name: str, display_path: Path
+) -> Tuple[int, int]:
+    head = _read_regular_owned_bytes_at(
+        dir_fd, leaf_name, display_path, max_bytes=24
+    )
+    if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        raise ValueError(f"Invalid PNG header in {display_path}")
+    w, h = struct.unpack(">II", head[16:24])
+    return int(w), int(h)
+
+
+def _verify_pdf_sfns_regular_at(
+    dir_fd: int, leaf_name: str, pdf_path: Path
+) -> Dict[str, Any]:
+    raw = _read_regular_owned_bytes_at(dir_fd, leaf_name, pdf_path)
     text_latin = raw.decode("latin-1", errors="ignore")
     has_sfns = ".SFNS-Regular" in text_latin or "SFNS-Regular" in text_latin
     has_truetype = "/Subtype /TrueType" in text_latin or "/Subtype/TrueType" in text_latin
     has_heiti_fallback = "Heiti" in text_latin or "STHeiti" in text_latin
     return {
         "pdfPath": str(pdf_path),
-        "sha256": sha256_file(pdf_path),
+        "sha256": hashlib.sha256(raw).hexdigest(),
         "hasSFNSRegular": has_sfns,
         "hasTrueTypeSubtype": has_truetype,
         "hasHeitiFallback": has_heiti_fallback,
         "valid": has_sfns and has_truetype and not has_heiti_fallback,
     }
+
+
+def verify_pdf_sfns_regular(pdf_path: Path) -> Dict[str, Any]:
+    dir_fd, leaf_name = _open_pinned_parent_dir(pdf_path, create=False)
+    try:
+        return _verify_pdf_sfns_regular_at(dir_fd, leaf_name, pdf_path)
+    finally:
+        os.close(dir_fd)
 
 
 def _export_one_artboard_scale(
@@ -716,80 +955,129 @@ def _export_one_artboard_scale(
     out_dir: Path,
     export_webp: bool,
     cwebp_bin: str = "cwebp",
+    scale_dir_fd: Optional[int] = None,
 ) -> Dict[str, Any]:
     ab_id = artboard["artboardID"]
     scale_dir = out_dir / f"{scale}x"
-    _ensure_private_export_dir(scale_dir)
+    owns_scale_fd = False
+    if scale_dir_fd is None:
+        scale_dir_fd = _open_pinned_export_dir(scale_dir)
+        owns_scale_fd = True
 
-    allowed_png_names = (f"{ab_id}.png", f"{ab_id}@{scale}x.png")
-    allowed_webp_names = (f"{ab_id}.webp", f"{ab_id}@{scale}x.webp")
-    for child in list(scale_dir.iterdir()):
-        if child.name.startswith(ab_id):
-            if child.name not in allowed_png_names and child.name not in allowed_webp_names:
-                raise RuntimeError(
-                    f"Refusing pre-existing unexpected render entry in export directory: {child}"
-                )
-            _validate_existing_output_target(child)
+    sketchtool_bin = (
+        os.path.abspath(sketchtool)
+        if (os.path.sep in sketchtool or Path(sketchtool).exists())
+        else sketchtool
+    )
+    sketch_abs = os.path.abspath(str(sketch_path))
 
-    stage_dir = Path(tempfile.mkdtemp(prefix=f".stage-{ab_id}-", dir=str(scale_dir)))
     try:
-        cmd = [
-            sketchtool,
-            "export",
-            "artboards",
-            str(sketch_path),
-            f"--item={ab_id}",
-            f"--scales={scale}",
-            "--formats=png",
-            "--use-id-for-name=YES",
-            f"--output={stage_dir}",
-        ]
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=60, check=False
+        allowed_png_names = (f"{ab_id}.png", f"{ab_id}@{scale}x.png")
+        allowed_webp_names = (f"{ab_id}.webp", f"{ab_id}@{scale}x.webp")
+        dup_fd = os.dup(scale_dir_fd)
+        with os.scandir(dup_fd) as it:
+            for entry in it:
+                if entry.name.startswith(ab_id):
+                    child_disp = scale_dir / entry.name
+                    if (
+                        entry.name not in allowed_png_names
+                        and entry.name not in allowed_webp_names
+                    ):
+                        raise RuntimeError(
+                            f"Refusing pre-existing unexpected render entry in export directory: {child_disp}"
+                        )
+                    _validate_existing_in_dir_fd(
+                        scale_dir_fd, entry.name, child_disp
+                    )
+
+        stage_fd, stage_name = _create_pinned_stage_dir(
+            scale_dir_fd, f".stage-{ab_id}-", scale_dir
         )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"sketchtool export artboards failed for {ab_id}@{scale}x: {proc.stderr.strip()}"
+        staged_leaf: Optional[str] = None
+        try:
+            cmd = [
+                sketchtool_bin,
+                "export",
+                "artboards",
+                sketch_abs,
+                f"--item={ab_id}",
+                f"--scales={scale}",
+                "--formats=png",
+                "--use-id-for-name=YES",
+                "--output=.",
+            ]
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+                preexec_fn=lambda: os.fchdir(stage_fd),
             )
+            if proc.returncode != 0:
+                raise RuntimeError(
+                    f"sketchtool export artboards failed for {ab_id}@{scale}x: {proc.stderr.strip()}"
+                )
 
-        staged_png: Optional[Path] = None
-        for candidate_name in allowed_png_names:
-            cand = stage_dir / candidate_name
-            if cand.exists() or cand.is_symlink():
-                _validate_regular_owned_file(cand)
-                staged_png = cand
+            for candidate_name in allowed_png_names:
+                try:
+                    os.stat(
+                        candidate_name, dir_fd=stage_fd, follow_symlinks=False
+                    )
+                except FileNotFoundError:
+                    continue
+                _read_regular_owned_bytes_at(
+                    stage_fd,
+                    candidate_name,
+                    scale_dir / stage_name / candidate_name,
+                    max_bytes=24,
+                )
+                staged_leaf = candidate_name
                 break
-        if staged_png is None:
-            raise FileNotFoundError(
-                f"sketchtool produced no exact PNG ({allowed_png_names}) for artboard {ab_id} in {stage_dir}"
+            if staged_leaf is None:
+                raise FileNotFoundError(
+                    f"sketchtool produced no exact PNG ({allowed_png_names}) for artboard {ab_id} in {scale_dir / stage_name}"
+                )
+            png_path = scale_dir / staged_leaf
+            _validate_existing_in_dir_fd(scale_dir_fd, staged_leaf, png_path)
+            os.replace(
+                staged_leaf,
+                staged_leaf,
+                src_dir_fd=stage_fd,
+                dst_dir_fd=scale_dir_fd,
             )
-        png_path = scale_dir / staged_png.name
-        _validate_existing_output_target(png_path)
-        os.replace(staged_png, png_path)
+        finally:
+            _cleanup_pinned_stage_dir(scale_dir_fd, stage_fd, stage_name)
+
+        w, h = _parse_png_dimensions_at(scale_dir_fd, staged_leaf, png_path)
+        png_sha = _sha256_at(scale_dir_fd, staged_leaf, png_path)
+
+        entry_res: Dict[str, Any] = {
+            "artboardID": ab_id,
+            "artboardName": artboard["artboardName"],
+            "pageID": artboard["pageID"],
+            "scale": f"{scale}x",
+            "pngPath": str(png_path),
+            "width": w,
+            "height": h,
+            "sha256": png_sha,
+        }
+        if export_webp:
+            webp_path = png_path.with_suffix(".webp")
+            convert_png_to_lossless_webp(
+                png_path,
+                webp_path,
+                cwebp_bin=cwebp_bin,
+                dir_fd=scale_dir_fd,
+            )
+            entry_res["webpPath"] = str(webp_path)
+            entry_res["webpSha256"] = _sha256_at(
+                scale_dir_fd, webp_path.name, webp_path
+            )
+        return entry_res
     finally:
-        shutil.rmtree(stage_dir, ignore_errors=True)
-
-    _validate_regular_owned_file(png_path)
-    w, h = parse_png_dimensions(png_path)
-    png_sha = sha256_file(png_path)
-
-    entry: Dict[str, Any] = {
-        "artboardID": ab_id,
-        "artboardName": artboard["artboardName"],
-        "pageID": artboard["pageID"],
-        "scale": f"{scale}x",
-        "pngPath": str(png_path),
-        "width": w,
-        "height": h,
-        "sha256": png_sha,
-    }
-    if export_webp:
-        webp_path = png_path.with_suffix(".webp")
-        convert_png_to_lossless_webp(png_path, webp_path, cwebp_bin=cwebp_bin)
-        _validate_regular_owned_file(webp_path)
-        entry["webpPath"] = str(webp_path)
-        entry["webpSha256"] = sha256_file(webp_path)
-    return entry
+        if owns_scale_fd:
+            os.close(scale_dir_fd)
 
 
 def run_export_and_manifest(
@@ -810,89 +1098,162 @@ def run_export_and_manifest(
 
     font_access = check_pingfang_font_access()
     artboards, clock_layers = inspect_sketch_artboards_and_clocks(sketch_path)
-    _ensure_private_export_dir(output_dir)
+    out_dir_fd = _open_pinned_export_dir(output_dir)
+    scale_dir_fds: Dict[str, int] = {}
+    pdf_dir_fd: Optional[int] = None
+    sketchtool_bin = (
+        os.path.abspath(sketchtool)
+        if (os.path.sep in sketchtool or Path(sketchtool).exists())
+        else sketchtool
+    )
+    sketch_abs = os.path.abspath(str(sketch_path))
 
-    tasks: List[Tuple[Dict[str, Any], str]] = [
-        (ab, sc) for ab in artboards for sc in scales
-    ]
-    exported_renders: List[Dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
-        futures = [
-            pool.submit(
-                _export_one_artboard_scale,
-                sketchtool,
-                sketch_path,
-                ab,
-                sc,
-                output_dir,
-                export_webp,
-                cwebp_bin,
-            )
-            for ab, sc in tasks
-        ]
-        for fut in futures:
-            exported_renders.append(fut.result())
-
-    clock_pdf_checks: List[Dict[str, Any]] = []
-    if verify_clock_pdf and clock_layers:
-        pdf_dir = output_dir / "pdf_layers"
-        _ensure_private_export_dir(pdf_dir)
-        for clock in clock_layers:
-            lid = clock["layerID"]
-            inst_id = str(clock.get("instanceID") or "")
-            candidate_ids = [lid] + ([inst_id] if inst_id and inst_id != lid else [])
-            stage_pdf_dir = Path(
-                tempfile.mkdtemp(prefix=f".stage-{lid}-", dir=str(pdf_dir))
-            )
-            try:
-                staged_pdf: Optional[Path] = None
-                last_err = ""
-                for cid in candidate_ids:
-                    cmd = [
-                        sketchtool,
-                        "export",
-                        "layers",
-                        str(sketch_path),
-                        f"--item={cid}",
-                        "--formats=pdf",
-                        "--use-id-for-name=YES",
-                        f"--output={stage_pdf_dir}",
-                    ]
-                    proc = subprocess.run(
-                        cmd, capture_output=True, text=True, timeout=60, check=False
-                    )
-                    if proc.returncode != 0:
-                        last_err = proc.stderr.strip()
-                        continue
-                    cand_pdf = stage_pdf_dir / f"{cid}.pdf"
-                    if cand_pdf.exists() or cand_pdf.is_symlink():
-                        staged_pdf = cand_pdf
-                        break
-                    last_err = f"No exact PDF ({cid}.pdf) exported for layer {cid}"
-
-                if staged_pdf is None:
-                    clock_pdf_checks.append(
-                        {
-                            **clock,
-                            "valid": False,
-                            "error": last_err
-                            or f"No exact PDF ({lid}.pdf) exported for layer {lid}",
-                        }
-                    )
-                    continue
-                _validate_regular_owned_file(staged_pdf)
-                pdf_filename = (
-                    f"{inst_id}_{lid}.pdf"
-                    if inst_id and (pdf_dir / f"{lid}.pdf").exists()
-                    else f"{lid}.pdf"
+    try:
+        for sc in scales:
+            if sc not in scale_dir_fds:
+                scale_dir_fds[sc] = _open_pinned_subdir(
+                    out_dir_fd, f"{sc}x", output_dir / f"{sc}x"
                 )
-                final_pdf = pdf_dir / pdf_filename
-                _validate_existing_output_target(final_pdf)
-                os.replace(staged_pdf, final_pdf)
-            finally:
-                shutil.rmtree(stage_pdf_dir, ignore_errors=True)
-            pdf_info = verify_pdf_sfns_regular(final_pdf)
-            clock_pdf_checks.append({**clock, **pdf_info})
+
+        tasks: List[Tuple[Dict[str, Any], str]] = [
+            (ab, sc) for ab in artboards for sc in scales
+        ]
+        exported_renders: List[Dict[str, Any]] = []
+        with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+            futures = [
+                pool.submit(
+                    _export_one_artboard_scale,
+                    sketchtool,
+                    sketch_path,
+                    ab,
+                    sc,
+                    output_dir,
+                    export_webp,
+                    cwebp_bin,
+                    scale_dir_fds[sc],
+                )
+                for ab, sc in tasks
+            ]
+            for fut in futures:
+                exported_renders.append(fut.result())
+
+        clock_pdf_checks: List[Dict[str, Any]] = []
+        if verify_clock_pdf and clock_layers:
+            pdf_dir = output_dir / "pdf_layers"
+            pdf_dir_fd = _open_pinned_subdir(out_dir_fd, "pdf_layers", pdf_dir)
+            for clock in clock_layers:
+                lid = clock["layerID"]
+                inst_id = str(clock.get("instanceID") or "")
+                candidate_ids = [lid] + (
+                    [inst_id] if inst_id and inst_id != lid else []
+                )
+                stage_pdf_fd, stage_pdf_name = _create_pinned_stage_dir(
+                    pdf_dir_fd, f".stage-{lid}-", pdf_dir
+                )
+                try:
+                    staged_pdf_leaf: Optional[str] = None
+                    last_err = ""
+                    for cid in candidate_ids:
+                        cmd = [
+                            sketchtool_bin,
+                            "export",
+                            "layers",
+                            sketch_abs,
+                            f"--item={cid}",
+                            "--formats=pdf",
+                            "--use-id-for-name=YES",
+                            "--output=.",
+                        ]
+                        proc = subprocess.run(
+                            cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=60,
+                            check=False,
+                            preexec_fn=lambda: os.fchdir(stage_pdf_fd),
+                        )
+                        if proc.returncode != 0:
+                            last_err = proc.stderr.strip()
+                            continue
+                        cand_leaf = f"{cid}.pdf"
+                        try:
+                            os.stat(
+                                cand_leaf,
+                                dir_fd=stage_pdf_fd,
+                                follow_symlinks=False,
+                            )
+                            staged_pdf_leaf = cand_leaf
+                            break
+                        except FileNotFoundError:
+                            last_err = (
+                                f"No exact PDF ({cand_leaf}) exported for layer {cid}"
+                            )
+
+                    if staged_pdf_leaf is None:
+                        clock_pdf_checks.append(
+                            {
+                                **clock,
+                                "valid": False,
+                                "error": last_err
+                                or f"No exact PDF ({lid}.pdf) exported for layer {lid}",
+                            }
+                        )
+                        continue
+                    _read_regular_owned_bytes_at(
+                        stage_pdf_fd,
+                        staged_pdf_leaf,
+                        pdf_dir / stage_pdf_name / staged_pdf_leaf,
+                        max_bytes=16,
+                    )
+                    default_pdf_exists = False
+                    if inst_id:
+                        try:
+                            os.stat(
+                                f"{lid}.pdf",
+                                dir_fd=pdf_dir_fd,
+                                follow_symlinks=False,
+                            )
+                            default_pdf_exists = True
+                        except FileNotFoundError:
+                            default_pdf_exists = False
+                    pdf_filename = (
+                        f"{inst_id}_{lid}.pdf"
+                        if inst_id and default_pdf_exists
+                        else f"{lid}.pdf"
+                    )
+                    final_pdf = pdf_dir / pdf_filename
+                    _validate_existing_in_dir_fd(
+                        pdf_dir_fd, pdf_filename, final_pdf
+                    )
+                    os.replace(
+                        staged_pdf_leaf,
+                        pdf_filename,
+                        src_dir_fd=stage_pdf_fd,
+                        dst_dir_fd=pdf_dir_fd,
+                    )
+                finally:
+                    _cleanup_pinned_stage_dir(
+                        pdf_dir_fd, stage_pdf_fd, stage_pdf_name
+                    )
+                pdf_info = _verify_pdf_sfns_regular_at(
+                    pdf_dir_fd, pdf_filename, final_pdf
+                )
+                clock_pdf_checks.append({**clock, **pdf_info})
+    finally:
+        if pdf_dir_fd is not None:
+            try:
+                os.close(pdf_dir_fd)
+            except OSError:
+                pass
+        for sfd in scale_dir_fds.values():
+            try:
+                os.close(sfd)
+            except OSError:
+                pass
+        try:
+            os.close(out_dir_fd)
+        except OSError:
+            pass
 
     manifest_mismatches: List[Dict[str, Any]] = []
     manifest_payload = {

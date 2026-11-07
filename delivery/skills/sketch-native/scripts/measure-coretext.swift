@@ -1,4 +1,5 @@
 #!/usr/bin/env swift
+import Darwin
 import Foundation
 #if canImport(CoreFoundation) && canImport(CoreGraphics) && canImport(CoreText)
 import CoreFoundation
@@ -259,11 +260,45 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
     var measuredLines: [MeasuredLine] = []
     var globalUTF16Cursor = 0
     var lineIndex = 0
+    var totalParagraphSpacing = 0.0
 
-    for pText in rawParagraphs {
+    for (pIdx, pText) in rawParagraphs.enumerated() {
         let pNS = pText as NSString
         let pLen = pNS.length
+        let pStart = globalUTF16Cursor
+        let pEnd = globalUTF16Cursor + pLen
+
+        var effectiveParaSpacing = paraSpacing
+        if !resolvedRuns.isEmpty {
+            var matchedSpacing: Double? = nil
+            for rr in resolvedRuns {
+                let overlaps: Bool
+                if pLen == 0 {
+                    overlaps = (rr.start <= pStart && pStart <= rr.end)
+                } else {
+                    overlaps = (min(pEnd, rr.end) > max(pStart, rr.start))
+                }
+                if overlaps {
+                    matchedSpacing = rr.paragraphSpacing
+                }
+            }
+            if let ms = matchedSpacing {
+                effectiveParaSpacing = ms
+            }
+        }
+        if pIdx < rawParagraphs.count - 1 {
+            totalParagraphSpacing += effectiveParaSpacing
+        }
+
         if pLen == 0 {
+            var emptyLineH = singleLineH
+            if !resolvedRuns.isEmpty {
+                for rr in resolvedRuns {
+                    if rr.start <= pStart && pStart <= rr.end {
+                        emptyLineH = max(emptyLineH, rr.lineHeight)
+                    }
+                }
+            }
             measuredLines.append(
                 MeasuredLine(
                     index: lineIndex,
@@ -271,7 +306,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
                     length: 0,
                     text: "",
                     width: 0.0,
-                    lineHeight: singleLineH
+                    lineHeight: emptyLineH
                 )
             )
             lineIndex += 1
@@ -287,8 +322,6 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
             baseAttrs[NSAttributedString.Key(kCTKernAttributeName as String)] = NSNumber(value: kerningVal)
         }
         let attrStr = NSMutableAttributedString(string: pText, attributes: baseAttrs)
-        let pStart = globalUTF16Cursor
-        let pEnd = globalUTF16Cursor + pLen
         for rr in resolvedRuns {
             let interStart = max(pStart, rr.start)
             let interEnd = min(pEnd, rr.end)
@@ -346,9 +379,8 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
         globalUTF16Cursor += pLen + 1
     }
 
-    let nonEmptyParagraphBreaks = max(0, rawParagraphs.count - 1)
     let sumLineHeights = measuredLines.reduce(0.0) { $0 + $1.lineHeight }
-    let totalHeight = sumLineHeights + Double(nonEmptyParagraphBreaks) * paraSpacing
+    let totalHeight = sumLineHeights + totalParagraphSpacing
     return MeasureOutputItem(
         id: item.id,
         text: item.text,
@@ -462,9 +494,167 @@ guard let encoded = try? encoder.encode(report),
     exit(1)
 }
 
+func writePrivateFileNofollow(path: String, data: Data) throws {
+    let rawAbs: String
+    if path.hasPrefix("/") {
+        rawAbs = path
+    } else {
+        rawAbs = FileManager.default.currentDirectoryPath + "/" + path
+    }
+    var parts: [String] = []
+    for seg in rawAbs.split(separator: "/", omittingEmptySubsequences: true) {
+        let s = String(seg)
+        if s == "." {
+            continue
+        } else if s == ".." {
+            if !parts.isEmpty {
+                parts.removeLast()
+            }
+        } else {
+            parts.append(s)
+        }
+    }
+    guard let leafName = parts.last else {
+        throw NSError(domain: "measure-coretext", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid output path: \(path)"])
+    }
+    let parentParts = Array(parts.dropLast())
+    let uid = getuid()
+
+    var curFd = Darwin.open("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+    guard curFd >= 0 else {
+        throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "Unable to open root directory"])
+    }
+    defer {
+        if curFd >= 0 {
+            Darwin.close(curFd)
+        }
+    }
+
+    for (idx, part) in parentParts.enumerated() {
+        if idx == 0 && (part == "tmp" || part == "var" || part == "etc") {
+            var stLink = stat()
+            if fstatat(curFd, part, &stLink, AT_SYMLINK_NOFOLLOW) == 0 {
+                if (stLink.st_mode & S_IFMT) == S_IFLNK && stLink.st_uid == 0 {
+                    let privFd = openat(curFd, "private", O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+                    guard privFd >= 0 else {
+                        throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "Unable to open /private"])
+                    }
+                    Darwin.close(curFd)
+                    curFd = privFd
+                    var stPriv = stat()
+                    guard fstat(curFd, &stPriv) == 0,
+                          stPriv.st_uid == 0,
+                          (stPriv.st_mode & (S_IWGRP | S_IWOTH)) == 0 else {
+                        throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Untrusted /private root directory"])
+                    }
+                }
+            }
+        }
+
+        var nextFd = openat(curFd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        if nextFd < 0 && errno == ENOENT {
+            guard mkdirat(curFd, part, 0o700) == 0 else {
+                throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "Unable to create directory component \(part)"])
+            }
+            nextFd = openat(curFd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        }
+        guard nextFd >= 0 else {
+            throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "Refusing symlink or inaccessible ancestor directory: \(part)"])
+        }
+        Darwin.close(curFd)
+        curFd = nextFd
+
+        var stDir = stat()
+        guard fstat(curFd, &stDir) == 0, (stDir.st_mode & S_IFMT) == S_IFDIR else {
+            throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Ancestor is not a directory: \(part)"])
+        }
+        if stDir.st_uid != 0 && stDir.st_uid != uid {
+            throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing ancestor owned by another user (uid=\(stDir.st_uid)): \(path)"])
+        }
+        if (stDir.st_mode & (S_IWGRP | S_IWOTH)) != 0 && (stDir.st_mode & S_ISVTX) == 0 {
+            throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing group/world-writable ancestor directory: \(path)"])
+        }
+    }
+
+    var stParent = stat()
+    guard fstat(curFd, &stParent) == 0 else {
+        throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "Unable to stat parent directory"])
+    }
+    if stParent.st_uid != uid && (stParent.st_mode & S_ISVTX) == 0 {
+        throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing to write inside directory not owned by current user: \(path)"])
+    }
+
+    func validateExistingLeaf() throws {
+        var stLeaf = stat()
+        if fstatat(curFd, leafName, &stLeaf, AT_SYMLINK_NOFOLLOW) == 0 {
+            let fmt = stLeaf.st_mode & S_IFMT
+            if fmt == S_IFLNK {
+                throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing to write to symlinked file: \(path)"])
+            }
+            if fmt != S_IFREG {
+                throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing to overwrite non-regular file: \(path)"])
+            }
+            if stLeaf.st_uid != uid {
+                throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing to overwrite file not owned by current user: \(path)"])
+            }
+            if stLeaf.st_nlink > 1 {
+                throw NSError(domain: "measure-coretext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Refusing to overwrite hard-linked file: \(path)"])
+            }
+        } else if errno != ENOENT {
+            throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "Failed to stat existing target: \(path)"])
+        }
+    }
+
+    try validateExistingLeaf()
+
+    let tmpName = ".\(leafName).tmp-\(getpid())-\(UUID().uuidString)"
+    let tmpFd = openat(curFd, tmpName, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode_t(0o600))
+    guard tmpFd >= 0 else {
+        throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "Failed to create temporary output file in parent directory"])
+    }
+    var renamed = false
+    defer {
+        if !renamed {
+            _ = unlinkat(curFd, tmpName, 0)
+        }
+    }
+    do {
+        guard fchmod(tmpFd, mode_t(0o600)) == 0 else {
+            Darwin.close(tmpFd)
+            throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "fchmod 0600 failed"])
+        }
+        try data.withUnsafeBytes { rawBuf in
+            guard let base = rawBuf.baseAddress else { return }
+            var offset = 0
+            while offset < rawBuf.count {
+                let written = Darwin.write(tmpFd, base.advanced(by: offset), rawBuf.count - offset)
+                if written < 0 {
+                    if errno == EINTR { continue }
+                    throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "write failed"])
+                }
+                offset += written
+            }
+        }
+        _ = fsync(tmpFd)
+        Darwin.close(tmpFd)
+
+        try validateExistingLeaf()
+        guard renameat(curFd, tmpName, curFd, leafName) == 0 else {
+            throw NSError(domain: "measure-coretext", code: Int(errno), userInfo: [NSLocalizedDescriptionKey: "renameat failed"])
+        }
+        renamed = true
+    } catch {
+        throw error
+    }
+}
+
 if let outPath = outputPath {
     do {
-        try (jsonString + "\n").write(toFile: outPath, atomically: true, encoding: .utf8)
+        guard let outData = (jsonString + "\n").data(using: .utf8) else {
+            fputs("Error: failed to encode UTF-8 output data\n", stderr)
+            exit(1)
+        }
+        try writePrivateFileNofollow(path: outPath, data: outData)
     } catch {
         fputs("Error: failed to write output to \(outPath): \(error)\n", stderr)
         exit(1)

@@ -2048,6 +2048,113 @@ test("sketch-native: round-7 focus-ring border detection, shared style asset ref
     assert.ok(r7Codes.has("FOCUS-RING-ANCESTOR-CLIPPED"));
     assert.ok(r7Codes.has("REF-MISSING-IMAGE-DATA"));
     assert.ok(r7Codes.has("REF-DANGLING-SWATCH-ID"));
+
+    // 3. Verify per-paragraph paragraphSpacing accumulation, Swift --output mode 0600, and unmodified taller sibling in horizontal master
+    if (process.platform === "darwin") {
+      const paraSpecPath = path.join(tmpDir, "para-spacing.json");
+      const swiftOutPath = path.join(tmpDir, "swift-out.json");
+      fs.writeFileSync(
+        paraSpecPath,
+        JSON.stringify([
+          {
+            id: "multi-para",
+            text: "第一段\n第二段\n第三段",
+            fontName: "PingFangSC-Regular",
+            fontSize: 14,
+            lineHeight: 20,
+            paragraphSpacing: 0,
+            width: 200,
+            runs: [
+              {
+                location: 0,
+                length: 4,
+                fontName: "PingFangSC-Regular",
+                fontSize: 14,
+                lineHeight: 20,
+                paragraphSpacing: 0,
+              },
+              {
+                location: 4,
+                length: 4,
+                fontName: "PingFangSC-Regular",
+                fontSize: 14,
+                lineHeight: 20,
+                paragraphSpacing: 40,
+              },
+              {
+                location: 8,
+                length: 3,
+                fontName: "PingFangSC-Regular",
+                fontSize: 14,
+                lineHeight: 20,
+                paragraphSpacing: 0,
+              },
+            ],
+          },
+        ]),
+      );
+      const swiftRes = spawnSync(
+        "swift",
+        [SWIFT_MEASURE, "--input", paraSpecPath, "--output", swiftOutPath],
+        { encoding: "utf8" },
+      );
+      assert.equal(swiftRes.status, 0, swiftRes.stderr);
+      const outStat = fs.lstatSync(swiftOutPath);
+      assert.equal(outStat.mode & 0o777, 0o600);
+      const swiftParsed = JSON.parse(fs.readFileSync(swiftOutPath, "utf8"));
+      assert.equal(swiftParsed.results[0].lineCount, 3);
+      assert.equal(swiftParsed.results[0].bakedHeight, 100);
+
+      // Verify Swift --output rejects symlinked output path
+      const symTarget = path.join(tmpDir, "swift-victim.json");
+      fs.writeFileSync(symTarget, "keep");
+      const symLink = path.join(tmpDir, "swift-symlink.json");
+      fs.symlinkSync(symTarget, symLink);
+      const swiftSymRes = spawnSync(
+        "swift",
+        [SWIFT_MEASURE, "--input", paraSpecPath, "--output", symLink],
+        { encoding: "utf8" },
+      );
+      assert.notEqual(swiftSymRes.status, 0);
+      assert.equal(fs.readFileSync(symTarget, "utf8"), "keep");
+
+      // Verify horizontal master with 60px unmodified sibling and 20px->44px text override keeps instance height 60
+      const hSibSpec = createCleanSketchSpec(44);
+      const hSibPage =
+        hSibSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+      const hSibMaster = hSibPage.layers[0];
+      hSibMaster.frame.height = 60;
+      hSibMaster.layers[0].textBehaviour = 1;
+      hSibMaster.layers[0].frame = {
+        _class: "rect",
+        x: 0,
+        y: 0,
+        width: 180,
+        height: 22,
+      };
+      hSibMaster.layers.push({
+        _class: "rectangle",
+        do_objectID: "30000000-0000-4000-8000-000000000077",
+        name: "TallAvatarGraphic",
+        isVisible: true,
+        frame: { _class: "rect", x: 196, y: 0, width: 60, height: 60 },
+      });
+      const hSibInst = hSibPage.layers[1].layers[1].layers[0];
+      hSibInst.frame.height = 60;
+      hSibInst.overrideValues[0].value =
+        "账户安全验证已开启，请在五分钟内完成确认。";
+      hSibPage.layers[1].layers[1].frame.height = 16 + 44 + 16 + 60 + 16;
+      hSibPage.layers[1].layers[2].frame.height = 60;
+      const hSibBuilder = path.join(tmpDir, "hsib-spec.json");
+      const hSibSketch = path.join(tmpDir, "hsib.sketch");
+      fs.writeFileSync(hSibBuilder, JSON.stringify(hSibSpec));
+      buildSyntheticSketch(hSibSketch, hSibBuilder);
+
+      const hSibMeasure = runPython(PY_MEASURE, ["--sketch", hSibSketch]);
+      assert.equal(hSibMeasure.status, 0, hSibMeasure.stdout);
+      const hSibReport = JSON.parse(hSibMeasure.stdout);
+      assert.equal(hSibReport.driftCount, 0);
+    }
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
