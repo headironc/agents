@@ -684,6 +684,123 @@ def _collect_master_static_leaf_intervals(
     return intervals
 
 
+def _simulate_master_tree_height(
+    root_master: Dict[str, Any],
+    symbol_masters: Dict[str, Dict[str, Any]],
+    inst_overrides: List[Dict[str, Any]],
+    base_heights_by_path: Dict[str, float],
+    target_heights_by_path: Dict[str, float],
+) -> Tuple[float, float]:
+    """Recursively evaluate (old_height, simulated_height) across root_master's hierarchy, stopping at fixed-height containers."""
+    swap_map: Dict[str, str] = {}
+    for ov in inst_overrides:
+        if not isinstance(ov, dict):
+            continue
+        ov_name = str(ov.get("overrideName", ""))
+        if (
+            ov_name.endswith("_symbolID")
+            and isinstance(ov.get("value"), str)
+            and ov.get("value")
+        ):
+            swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
+
+    def eval_node(
+        node: Dict[str, Any],
+        prefix: str,
+        visited: set[str],
+        is_root: bool = False,
+    ) -> Tuple[float, float]:
+        frame = node.get("frame") or {}
+        node_h = float(frame.get("height", 0.0))
+        node_id = str(node.get("do_objectID", ""))
+        node_path = (
+            ""
+            if is_root
+            else (f"{prefix}/{node_id}" if (prefix and node_id) else node_id)
+        )
+        cls = node.get("_class")
+
+        if cls == "text":
+            if node_path in target_heights_by_path:
+                b_h = float(base_heights_by_path.get(node_path, node_h))
+                t_h = float(target_heights_by_path[node_path])
+                return b_h, t_h
+            return node_h, node_h
+
+        if cls == "symbolInstance":
+            eff_sym = swap_map.get(node_path, str(node.get("symbolID", "")))
+            if not eff_sym or eff_sym.lower() == "none":
+                return node_h, node_h
+            nested_m = symbol_masters.get(eff_sym)
+            if nested_m is None or eff_sym in visited:
+                return node_h, node_h
+            m_old_h, m_sim_h = eval_node(
+                nested_m, node_path, visited | {eff_sym}, is_root=True
+            )
+            return node_h, node_h + (m_sim_h - m_old_h)
+
+        raw_children = node.get("layers") or []
+        if raw_children:
+            layout = node.get("groupLayout") or {}
+            is_flex = layout.get("_class") == "MSImmutableFlexGroupLayout"
+            if is_flex and int(layout.get("verticalSizing", 1)) == 0:
+                return node_h, node_h
+
+            flow_children = [
+                ch
+                for ch in raw_children
+                if isinstance(ch, dict) and _participates_in_flex_flow(ch)
+            ]
+            if not flow_children:
+                return node_h, node_h
+
+            if is_flex:
+                flex_dir = int(layout.get("flexDirection", 1))
+                child_pairs = [
+                    eval_node(ch, prefix, visited, is_root=False)
+                    for ch in flow_children
+                ]
+                if flex_dir == 0:
+                    old_c = max(p[0] for p in child_pairs)
+                    sim_c = max(p[1] for p in child_pairs)
+                else:
+                    old_c = sum(p[0] for p in child_pairs)
+                    sim_c = sum(p[1] for p in child_pairs)
+                return node_h, node_h + (sim_c - old_c)
+
+            iv: List[Tuple[float, float, float]] = []
+            for ch in flow_children:
+                ch_y = float((ch.get("frame") or {}).get("y", 0.0))
+                c_old, c_sim = eval_node(ch, prefix, visited, is_root=False)
+                iv.append((ch_y, c_old, c_sim))
+            sorted_iv = sorted(iv, key=lambda t: (t[0], -(t[0] + t[1])))
+            bands: List[List[Tuple[float, float, float]]] = []
+            for y0, old_h, new_h in sorted_iv:
+                if not bands:
+                    bands.append([(y0, old_h, new_h)])
+                    continue
+                prev_old_bottom = max(py + p_old for py, p_old, _ in bands[-1])
+                if y0 < prev_old_bottom - 0.5:
+                    bands[-1].append((y0, old_h, new_h))
+                else:
+                    bands.append([(y0, old_h, new_h)])
+            delta_free = 0.0
+            for band in bands:
+                old_b = max(py + p_old for py, p_old, _ in band)
+                new_b = max(py + p_new for py, _, p_new in band)
+                delta_free += new_b - old_b
+            return node_h, node_h + delta_free
+
+        return node_h, node_h
+
+    root_sym_id = str(
+        root_master.get("symbolID") or root_master.get("do_objectID") or ""
+    )
+    return eval_node(
+        root_master, "", {root_sym_id} if root_sym_id else set(), is_root=True
+    )
+
+
 def _resolve_nested_override_text_target(
     root_master: Dict[str, Any],
     override_path: str,
@@ -1196,6 +1313,7 @@ def _audit_and_rebake_members(
                     measure_queue.append(ov_spec)
                     override_entries.append(
                         {
+                            "overridePath": override_path,
                             "overrideName": ov_name,
                             "spec": ov_spec,
                             "masterTextY": float(master_text_y),
@@ -1230,6 +1348,8 @@ def _audit_and_rebake_members(
                             "pageFile": page_file,
                             "artboard": cur_artboard,
                             "node": node,
+                            "master": master,
+                            "instOverrides": inst_overrides,
                             "ancestors": list(ancestors),
                             "overrides": override_entries,
                             "staticIntervals": static_intervals,
@@ -1281,7 +1401,8 @@ def _audit_and_rebake_members(
             ov_details = []
             resolved_ps = ""
             total_lines = 0
-            ov_intervals: List[Tuple[float, float, float]] = []
+            base_heights_by_path: Dict[str, float] = {}
+            measured_heights_by_path: Dict[str, float] = {}
             for ov_entry in meta["overrides"]:
                 ov_spec = ov_entry["spec"]
                 m_res = measured_by_id.get(ov_spec["id"])
@@ -1290,9 +1411,10 @@ def _audit_and_rebake_members(
                 base_h = float(ov_entry["masterTextBaseHeight"])
                 meas_h = float(m_res["bakedHeight"])
                 delta_text = meas_h - base_h
-                ov_intervals.append(
-                    (float(ov_entry.get("masterTextY", 0.0)), base_h, meas_h)
-                )
+                ov_path = str(ov_entry.get("overridePath") or "")
+                if ov_path:
+                    base_heights_by_path[ov_path] = base_h
+                    measured_heights_by_path[ov_path] = meas_h
                 total_lines += int(m_res["lineCount"])
                 resolved_ps = m_res["resolvedPostScriptName"]
                 ov_details.append(
@@ -1309,36 +1431,18 @@ def _audit_and_rebake_members(
             if meta.get("masterFixedVertical"):
                 expected_h = round(current_h, 2)
             else:
-                # Merge overlapping vertical bands across both overridden text layers and unmodified siblings
-                # so horizontal siblings take max bottom extent while stacked vertical bands sum deltas.
-                combined_iv = list(ov_intervals) + list(
-                    meta.get("staticIntervals") or []
-                )
-                sorted_iv = sorted(
-                    combined_iv, key=lambda t: (t[0], -(t[0] + t[1]))
-                )
-                bands: List[List[Tuple[float, float, float]]] = []
-                for y0, old_h, new_h in sorted_iv:
-                    if not bands:
-                        bands.append([(y0, old_h, new_h)])
-                        continue
-                    prev_old_bottom = max(
-                        py + p_old for py, p_old, _ in bands[-1]
+                master_node = meta.get("master")
+                if isinstance(master_node, dict):
+                    sim_old_h, sim_new_h = _simulate_master_tree_height(
+                        master_node,
+                        symbol_masters,
+                        meta.get("instOverrides") or [],
+                        base_heights_by_path,
+                        measured_heights_by_path,
                     )
-                    if y0 < prev_old_bottom - 0.5:
-                        bands[-1].append((y0, old_h, new_h))
-                    else:
-                        bands.append([(y0, old_h, new_h)])
-                total_delta_text = 0.0
-                for band in bands:
-                    if meta.get("masterIsHorizontalFlex"):
-                        old_band_h = max(p_old for _, p_old, _ in band)
-                        new_band_h = max(p_new for _, _, p_new in band)
-                        total_delta_text += new_band_h - old_band_h
-                    else:
-                        old_bottom = max(py + p_old for py, p_old, _ in band)
-                        new_bottom = max(py + p_new for py, _, p_new in band)
-                        total_delta_text += new_bottom - old_bottom
+                    total_delta_text = sim_new_h - sim_old_h
+                else:
+                    total_delta_text = 0.0
                 if not meta.get("masterFitVertical") and abs(total_delta_text) <= 0.01:
                     expected_h = round(current_h, 2)
                 else:

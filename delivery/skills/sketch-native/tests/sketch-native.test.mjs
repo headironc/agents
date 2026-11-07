@@ -2798,6 +2798,79 @@ try:
     raise AssertionError("Expected audit_and_rebake_sketch to reject high-ratio ZIP member")
 except RuntimeError as exc:
     assert "compression ratio limit" in str(exc), exc
+
+# 4. Verify _simulate_master_tree_height stops propagating height changes at fixed-height child containers (verticalSizing == 0)
+fit_master_with_fixed_child = {
+    "_class": "symbolMaster",
+    "do_objectID": "m-fit-fixed-child",
+    "symbolID": "sym-fit-fixed-child",
+    "frame": {"x": 0, "y": 0, "width": 200, "height": 60},
+    "groupLayout": {
+        "_class": "MSImmutableFlexGroupLayout",
+        "flexDirection": 1,
+        "verticalSizing": 1,
+        "padding": 0,
+    },
+    "layers": [
+        {
+            "_class": "group",
+            "do_objectID": "sub-fixed-stack",
+            "isVisible": True,
+            "frame": {"x": 0, "y": 0, "width": 200, "height": 60},
+            "groupLayout": {
+                "_class": "MSImmutableFlexGroupLayout",
+                "flexDirection": 1,
+                "verticalSizing": 0,
+                "padding": 0,
+            },
+            "layers": [
+                {
+                    "_class": "text",
+                    "do_objectID": "txt-in-fixed",
+                    "isVisible": True,
+                    "textBehaviour": 1,
+                    "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+                }
+            ],
+        }
+    ],
+}
+sim_old, sim_new = cm._simulate_master_tree_height(
+    fit_master_with_fixed_child,
+    {"sym-fit-fixed-child": fit_master_with_fixed_child},
+    [],
+    {"txt-in-fixed": 20.0},
+    {"txt-in-fixed": 40.0},
+)
+assert sim_old == 60.0 and sim_new == 60.0, (sim_old, sim_new)
+
+# 5. Verify diff_sketch_archives_offline detects bitmap image._ref changes and arbitrary rawAttributes changes
+bmp_before = Path(sys.argv[1]) / "bmp-before.sketch"
+bmp_after = Path(sys.argv[1]) / "bmp-after.sketch"
+for p, img_ref in ((bmp_before, "images/a.png"), (bmp_after, "images/b.png")):
+    with zipfile.ZipFile(p, "w") as zf:
+        zf.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc-bmp"}))
+        zf.writestr(
+            "pages/p1.json",
+            json.dumps({
+                "_class": "page",
+                "do_objectID": "page-bmp",
+                "name": "Page 1",
+                "layers": [
+                    {
+                        "_class": "bitmap",
+                        "do_objectID": "bmp-1",
+                        "name": "HeroImage",
+                        "isVisible": True,
+                        "frame": {"x": 0, "y": 0, "width": 120, "height": 80},
+                        "image": {"_class": "MSJSONFileReference", "_ref_class": "MSImageData", "_ref": img_ref},
+                    }
+                ],
+            }),
+        )
+bmp_diff = rt.diff_sketch_archives_offline(bmp_before, bmp_after, set())
+assert bmp_diff["unexpectedDriftCount"] == 1, bmp_diff
+assert bmp_diff["unexpectedDrifts"][0]["layerID"] == "bmp-1", bmp_diff
 `,
         tmpDir,
       ],

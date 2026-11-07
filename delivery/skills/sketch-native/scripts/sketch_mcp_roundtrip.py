@@ -777,13 +777,37 @@ def _read_zip_member_bounded(
     return b"".join(chunks)
 
 
+def _normalize_json_value(val: Any) -> Any:
+    if isinstance(val, float):
+        return round(val, 4)
+    if isinstance(val, dict):
+        return {str(k): _normalize_json_value(v) for k, v in sorted(val.items())}
+    if isinstance(val, list):
+        return [_normalize_json_value(item) for item in val]
+    return val
+
+
 def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
     """Extract per-object structural snapshot from a .sketch ZIP archive offline."""
     snapshot: Dict[str, Dict[str, Any]] = {}
     with zipfile.ZipFile(sketch_path, "r") as zf:
         _validate_zip_archive_budget(zf)
         for member in sorted(zf.namelist()):
-            if not (member == "document.json" or (member.startswith("pages/") and member.endswith(".json"))):
+            if member.startswith("images/"):
+                raw_img = _read_zip_member_bounded(
+                    zf, member, max_bytes=MAX_ZIP_SINGLE_MEMBER_BYTES
+                )
+                snapshot[f"archiveMember:{member}"] = {
+                    "_class": "archiveMember",
+                    "name": member,
+                    "sha256": hashlib.sha256(raw_img).hexdigest(),
+                    "size": len(raw_img),
+                }
+                continue
+            if not (
+                member == "document.json"
+                or (member.startswith("pages/") and member.endswith(".json"))
+            ):
                 continue
             data = json.loads(_read_zip_member_bounded(zf, member).decode("utf-8"))
 
@@ -808,6 +832,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         "name": st.get("name"),
                         "fontDescriptor": font_desc,
                         "paragraphStyle": enc_attrs.get("paragraphStyle"),
+                        "rawObject": _normalize_json_value(st),
                     }
                 for fst in data.get("foreignTextStyles") or []:
                     if not isinstance(fst, dict):
@@ -832,6 +857,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         "name": local_st.get("name"),
                         "fontDescriptor": font_desc,
                         "paragraphStyle": enc_attrs.get("paragraphStyle"),
+                        "rawObject": _normalize_json_value(fst),
                     }
                 for lst in (data.get("layerStyles") or {}).get("objects") or []:
                     if not isinstance(lst, dict):
@@ -843,6 +869,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                             "name": lst.get("name"),
                             "borders": ((lst.get("value") or {}).get("borders")),
                             "fills": ((lst.get("value") or {}).get("fills")),
+                            "rawObject": _normalize_json_value(lst),
                         }
                 for flst in data.get("foreignLayerStyles") or []:
                     if not isinstance(flst, dict):
@@ -855,6 +882,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                             "name": local_lst.get("name"),
                             "borders": ((local_lst.get("value") or {}).get("borders")),
                             "fills": ((local_lst.get("value") or {}).get("fills")),
+                            "rawObject": _normalize_json_value(flst),
                         }
                 for sw in (data.get("sharedSwatches") or {}).get("objects") or []:
                     if not isinstance(sw, dict):
@@ -865,6 +893,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                             "_class": sw.get("_class", "swatch"),
                             "name": sw.get("name"),
                             "value": sw.get("value"),
+                            "rawObject": _normalize_json_value(sw),
                         }
                 for fsw in data.get("foreignSwatches") or []:
                     if not isinstance(fsw, dict):
@@ -876,6 +905,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                             "_class": local_sw.get("_class", "swatch"),
                             "name": local_sw.get("name"),
                             "value": local_sw.get("value"),
+                            "rawObject": _normalize_json_value(fsw),
                         }
 
             def walk(node: Dict[str, Any], parent_id: Optional[str] = None) -> None:
@@ -925,6 +955,13 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         if attr_str
                         else None
                     )
+                    raw_attrs = _normalize_json_value(
+                        {
+                            k: v
+                            for k, v in node.items()
+                            if k not in ("layers", "frame")
+                        }
+                    )
                     snapshot[oid] = {
                         "_class": node.get("_class"),
                         "name": node.get("name"),
@@ -964,12 +1001,14 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         "symbolID": node.get("symbolID"),
                         "sharedStyleID": node.get("sharedStyleID"),
                         "overrideValues": node.get("overrideValues"),
+                        "image": node.get("image"),
                         "borders": style.get("borders"),
                         "fills": style.get("fills"),
                         "shadows": style.get("shadows"),
                         "innerShadows": style.get("innerShadows"),
                         "blur": style.get("blur"),
                         "contextSettings": style.get("contextSettings"),
+                        "rawAttributes": raw_attrs,
                     }
                 for child in children:
                     walk(child, oid or parent_id)
