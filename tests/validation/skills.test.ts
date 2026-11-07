@@ -21,7 +21,7 @@ const skill = (name: string) =>
 
 test("design orchestration stays Codex-only while shared skills reach both validators", () => {
   const entries = readSkillEntries(repositoryRoot);
-  assert.equal(entries.length, 16);
+  assert.equal(entries.length, 17);
   assert.equal(
     entries.find((entry) => entry.path === "project-guide")?.target,
     "codex,claude,antigravity",
@@ -55,9 +55,9 @@ test("design orchestration stays Codex-only while shared skills reach both valid
     ["codex"],
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 16, Claude 15, Antigravity 5",
-    "Codex skill validation: 16 entries",
-    "Claude skill validation: 15 entries",
+    "Skill membership: DELIVERED; Codex 17, Claude 16, Antigravity 5",
+    "Codex skill validation: 17 entries",
+    "Claude skill validation: 16 entries",
     "Antigravity skill validation: 5 entries",
   ]);
 });
@@ -111,17 +111,17 @@ test("nested members belong to their top-level skill and do not add install targ
     entries.find((entry) => entry.path === "suite/skills/child")?.topLevel,
     "suite",
   );
-  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 9);
-  assert.equal(selectSkillEntries(entries, "claude").length, 17);
+  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 10);
+  assert.equal(selectSkillEntries(entries, "claude").length, 18);
   assert.ok(
     !selectSkillEntries(entries, "claude").some(
       (entry) => entry.path === "private",
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 19, Claude 17, Antigravity 5",
-    "Codex skill validation: 19 entries",
-    "Claude skill validation: 17 entries",
+    "Skill membership: DELIVERED; Codex 20, Claude 18, Antigravity 5",
+    "Codex skill validation: 20 entries",
+    "Claude skill validation: 18 entries",
     "Antigravity skill validation: 5 entries",
   ]);
 });

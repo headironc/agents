@@ -26,4 +26,4 @@
 
 [项目导航与验证](skills/project-guide/SKILL.md)提供四项能力。它识别项目与版本，发现权威资料，选择并执行原生检查，报告证据与缺口。按任务需要使用，不增加普通开发的必经流程。命令、业务规则及授权范围由目标项目和当前任务决定。
 
-[设计工作流](skills/figma-design-workflow/SKILL.md)供 Codex 制作授权内的可编辑设计稿，核对实际像素并由负责人验收。模型与 effort 见[模型政策](policy/models.md#current-defaults)。Figma 按任务需要使用；选用时加载实际技能并读回目标。源码交付不代表模型已经切换、插件已安装或真实设计演练已通过。
+[设计工作流](skills/figma-design-workflow/SKILL.md)与 [Sketch 原生技能](skills/sketch-native/SKILL.md)供制作授权内的可编辑设计稿。实际像素由负责人核对并验收。模型与 effort 见[模型政策](policy/models.md#current-defaults)。Figma 与 Sketch 按任务需要使用。选用时加载实际技能并读回目标。源码交付不代表模型已经切换、插件已安装或真实设计演练已通过。
