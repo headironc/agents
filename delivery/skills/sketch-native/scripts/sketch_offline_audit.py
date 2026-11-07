@@ -57,19 +57,79 @@ def _new_finding(
     return item
 
 
-def _collect_symbol_layer_ids(master: Dict[str, Any]) -> Set[str]:
-    ids: Set[str] = set()
+def _find_layer_in_symbol_master(
+    master: Dict[str, Any], target_layer_id: str
+) -> Optional[Dict[str, Any]]:
+    found: Optional[Dict[str, Any]] = None
 
     def walk(node: Dict[str, Any]) -> None:
-        oid = node.get("do_objectID")
-        if oid:
-            ids.add(str(oid))
+        nonlocal found
+        if found is not None:
+            return
+        if str(node.get("do_objectID", "")) == target_layer_id:
+            found = node
+            return
         for ch in node.get("layers") or []:
             if isinstance(ch, dict):
                 walk(ch)
 
     walk(master)
-    return ids
+    return found
+
+
+def _resolve_override_path_in_masters(
+    root_sym_id: str,
+    path_part: str,
+    symbol_masters: Dict[str, Dict[str, Any]],
+    foreign_symbol_ids: Set[str],
+    override_values: List[Dict[str, Any]],
+) -> Tuple[bool, str, str]:
+    """Validate every segment of a potentially nested override path (`instA/instB/leaf`).
+
+    Returns `(is_valid, failed_layer_id, failed_symbol_id)`.
+    """
+    segments = [seg for seg in path_part.split("/") if seg]
+    if not segments:
+        return False, "", root_sym_id
+
+    symbol_swaps: Dict[str, str] = {}
+    for ov in override_values:
+        if not isinstance(ov, dict):
+            continue
+        ov_name = str(ov.get("overrideName", ""))
+        if ov_name.endswith("_symbolID") and isinstance(ov.get("value"), str):
+            prefix = ov_name[: -len("_symbolID")]
+            symbol_swaps[prefix] = str(ov["value"])
+
+    cur_sym_id = root_sym_id
+    prefix_segments: List[str] = []
+    for idx, seg in enumerate(segments):
+        prefix_segments.append(seg)
+        cur_master = symbol_masters.get(cur_sym_id)
+        if cur_master is None:
+            # If the symbol master is an external/upstream foreign symbol without an embedded master tree,
+            # we cannot inspect its internal layers offline.
+            if cur_sym_id in foreign_symbol_ids:
+                return True, "", cur_sym_id
+            return False, seg, cur_sym_id
+
+        target_node = _find_layer_in_symbol_master(cur_master, seg)
+        if target_node is None:
+            return False, seg, cur_sym_id
+
+        is_last = idx == len(segments) - 1
+        if not is_last:
+            if target_node.get("_class") != "symbolInstance":
+                return False, seg, cur_sym_id
+            prefix_key = "/".join(prefix_segments)
+            next_sym_id = symbol_swaps.get(
+                prefix_key, str(target_node.get("symbolID", ""))
+            )
+            if not next_sym_id:
+                return False, seg, cur_sym_id
+            cur_sym_id = next_sym_id
+
+    return True, "", cur_sym_id
 
 
 def _is_focus_ring_layer(layer: Dict[str, Any]) -> bool:
@@ -126,8 +186,36 @@ def _check_flex_group_closure(
         return
 
     visual_children = list(reversed(flow_children))
-    if flex_dir == 1 and justify == 0:
+    if flex_dir == 1:
+        total_children_h = sum(
+            float((ch.get("frame") or {}).get("height", 0.0))
+            for ch in visual_children
+        )
+        n_children = len(visual_children)
+        natural_content_h = total_children_h + gap * max(0, n_children - 1)
+        expected_total_h = top_pad + natural_content_h + bottom_pad
+
         cursor_y = top_pad
+        step_gap = gap
+        if vert_sizing != 1 and g_h > 0.0:
+            inner_h = max(0.0, g_h - top_pad - bottom_pad)
+            free_space = inner_h - natural_content_h
+            if justify == 1:  # Center
+                cursor_y = top_pad + free_space / 2.0
+            elif justify == 2:  # End
+                cursor_y = top_pad + free_space
+            elif justify == 3 and n_children > 1:  # SpaceBetween
+                cursor_y = top_pad
+                step_gap = max(0.0, (inner_h - total_children_h) / (n_children - 1))
+            elif justify == 4 and n_children > 0:  # SpaceAround
+                unit = max(0.0, (inner_h - total_children_h) / n_children)
+                cursor_y = top_pad + unit / 2.0
+                step_gap = unit
+            elif justify == 5 and n_children > 0:  # SpaceEvenly
+                unit = max(0.0, (inner_h - total_children_h) / (n_children + 1))
+                cursor_y = top_pad + unit
+                step_gap = unit
+
         for idx, ch in enumerate(visual_children):
             cf = ch.get("frame") or {}
             cy = float(cf.get("y", 0.0))
@@ -150,9 +238,8 @@ def _check_flex_group_closure(
                 )
             cursor_y += ch_h
             if idx < len(visual_children) - 1:
-                cursor_y += gap
+                cursor_y += step_gap
 
-        expected_total_h = cursor_y + bottom_pad
         if vert_sizing == 1 and abs(g_h - expected_total_h) > tolerance:
             findings.append(
                 _new_finding(
@@ -437,11 +524,6 @@ def run_offline_audit(
 
         pre_walk(page_obj)
 
-    symbol_master_layer_ids: Dict[str, Set[str]] = {
-        sym_id: _collect_symbol_layer_ids(master)
-        for sym_id, master in symbol_masters.items()
-    }
-
     # Walk all pages for ID uniqueness, references, fonts, Flex stacks, Focus Rings, and Flows
     seen_object_ids: Dict[str, str] = {}
     duplicate_ids: List[Dict[str, str]] = []
@@ -623,10 +705,10 @@ def run_offline_audit(
                             layer_id=oid,
                         )
                     )
-                known_layer_ids = symbol_master_layer_ids.get(sym_id, set())
-                for ov in node.get("overrideValues") or []:
-                    if not isinstance(ov, dict):
-                        continue
+                override_list = [
+                    ov for ov in (node.get("overrideValues") or []) if isinstance(ov, dict)
+                ]
+                for ov in override_list:
                     ov_name = str(ov.get("overrideName", ""))
                     if "_" not in ov_name:
                         dangling_overrides.append(
@@ -644,26 +726,35 @@ def run_offline_audit(
                         )
                         continue
                     path_part, prop_part = ov_name.rsplit("_", 1)
-                    leaf_layer_id = path_part.split("/")[-1]
-                    if known_layer_ids and leaf_layer_id not in known_layer_ids:
-                        dangling_overrides.append(
-                            {
-                                "overrideName": ov_name,
-                                "leafLayerID": leaf_layer_id,
-                                "symbolID": sym_id,
-                                "layerID": oid,
-                            }
-                        )
-                        findings.append(
-                            _new_finding(
-                                "reference_integrity",
-                                "REF-DANGLING-OVERRIDE-PATH",
-                                f"Override '{ov_name}' targets non-existent layer '{leaf_layer_id}' in symbolMaster '{sym_id}'",
-                                page_id=page_id,
-                                artboard_id=aid,
-                                layer_id=oid,
+                    if sym_id in symbol_masters:
+                        is_valid_path, failed_layer_id, failed_sym_id = (
+                            _resolve_override_path_in_masters(
+                                sym_id,
+                                path_part,
+                                symbol_masters,
+                                foreign_symbol_ids,
+                                override_list,
                             )
                         )
+                        if not is_valid_path:
+                            dangling_overrides.append(
+                                {
+                                    "overrideName": ov_name,
+                                    "leafLayerID": failed_layer_id,
+                                    "symbolID": failed_sym_id,
+                                    "layerID": oid,
+                                }
+                            )
+                            findings.append(
+                                _new_finding(
+                                    "reference_integrity",
+                                    "REF-DANGLING-OVERRIDE-PATH",
+                                    f"Override '{ov_name}' targets non-existent or invalid path segment '{failed_layer_id}' in symbolMaster '{failed_sym_id}'",
+                                    page_id=page_id,
+                                    artboard_id=aid,
+                                    layer_id=oid,
+                                )
+                            )
                     ov_val = ov.get("value")
                     if prop_part == "symbolID" and isinstance(ov_val, str) and ov_val:
                         if (

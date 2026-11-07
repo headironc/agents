@@ -9,7 +9,7 @@ metadata:
 
 ## Overview
 
-`sketch-native` provides a high-throughput, crash-free, zero-rework workflow and companion script toolkit for generating, mutating, exporting, and verifying macOS native `.sketch` documents (`Sketch 2026.3+`).
+`sketch-native` provides a high-throughput, crash-free, zero-rework workflow and companion script toolkit for generating, mutating, exporting, and verifying macOS native `.sketch` documents (`Sketch 2026.3+`). Because Sketch, `sketchtool`, and `CoreText` are macOS-exclusive, this skill is installed and executed only on macOS (`darwin`); non-macOS installation plans automatically skip `sketch-native`, and `coretext_measure.py` fails closed rather than falling back to heuristic character estimation.
 
 It combines offline `.sketch` archive engineering (`zipfile` + macOS `CoreText` + `sketchtool`) with disciplined single-slot native Sketch MCP verification (`http://localhost:31126/mcp`), incorporating best practices from Sketch's official `sketch-hq/agents` skills and built-in Sketch 2026.3 `MCPGuides`.
 

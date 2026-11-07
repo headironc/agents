@@ -54,6 +54,18 @@ test("design orchestration stays Codex-only while shared skills reach both valid
       .map((member) => member.product),
     ["codex"],
   );
+  assert.deepEqual(
+    publicMembers(entries, undefined, "darwin")
+      .filter((member) => member.source === "delivery/skills/sketch-native")
+      .map((member) => member.product),
+    ["codex", "claude"],
+  );
+  assert.deepEqual(
+    publicMembers(entries, undefined, "linux").filter(
+      (member) => member.source === "delivery/skills/sketch-native",
+    ),
+    [],
+  );
   assert.deepEqual(skillCheckNames(entries), [
     "Skill membership: DELIVERED; Codex 17, Claude 16, Antigravity 5",
     "Codex skill validation: 17 entries",

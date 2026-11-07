@@ -13,14 +13,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 import platform
 import shutil
 import subprocess
 import sys
 import tempfile
-import unicodedata
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -28,142 +26,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SWIFT_SOURCE = SCRIPT_DIR / "measure-coretext.swift"
-
-
-def _fallback_measure_item(item: Dict[str, Any]) -> Dict[str, Any]:
-    """Deterministic CoreText-calibrated fallback when Swift/CoreText is unavailable."""
-    text = str(item.get("text", ""))
-    font_size = max(1.0, float(item.get("fontSize", 14.0)))
-    raw_line_height = item.get("lineHeight")
-    single_lh = (
-        float(raw_line_height)
-        if raw_line_height is not None and float(raw_line_height) > 0
-        else float(math.ceil(font_size * 1.4))
-    )
-    width = max(1.0, float(item.get("width", 100.0)))
-    para_spacing = max(0.0, float(item.get("paragraphSpacing", 0.0) or 0.0))
-    kerning = float(item.get("kerning", 0.0) or 0.0)
-    ui_usage = item.get("uiUsage")
-    font_name = item.get("fontName") or ui_usage or "CTFontRegularUsage"
-    used_sys = bool(
-        ui_usage
-        or font_name
-        in {
-            "CTFontRegularUsage",
-            "CTFontEmphasizedUsage",
-            ".SFNS-Regular",
-            "system",
-            "System",
-        }
-    )
-    resolved_ps = ".SFNS-Regular" if used_sys else str(font_name)
-
-    if not text:
-        return {
-            "id": str(item.get("id", "")),
-            "text": "",
-            "requestedFontName": str(font_name),
-            "resolvedPostScriptName": resolved_ps,
-            "usedSystemUIFont": used_sys,
-            "fontSize": font_size,
-            "singleLineHeight": single_lh,
-            "width": width,
-            "paragraphSpacing": para_spacing,
-            "lineCount": 1,
-            "lines": [
-                {
-                    "index": 0,
-                    "location": 0,
-                    "length": 0,
-                    "text": "",
-                    "width": 0.0,
-                    "lineHeight": single_lh,
-                }
-            ],
-            "bakedHeight": float(round(single_lh)),
-        }
-
-    paragraphs = text.split("\n")
-    lines: List[Dict[str, Any]] = []
-    cursor = 0
-    line_idx = 0
-    for para in paragraphs:
-        if not para:
-            lines.append(
-                {
-                    "index": line_idx,
-                    "location": cursor,
-                    "length": 0,
-                    "text": "",
-                    "width": 0.0,
-                    "lineHeight": single_lh,
-                }
-            )
-            line_idx += 1
-            cursor += 1
-            continue
-
-        cur_start = 0
-        cur_w = 0.0
-        cur_chars: List[str] = []
-        for idx, ch in enumerate(para):
-            ea = unicodedata.east_asian_width(ch)
-            ch_w = (
-                font_size * 1.0
-                if ea in ("W", "F")
-                else (font_size * 0.32 if ch.isspace() else font_size * 0.56)
-            ) + kerning
-            if cur_chars and (cur_w + ch_w) > width + 0.01:
-                seg = "".join(cur_chars)
-                lines.append(
-                    {
-                        "index": line_idx,
-                        "location": cursor + cur_start,
-                        "length": len(seg),
-                        "text": seg,
-                        "width": round(cur_w, 2),
-                        "lineHeight": single_lh,
-                    }
-                )
-                line_idx += 1
-                cur_start = idx
-                cur_chars = [ch]
-                cur_w = ch_w
-            else:
-                cur_chars.append(ch)
-                cur_w += ch_w
-
-        if cur_chars:
-            seg = "".join(cur_chars)
-            lines.append(
-                {
-                    "index": line_idx,
-                    "location": cursor + cur_start,
-                    "length": len(seg),
-                    "text": seg,
-                    "width": round(cur_w, 2),
-                    "lineHeight": single_lh,
-                }
-            )
-            line_idx += 1
-        cursor += len(para) + 1
-
-    breaks = max(0, len(paragraphs) - 1)
-    baked_h = round(len(lines) * single_lh + breaks * para_spacing)
-    return {
-        "id": str(item.get("id", "")),
-        "text": text,
-        "requestedFontName": str(font_name),
-        "resolvedPostScriptName": resolved_ps,
-        "usedSystemUIFont": used_sys,
-        "fontSize": font_size,
-        "singleLineHeight": single_lh,
-        "width": width,
-        "paragraphSpacing": para_spacing,
-        "lineCount": len(lines),
-        "lines": lines,
-        "bakedHeight": float(baked_h),
-    }
 
 
 def _get_or_compile_swift_binary() -> Optional[Path]:
@@ -205,43 +67,49 @@ def _get_or_compile_swift_binary() -> Optional[Path]:
 
 
 def measure_specs(
-    items: List[Dict[str, Any]], force_fallback: bool = False
+    items: List[Dict[str, Any]],
+    swift_bin: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Measure a batch of text specs via native macOS CoreText or fallback."""
+    """Measure a batch of text specs exclusively via native macOS CoreText."""
+    if platform.system() != "Darwin":
+        raise RuntimeError(
+            f"Unsupported platform '{platform.system()}': native macOS CoreText is required."
+        )
+    if not SWIFT_SOURCE.exists():
+        raise FileNotFoundError(
+            f"Required Swift CoreText helper not found: {SWIFT_SOURCE}"
+        )
     if not items:
         return {
             "tool": "coretext_measure.py",
-            "engine": "macOS-CoreText-CTTypesetter"
-            if (platform.system() == "Darwin" and not force_fallback)
-            else "python-coretext-calibrated-fallback",
+            "engine": "macOS-CoreText-CTTypesetter",
             "count": 0,
             "results": [],
         }
 
-    if not force_fallback and platform.system() == "Darwin" and SWIFT_SOURCE.exists():
+    if swift_bin:
+        cmd = [swift_bin, str(SWIFT_SOURCE)]
+    else:
         binary = _get_or_compile_swift_binary()
         cmd = [str(binary)] if binary else ["swift", str(SWIFT_SOURCE)]
-        try:
-            proc = subprocess.run(
-                cmd + ["--input", "-"],
-                input=json.dumps(items, ensure_ascii=False),
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
-            if proc.returncode == 0 and proc.stdout.strip():
-                return json.loads(proc.stdout)
-        except Exception:
-            pass
 
-    results = [_fallback_measure_item(it) for it in items]
-    return {
-        "tool": "coretext_measure.py",
-        "engine": "python-coretext-calibrated-fallback",
-        "count": len(results),
-        "results": results,
-    }
+    proc = subprocess.run(
+        cmd + ["--input", "-"],
+        input=json.dumps(items, ensure_ascii=False),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        err_detail = (proc.stderr or "").strip() or f"exit code {proc.returncode}"
+        raise RuntimeError(
+            f"Native macOS CoreText measurement failed: {err_detail}"
+        )
+    parsed = json.loads(proc.stdout)
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("results"), list):
+        raise RuntimeError("Native macOS CoreText returned invalid JSON structure.")
+    return parsed
 
 
 def _extract_text_layer_spec(layer: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -317,8 +185,45 @@ def _find_layer_by_id(
     return None
 
 
+def _resolve_nested_override_text_layer(
+    root_master: Dict[str, Any],
+    override_path: str,
+    symbol_masters: Dict[str, Dict[str, Any]],
+    instance_overrides: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Resolve a potentially nested override path (<inst-id>/.../<text-id>) to its target text layer."""
+    segments = [seg for seg in override_path.split("/") if seg]
+    if not segments:
+        return None
+    swap_map: Dict[str, str] = {}
+    for ov in instance_overrides:
+        if not isinstance(ov, dict):
+            continue
+        ov_name = str(ov.get("overrideName", ""))
+        if ov_name.endswith("_symbolID") and isinstance(ov.get("value"), str) and ov.get("value"):
+            swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
+
+    cur_master = root_master
+    for idx, seg_id in enumerate(segments):
+        found = _find_layer_by_id(cur_master, seg_id)
+        if found is None:
+            return None
+        if idx < len(segments) - 1:
+            if found.get("_class") != "symbolInstance":
+                return None
+            prefix = "/".join(segments[: idx + 1])
+            next_sym_id = swap_map.get(prefix) or str(found.get("symbolID", ""))
+            next_master = symbol_masters.get(next_sym_id)
+            if next_master is None:
+                return None
+            cur_master = next_master
+        else:
+            return found
+    return None
+
+
 def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
-    """Re-pack a vertical MSImmutableFlexGroupLayout in Sketch's reversed index order."""
+    """Re-pack a vertical MSImmutableFlexGroupLayout in Sketch's reversed index order, preserving justifyContent."""
     layout = group.get("groupLayout") or {}
     if layout.get("_class") != "MSImmutableFlexGroupLayout":
         return 0.0
@@ -330,6 +235,8 @@ def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
     top_pad = float(layout.get("topPadding", base_pad) if has_ind else base_pad)
     bottom_pad = float(layout.get("bottomPadding", base_pad) if has_ind else base_pad)
     gap = float(layout.get("allGuttersGap", 0.0) or 0.0)
+    justify = int(layout.get("justifyContent", 0) or 0)
+    vertical_sizing = int(layout.get("verticalSizing", 1))
 
     children = [
         ch
@@ -339,19 +246,57 @@ def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
         and not bool((ch.get("flexItem") or {}).get("ignoresStackLayout", False))
     ]
     visual_children = list(reversed(children))
+    n = len(visual_children)
+    if n == 0:
+        return 0.0
+
+    children_total_h = sum(
+        float((ch.get("frame") or {}).get("height", 0.0)) for ch in visual_children
+    )
+    content_h = children_total_h + gap * max(0, n - 1)
+    g_frame = group.get("frame")
+
     cursor_y = top_pad
+    effective_gap = gap
+    if vertical_sizing != 1 and isinstance(g_frame, dict):
+        container_h = float(g_frame.get("height", 0.0))
+        inner_h = container_h - top_pad - bottom_pad
+        free_space = inner_h - content_h
+        if justify == 0:
+            cursor_y = top_pad
+            effective_gap = gap
+        elif justify == 1:
+            cursor_y = top_pad + free_space / 2.0
+            effective_gap = gap
+        elif justify == 2:
+            cursor_y = top_pad + free_space
+            effective_gap = gap
+        elif justify == 3:
+            cursor_y = top_pad
+            effective_gap = (inner_h - children_total_h) / (n - 1) if n > 1 else 0.0
+        elif justify == 4:
+            unit = (inner_h - children_total_h) / n
+            cursor_y = top_pad + unit / 2.0
+            effective_gap = unit
+        elif justify == 5:
+            unit = (inner_h - children_total_h) / (n + 1)
+            cursor_y = top_pad + unit
+            effective_gap = unit
+        else:
+            raise ValueError(
+                f"Unsupported vertical justifyContent={justify} on Flex group '{group.get('do_objectID')}'"
+            )
+
     for idx, child in enumerate(visual_children):
         c_frame = child.get("frame")
         if isinstance(c_frame, dict):
             c_frame["y"] = round(cursor_y, 2)
             cursor_y += float(c_frame.get("height", 0.0))
-            if idx < len(visual_children) - 1:
-                cursor_y += gap
+            if idx < n - 1:
+                cursor_y += effective_gap
 
-    new_total_h = round(cursor_y + bottom_pad, 2)
-    vertical_sizing = int(layout.get("verticalSizing", 1))
-    g_frame = group.get("frame")
-    if isinstance(g_frame, dict) and vertical_sizing == 1 and len(visual_children) > 0:
+    new_total_h = round(top_pad + content_h + bottom_pad, 2)
+    if isinstance(g_frame, dict) and vertical_sizing == 1:
         old_h = float(g_frame.get("height", 0.0))
         g_frame["height"] = new_total_h
         return new_total_h - old_h
@@ -379,7 +324,9 @@ def _collect_artboard_rects(
 
 
 def audit_and_rebake_sketch(
-    sketch_path: Path, rebake: bool = False, force_fallback: bool = False
+    sketch_path: Path,
+    rebake: bool = False,
+    swift_bin: Optional[str] = None,
 ) -> Dict[str, Any]:
     if not sketch_path.exists():
         raise FileNotFoundError(f".sketch file not found: {sketch_path}")
@@ -425,19 +372,25 @@ def audit_and_rebake_sketch(
             sym_id = str(node.get("symbolID", ""))
             master = symbol_masters.get(sym_id)
             if master is not None:
-                for ov in node.get("overrideValues") or []:
+                inst_overrides = node.get("overrideValues") or []
+                inst_frame = node.get("frame") or {}
+                m_frame = master.get("frame") or {}
+                override_entries: List[Dict[str, Any]] = []
+                for ov in inst_overrides:
+                    if not isinstance(ov, dict):
+                        continue
                     ov_name = str(ov.get("overrideName", ""))
                     if not ov_name.endswith("_stringValue"):
                         continue
-                    target_layer_id = ov_name[: -len("_stringValue")].split("/")[-1]
-                    master_text = _find_layer_by_id(master, target_layer_id)
+                    override_path = ov_name[: -len("_stringValue")]
+                    master_text = _resolve_nested_override_text_layer(
+                        master, override_path, symbol_masters, inst_overrides
+                    )
                     if master_text is None:
                         continue
                     m_spec = _extract_text_layer_spec(master_text)
                     if m_spec is None:
                         continue
-                    inst_frame = node.get("frame") or {}
-                    m_frame = master.get("frame") or {}
                     scale_w = float(inst_frame.get("width", m_spec["width"])) - (
                         float(m_frame.get("width", m_spec["width"])) - m_spec["width"]
                     )
@@ -447,6 +400,14 @@ def audit_and_rebake_sketch(
                     ov_spec["text"] = str(ov.get("value", ""))
                     ov_spec["width"] = max(1.0, scale_w)
                     measure_queue.append(ov_spec)
+                    override_entries.append(
+                        {
+                            "overrideName": ov_name,
+                            "spec": ov_spec,
+                            "masterTextBaseHeight": float(m_spec["currentHeight"]),
+                        }
+                    )
+                if override_entries:
                     targets_meta.append(
                         {
                             "kind": "symbolInstanceOverride",
@@ -454,8 +415,7 @@ def audit_and_rebake_sketch(
                             "artboard": cur_artboard,
                             "node": node,
                             "ancestors": list(ancestors),
-                            "spec": ov_spec,
-                            "masterTextBaseHeight": m_spec["currentHeight"],
+                            "overrides": override_entries,
                             "masterBaseHeight": float(
                                 m_frame.get("height", inst_frame.get("height", 0.0))
                             ),
@@ -470,7 +430,7 @@ def audit_and_rebake_sketch(
     for page_file, page_obj in sorted(pages_data.items()):
         scan_node(page_file, None, page_obj, [])
 
-    batch_report = measure_specs(measure_queue, force_fallback=force_fallback)
+    batch_report = measure_specs(measure_queue, swift_bin=swift_bin)
     measured_by_id = {item["id"]: item for item in batch_report.get("results", [])}
 
     drifts: List[Dict[str, Any]] = []
@@ -478,24 +438,59 @@ def audit_and_rebake_sketch(
     dirty_pages: set[str] = set()
 
     for meta in targets_meta:
-        spec = meta["spec"]
-        m_res = measured_by_id.get(spec["id"])
-        if m_res is None:
-            continue
         node = meta["node"]
         frame = node.get("frame") or {}
         current_h = float(frame.get("height", 0.0))
         if meta["kind"] == "textLayer":
+            spec = meta["spec"]
+            m_res = measured_by_id.get(spec["id"])
+            if m_res is None:
+                continue
             expected_h = float(m_res["bakedHeight"])
+            spec_id = spec["id"]
+            line_count = m_res["lineCount"]
+            resolved_ps = m_res["resolvedPostScriptName"]
+            ov_details = None
         else:
-            delta_text = float(m_res["bakedHeight"]) - float(
-                meta["masterTextBaseHeight"]
+            total_delta_text = 0.0
+            ov_details = []
+            resolved_ps = ""
+            total_lines = 0
+            for ov_entry in meta["overrides"]:
+                ov_spec = ov_entry["spec"]
+                m_res = measured_by_id.get(ov_spec["id"])
+                if m_res is None:
+                    continue
+                delta_text = float(m_res["bakedHeight"]) - float(
+                    ov_entry["masterTextBaseHeight"]
+                )
+                total_delta_text += delta_text
+                total_lines += int(m_res["lineCount"])
+                resolved_ps = m_res["resolvedPostScriptName"]
+                ov_details.append(
+                    {
+                        "overrideName": ov_entry["overrideName"],
+                        "specID": ov_spec["id"],
+                        "masterTextBaseHeight": ov_entry["masterTextBaseHeight"],
+                        "measuredTextHeight": float(m_res["bakedHeight"]),
+                        "deltaTextHeight": round(delta_text, 2),
+                    }
+                )
+            if not ov_details:
+                continue
+            expected_h = round(
+                max(1.0, float(meta["masterBaseHeight"]) + total_delta_text), 2
             )
-            expected_h = float(meta["masterBaseHeight"]) + max(0.0, delta_text)
+            spec_id = (
+                ov_details[0]["specID"]
+                if len(ov_details) == 1
+                else f"{node.get('do_objectID')}::merged({len(ov_details)})"
+            )
+            line_count = total_lines
 
         delta_h = round(expected_h - current_h, 2)
         if abs(delta_h) > 0.01:
-            drift_record = {
+            drift_record: Dict[str, Any] = {
                 "code": "NATIVE-LAYOUT-HOTSPOT-DESYNC",
                 "kind": meta["kind"],
                 "pageFile": meta["pageFile"],
@@ -503,13 +498,15 @@ def audit_and_rebake_sketch(
                 "artboardName": (meta["artboard"] or {}).get("name"),
                 "layerID": node.get("do_objectID"),
                 "layerName": node.get("name"),
-                "specID": spec["id"],
+                "specID": spec_id,
                 "currentHeight": current_h,
                 "bakedHeight": expected_h,
                 "deltaHeight": delta_h,
-                "lineCount": m_res["lineCount"],
-                "resolvedPostScriptName": m_res["resolvedPostScriptName"],
+                "lineCount": line_count,
+                "resolvedPostScriptName": resolved_ps,
             }
+            if ov_details is not None:
+                drift_record["overrides"] = ov_details
             drifts.append(drift_record)
 
             if rebake:
@@ -544,11 +541,13 @@ def audit_and_rebake_sketch(
                                     and abs(hw - bw) <= 2.0
                                     and abs(hh - bh) <= 2.0
                                 ):
-                                    ax, ay, _, _ = after_rects.get(
+                                    ax, ay, aw, ah = after_rects.get(
                                         oid, (bx, by, bw, bh)
                                     )
                                     hs_frame["x"] = round(ax + (hx - bx), 2)
                                     hs_frame["y"] = round(ay + (hy - by), 2)
+                                    hs_frame["width"] = round(aw + (hw - bw), 2)
+                                    hs_frame["height"] = round(ah + (hh - bh), 2)
                                     break
 
                 dirty_pages.add(meta["pageFile"])
@@ -612,9 +611,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write the JSON report to this file path in addition to stdout.",
     )
     parser.add_argument(
-        "--offline-fallback",
-        action="store_true",
-        help="Force deterministic CoreText-calibrated Python measurement without invoking Swift.",
+        "--swift-bin",
+        help="Optional path to the swift executable (default: cached compiled binary or 'swift').",
     )
     return parser
 
@@ -631,7 +629,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             report = audit_and_rebake_sketch(
                 Path(args.sketch),
                 rebake=args.rebake,
-                force_fallback=args.offline_fallback,
+                swift_bin=args.swift_bin,
             )
             exit_code = 0 if report.get("passed", False) else 1
         else:
@@ -643,7 +641,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             items = parsed["items"] if isinstance(parsed, dict) and "items" in parsed else parsed
             if not isinstance(items, list):
                 raise ValueError("Input JSON must be a list of specs or {'items': [...]}")
-            report = measure_specs(items, force_fallback=args.offline_fallback)
+            report = measure_specs(items, swift_bin=args.swift_bin)
             report["passed"] = True
             exit_code = 0
     except Exception as exc:

@@ -99,25 +99,51 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def convert_png_to_lossless_webp(png_path: Path, webp_path: Path) -> bool:
-    """Convert PNG to lossless WebP using cwebp if installed, or deterministic RIFF/WEBP container."""
-    cwebp = shutil.which("cwebp")
-    if cwebp:
-        proc = subprocess.run(
-            [cwebp, "-lossless", "-q", "100", str(png_path), "-o", str(webp_path)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-        if proc.returncode == 0 and webp_path.exists():
-            return True
+def _is_valid_webp_file(webp_path: Path) -> bool:
+    """Verify RIFF....WEBP container and ensure payload is not raw PNG bytes."""
+    if not webp_path.exists():
+        return False
+    header = webp_path.read_bytes()[:32]
+    if len(header) < 21:
+        return False
+    if header[:4] != b"RIFF" or header[8:12] != b"WEBP":
+        return False
+    chunk_tag = header[12:16]
+    if chunk_tag not in (b"VP8L", b"VP8 ", b"VP8X"):
+        return False
+    # VP8L lossless bitstream starts with signature byte 0x2f ('/'), never PNG magic (\x89PNG)
+    if chunk_tag == b"VP8L" and (header[20:21] != b"\x2f" or header[20:24] == b"\x89PNG"):
+        return False
+    return True
 
-    raw_png = png_path.read_bytes()
-    payload = b"VP8L" + struct.pack("<I", len(raw_png)) + raw_png
-    riff_size = 4 + len(payload)
-    webp_bytes = b"RIFF" + struct.pack("<I", riff_size) + b"WEBP" + payload
-    webp_path.write_bytes(webp_bytes)
+
+def convert_png_to_lossless_webp(
+    png_path: Path, webp_path: Path, cwebp_bin: str = "cwebp"
+) -> bool:
+    """Convert PNG to lossless WebP using cwebp. Fails explicitly if unavailable or invalid."""
+    resolved = shutil.which(cwebp_bin)
+    if not resolved and Path(cwebp_bin).exists():
+        resolved = str(Path(cwebp_bin))
+    if not resolved:
+        raise RuntimeError(
+            f"Lossless WebP encoder '{cwebp_bin}' not found in PATH; install webp (cwebp) or pass --no-webp."
+        )
+
+    proc = subprocess.run(
+        [resolved, "-lossless", "-q", "100", str(png_path), "-o", str(webp_path)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"cwebp lossless conversion failed (exit {proc.returncode}): {proc.stderr.strip()}"
+        )
+    if not _is_valid_webp_file(webp_path):
+        raise RuntimeError(
+            f"cwebp output at {webp_path} is missing or is not a valid WebP bitstream"
+        )
     return True
 
 
@@ -198,6 +224,7 @@ def _export_one_artboard_scale(
     scale: str,
     out_dir: Path,
     export_webp: bool,
+    cwebp_bin: str = "cwebp",
 ) -> Dict[str, Any]:
     ab_id = artboard["artboardID"]
     scale_dir = out_dir / f"{scale}x"
@@ -242,7 +269,7 @@ def _export_one_artboard_scale(
     }
     if export_webp:
         webp_path = png_path.with_suffix(".webp")
-        convert_png_to_lossless_webp(png_path, webp_path)
+        convert_png_to_lossless_webp(png_path, webp_path, cwebp_bin=cwebp_bin)
         entry["webpPath"] = str(webp_path)
         entry["webpSha256"] = sha256_file(webp_path)
     return entry
@@ -254,6 +281,7 @@ def run_export_and_manifest(
     sketchtool: str = DEFAULT_SKETCHTOOL,
     scales: List[str] = ["1", "2"],
     export_webp: bool = True,
+    cwebp_bin: str = "cwebp",
     verify_clock_pdf: bool = True,
     manifest_path: Optional[Path] = None,
     renders_path: Optional[Path] = None,
@@ -281,6 +309,7 @@ def run_export_and_manifest(
                 sc,
                 output_dir,
                 export_webp,
+                cwebp_bin,
             )
             for ab, sc in tasks
         ]
@@ -346,8 +375,25 @@ def run_export_and_manifest(
         "clockPdfChecks": clock_pdf_checks,
     }
 
-    for target_json_path in [p for p in (manifest_path, renders_path) if p is not None]:
-        if verify_only and target_json_path.exists():
+    target_json_paths = [p for p in (manifest_path, renders_path) if p is not None]
+    if verify_only and not target_json_paths:
+        manifest_mismatches.append(
+            {
+                "type": "missing_baseline_argument",
+                "message": "--verify-only requires --manifest and/or --renders baseline file path",
+            }
+        )
+
+    for target_json_path in target_json_paths:
+        if verify_only:
+            if not target_json_path.exists():
+                manifest_mismatches.append(
+                    {
+                        "type": "missing_baseline_file",
+                        "path": str(target_json_path),
+                    }
+                )
+                continue
             existing = json.loads(target_json_path.read_text(encoding="utf-8"))
             existing_by_key = {
                 (r.get("artboardID"), r.get("scale")): r
@@ -444,6 +490,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable lossless WebP conversion.",
     )
     parser.add_argument(
+        "--cwebp",
+        default="cwebp",
+        help="Path or name of cwebp encoder binary (default: cwebp).",
+    )
+    parser.add_argument(
         "--verify-clock-pdf",
         action="store_true",
         default=True,
@@ -495,6 +546,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             sketchtool=args.sketchtool,
             scales=scales,
             export_webp=args.webp,
+            cwebp_bin=args.cwebp,
             verify_clock_pdf=args.verify_clock_pdf,
             manifest_path=Path(args.manifest) if args.manifest else None,
             renders_path=Path(args.renders) if args.renders else None,

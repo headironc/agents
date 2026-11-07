@@ -345,11 +345,13 @@ test("all sketch-native scripts support --help and exit 0", () => {
     assert.equal(res.status, 0, `${script} --help failed: ${res.stderr}`);
     assert.match(res.stdout, /usage:/i);
   }
-  const swiftRes = spawnSync("swift", [SWIFT_MEASURE, "--help"], {
-    encoding: "utf8",
-  });
-  assert.equal(swiftRes.status, 0, swiftRes.stderr);
-  assert.match(swiftRes.stdout, /Usage: measure-coretext\.swift/);
+  if (process.platform === "darwin") {
+    const swiftRes = spawnSync("swift", [SWIFT_MEASURE, "--help"], {
+      encoding: "utf8",
+    });
+    assert.equal(swiftRes.status, 0, swiftRes.stderr);
+    assert.match(swiftRes.stdout, /Usage: measure-coretext\.swift/);
+  }
 });
 
 test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex Stack + HotSpot", () => {
@@ -379,6 +381,26 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
         },
       ]),
     );
+
+    if (process.platform !== "darwin") {
+      const nonMacRes = runPython(PY_MEASURE, ["--input", specsPath]);
+      assert.equal(nonMacRes.status, 2);
+      const errReport = JSON.parse(nonMacRes.stdout);
+      assert.equal(errReport.passed, false);
+      assert.match(errReport.error, /Unsupported platform/);
+      return;
+    }
+
+    // Verify failure when CoreText helper is unavailable (never silently falls back to character estimation)
+    const missingSwiftRes = runPython(PY_MEASURE, [
+      "--input",
+      specsPath,
+      "--swift-bin",
+      path.join(tmpDir, "nonexistent-coretext-helper"),
+    ]);
+    assert.equal(missingSwiftRes.status, 2);
+    const missingSwiftReport = JSON.parse(missingSwiftRes.stdout);
+    assert.equal(missingSwiftReport.passed, false);
 
     const measureRes = runPython(PY_MEASURE, ["--input", specsPath]);
     assert.equal(measureRes.status, 0, measureRes.stderr);
@@ -430,6 +452,75 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
       driftedSketch,
     ]);
     assert.equal(fullAuditAfterRebake.status, 0, fullAuditAfterRebake.stdout);
+
+    // Multi-override SymbolInstance height delta merging + fixed-height justifyContent=1 (Center) Flex Stack reflow
+    const multiSpec = createCleanSketchSpec({ textHeight: 44, hotspotY: 76 });
+    const page = multiSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const symMaster = page.layers[0];
+    symMaster.frame.height = 88;
+    symMaster.layers = [
+      {
+        _class: "text",
+        do_objectID: "30000000-0000-4000-8000-000000000002",
+        name: "TitleLabel",
+        isVisible: true,
+        textBehaviour: 1,
+        frame: { _class: "rect", x: 16, y: 12, width: 180, height: 22 },
+        attributedString:
+          symMaster.layers[0].attributedString,
+      },
+      {
+        _class: "text",
+        do_objectID: "30000000-0000-4000-8000-000000000003",
+        name: "SubLabel",
+        isVisible: true,
+        textBehaviour: 1,
+        frame: { _class: "rect", x: 16, y: 42, width: 180, height: 22 },
+        attributedString:
+          symMaster.layers[0].attributedString,
+      },
+    ];
+    const homeAb = page.layers[1];
+    const cardStack = homeAb.layers[1];
+    // Fixed-height vertical Flex Stack (verticalSizing: 0, justifyContent: 1 Center, height: 240)
+    cardStack.groupLayout.verticalSizing = 0;
+    cardStack.groupLayout.justifyContent = 1;
+    cardStack.frame.height = 240;
+    cardStack.layers[1].frame.y = 48; // BodyCopy y in centered 240px stack before rebake
+    const btnInst = cardStack.layers[0];
+    btnInst.frame.y = 104; // btnInst y in centered 240px stack before rebake
+    btnInst.frame.height = 88; // base height before 2 multi-line overrides (+22 each -> +44 total -> 132)
+    homeAb.layers[2].frame.y = 184; // 80 + 104
+    homeAb.layers[2].frame.height = 88;
+    btnInst.overrideValues = [
+      {
+        _class: "overrideValue",
+        overrideName: "30000000-0000-4000-8000-000000000002_stringValue",
+        value: "账户安全验证已开启，请在五分钟内完成确认。",
+      },
+      {
+        _class: "overrideValue",
+        overrideName: "30000000-0000-4000-8000-000000000003_stringValue",
+        value: "若非本人操作，请立即点击下方按钮冻结账户。",
+      },
+    ];
+    const multiBuilder = path.join(tmpDir, "multi-spec.json");
+    const multiSketch = path.join(tmpDir, "multi.sketch");
+    fs.writeFileSync(multiBuilder, JSON.stringify(multiSpec));
+    buildSyntheticSketch(multiSketch, multiBuilder);
+
+    const multiRebake = runPython(PY_MEASURE, [
+      "--sketch",
+      multiSketch,
+      "--rebake",
+    ]);
+    assert.equal(multiRebake.status, 0, multiRebake.stderr);
+    const multiReport = JSON.parse(multiRebake.stdout);
+    assert.equal(multiReport.driftCount, 1);
+    assert.equal(multiReport.drifts[0].bakedHeight, 132);
+
+    const multiAudit = runPython(PY_AUDIT, ["--sketch", multiSketch]);
+    assert.equal(multiAudit.status, 0, multiAudit.stdout);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -452,6 +543,70 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
     assert.equal(passReport.passed, true);
     assert.equal(passReport.blockingCount, 0);
     assert.ok(passReport.elapsedMs < 1000);
+
+    // Verify nested SymbolInstance override path validation across multiple symbolMasters
+    const nestedSpec = createCleanSketchSpec({ textHeight: 44, hotspotY: 76 });
+    const nPage = nestedSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const outerMaster = nPage.layers[0];
+    // Add a nested SymbolMaster and nested SymbolInstance inside outerMaster
+    const innerMaster = {
+      _class: "symbolMaster",
+      do_objectID: "30000000-0000-4000-8000-000000000010",
+      symbolID: "90000000-0000-4000-8000-000000000010",
+      name: "Badge/Inner",
+      frame: { _class: "rect", x: 0, y: 120, width: 80, height: 24 },
+      layers: [
+        {
+          _class: "text",
+          do_objectID: "30000000-0000-4000-8000-000000000011",
+          name: "InnerBadgeText",
+          isVisible: true,
+          textBehaviour: 1,
+          frame: { _class: "rect", x: 0, y: 0, width: 80, height: 22 },
+          attributedString: outerMaster.layers[0].attributedString,
+        },
+      ],
+    };
+    outerMaster.layers.push({
+      _class: "symbolInstance",
+      do_objectID: "30000000-0000-4000-8000-000000000009",
+      symbolID: "90000000-0000-4000-8000-000000000010",
+      name: "NestedBadge",
+      isVisible: true,
+      frame: { _class: "rect", x: 200, y: 12, width: 80, height: 24 },
+      overrideValues: [],
+    });
+    nPage.layers.unshift(innerMaster);
+    const outerInst = nPage.layers[2].layers[1].layers[0];
+    outerInst.overrideValues.push({
+      _class: "overrideValue",
+      overrideName:
+        "30000000-0000-4000-8000-000000000009/30000000-0000-4000-8000-000000000011_stringValue",
+      value: "已认证",
+    });
+
+    const nestedCleanBuilder = path.join(tmpDir, "nested-clean-spec.json");
+    const nestedCleanSketch = path.join(tmpDir, "nested-clean.sketch");
+    fs.writeFileSync(nestedCleanBuilder, JSON.stringify(nestedSpec));
+    buildSyntheticSketch(nestedCleanSketch, nestedCleanBuilder);
+
+    const nestedPassRes = runPython(PY_AUDIT, ["--sketch", nestedCleanSketch]);
+    assert.equal(nestedPassRes.status, 0, nestedPassRes.stdout);
+
+    // Corrupt nested override leaf ID -> should trigger REF-DANGLING-OVERRIDE-PATH
+    outerInst.overrideValues[1].overrideName =
+      "30000000-0000-4000-8000-000000000009/30000000-0000-4000-8000-999999999999_stringValue";
+    const nestedBadBuilder = path.join(tmpDir, "nested-bad-spec.json");
+    const nestedBadSketch = path.join(tmpDir, "nested-bad.sketch");
+    fs.writeFileSync(nestedBadBuilder, JSON.stringify(nestedSpec));
+    buildSyntheticSketch(nestedBadSketch, nestedBadBuilder);
+
+    const nestedFailRes = runPython(PY_AUDIT, ["--sketch", nestedBadSketch]);
+    assert.equal(nestedFailRes.status, 1);
+    const nestedFailCodes = new Set(
+      JSON.parse(nestedFailRes.stdout).findings.map((f) => f.code),
+    );
+    assert.ok(nestedFailCodes.has("REF-DANGLING-OVERRIDE-PATH"));
 
     // Introduce blocking violations: hardcoded SFPro on clock, Noto font, start-artboard "back" trap, clipping ancestor
     const badSpec = createCleanSketchSpec({ textHeight: 44, hotspotY: 76 });
@@ -491,18 +646,50 @@ test("sketch_mcp_roundtrip.py executes 6-step non-activating roundtrip with offl
   const anchorId = "00000000-0000-4000-8000-000000000099";
   const workDocId = "10000000-0000-4000-8000-000000000001";
   const copySketch = path.join(tmpDir, "disposable-copy.sketch");
+  const specObj = createCleanSketchSpec({ textHeight: 44, hotspotY: 76 });
+  // Include a shared text style in document.json and a second override on the same SymbolInstance
+  specObj["document.json"].layerTextStyles.objects = [
+    {
+      _class: "sharedStyle",
+      do_objectID: "60000000-0000-4000-8000-000000000001",
+      name: "Body/Default",
+      value: {
+        _class: "style",
+        textStyle: {
+          _class: "textStyle",
+          encodedAttributes: {
+            MSAttributedStringFontAttribute: {
+              _class: "fontDescriptor",
+              attributes: { name: "PingFangSC-Regular", size: 15 },
+            },
+          },
+        },
+      },
+    },
+  ];
+  const instLayer =
+    specObj["pages/20000000-0000-4000-8000-000000000001.json"].layers[1]
+      .layers[1].layers[0];
+  instLayer.overrideValues.push({
+    _class: "overrideValue",
+    overrideName: "30000000-0000-4000-8000-000000000003_stringValue",
+    value: "副标题原文",
+  });
   const specPath = path.join(tmpDir, "clean-spec.json");
-  fs.writeFileSync(
-    specPath,
-    JSON.stringify(createCleanSketchSpec({ textHeight: 44, hotspotY: 76 })),
-  );
+  fs.writeFileSync(specPath, JSON.stringify(specObj));
   buildSyntheticSketch(copySketch, specPath);
 
   // Create a mock `open` executable that records args and notifies the mock state file
   const stateFile = path.join(tmpDir, "mcp-state.json");
   fs.writeFileSync(
     stateFile,
-    JSON.stringify({ workOpen: false, mutatedText: null, openCalls: [] }),
+    JSON.stringify({
+      workOpen: false,
+      mutatedText1: null,
+      mutatedText2: null,
+      failScreenshotOnce: false,
+      openCalls: [],
+    }),
   );
   const mockOpenBin = path.join(tmpDir, "mock-open");
   fs.writeFileSync(
@@ -557,7 +744,23 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
       const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
 
       if (toolName === "get_screenshot") {
-        const imgData = state.mutatedText ? pngBase64Post : pngBase64Pre;
+        if (state.failScreenshotOnce) {
+          state.failScreenshotOnce = false;
+          fs.writeFileSync(stateFile, JSON.stringify(state));
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: rpc.id,
+              result: {
+                isError: true,
+                content: [{ type: "text", text: "Simulated screenshot error" }],
+              },
+            }),
+          );
+          return;
+        }
+        const imgData = state.mutatedText1 ? pngBase64Post : pngBase64Pre;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
@@ -595,9 +798,10 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
             pagesCount: 1,
           };
         } else if (title.includes("mutate-and-save")) {
-          state.mutatedText = "立即认证（已更新）";
+          state.mutatedText1 = "立即认证（已更新）";
+          state.mutatedText2 = "副标题（已更新）";
           fs.writeFileSync(stateFile, JSON.stringify(state));
-          // Mutate only the targeted SymbolInstance override inside copySketch
+          // Mutate both targeted SymbolInstance overrides inside copySketch
           const pyMutate = `
 import json, sys, zipfile
 from pathlib import Path
@@ -608,6 +812,7 @@ page_key = "pages/20000000-0000-4000-8000-000000000001.json"
 page = json.loads(members[page_key].decode("utf-8"))
 inst = page["layers"][1]["layers"][1]["layers"][0]
 inst["overrideValues"][0]["value"] = "立即认证（已更新）"
+inst["overrideValues"][1]["value"] = "副标题（已更新）"
 members[page_key] = (json.dumps(page, ensure_ascii=False, indent=2) + "\\n").encode("utf-8")
 with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     for n, raw in members.items():
@@ -627,7 +832,7 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
                 },
               ],
               swatchesCount: 1,
-              sharedTextStylesCount: 0,
+              sharedTextStylesCount: 1,
               sharedLayerStylesCount: 0,
             },
             applied: [
@@ -647,9 +852,19 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
             docId: workDocId,
             readbacks: [
               {
+                editIndex: 0,
                 layerID: "40000000-0000-4000-8000-000000000005",
+                overrideID: "30000000-0000-4000-8000-000000000002_stringValue",
                 text: null,
-                overrideValue: state.mutatedText,
+                overrideValue: state.mutatedText1,
+                borderThickness: 2,
+              },
+              {
+                editIndex: 1,
+                layerID: "40000000-0000-4000-8000-000000000005",
+                overrideID: "30000000-0000-4000-8000-000000000003_stringValue",
+                text: null,
+                overrideValue: state.mutatedText2,
                 borderThickness: 2,
               },
             ],
@@ -685,8 +900,46 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
           overrideID: "30000000-0000-4000-8000-000000000002_stringValue",
           overrideValue: "立即认证（已更新）",
         },
+        {
+          layerID: "40000000-0000-4000-8000-000000000005",
+          overrideID: "30000000-0000-4000-8000-000000000003_stringValue",
+          overrideValue: "副标题（已更新）",
+        },
       ],
     };
+
+    // 1. Simulate a mid-slot screenshot failure and verify emergency close releases the slot
+    const failState = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    failState.failScreenshotOnce = true;
+    fs.writeFileSync(stateFile, JSON.stringify(failState));
+
+    const abortedRes = await runPythonAsync(PY_ROUNDTRIP, [
+      "--sketch",
+      copySketch,
+      "--anchor-id",
+      anchorId,
+      "--edit-spec",
+      JSON.stringify(editSpec),
+      "--output",
+      outReportPath,
+      "--screenshots-dir",
+      shotsDir,
+      "--mcp-url",
+      mcpUrl,
+      "--open-bin",
+      mockOpenBin,
+    ]);
+    assert.equal(abortedRes.status, 1);
+    const stateAfterAbort = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(
+      stateAfterAbort.workOpen,
+      false,
+      "Working document must be closed in finally block after mid-slot failure",
+    );
+
+    // Reset openCalls before running the full passing roundtrip
+    stateAfterAbort.openCalls = [];
+    fs.writeFileSync(stateFile, JSON.stringify(stateAfterAbort));
 
     const res = await runPythonAsync(PY_ROUNDTRIP, [
       "--sketch",
@@ -721,6 +974,35 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
       assert.equal(callArgs[0], "-g");
       assert.equal(callArgs[1], "-a");
     }
+
+    // Verify offline diff catches sharedTextStyle fontDescriptor drift in document.json
+    const driftedDocSketch = path.join(tmpDir, "drifted-doc.sketch");
+    const driftedDocSpec = JSON.parse(fs.readFileSync(specPath, "utf8"));
+    driftedDocSpec[
+      "document.json"
+    ].layerTextStyles.objects[0].value.textStyle.encodedAttributes.MSAttributedStringFontAttribute.attributes.name =
+      "Heiti SC";
+    const driftedDocSpecPath = path.join(tmpDir, "drifted-doc-spec.json");
+    fs.writeFileSync(driftedDocSpecPath, JSON.stringify(driftedDocSpec));
+    buildSyntheticSketch(driftedDocSketch, driftedDocSpecPath);
+
+    const diffCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `import json, sys; from pathlib import Path; sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)}); import sketch_mcp_roundtrip as r; print(json.dumps(r.diff_sketch_archives_offline(Path(sys.argv[1]), Path(sys.argv[2]), set())))`,
+        copySketch,
+        driftedDocSketch,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(diffCheck.status, 0, diffCheck.stderr);
+    const diffOut = JSON.parse(diffCheck.stdout);
+    assert.ok(
+      diffOut.unexpectedDrifts.some(
+        (d) => d.layerID === "sharedTextStyle:60000000-0000-4000-8000-000000000001",
+      ),
+    );
   } finally {
     await new Promise((resolve) => server.close(resolve));
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -768,10 +1050,66 @@ elif kind == "layers":
       { mode: 0o755 },
     );
 
+    const mockCwebp = path.join(tmpDir, "mock-cwebp");
+    fs.writeFileSync(
+      mockCwebp,
+      `#!/usr/bin/env python3
+import struct, sys
+from pathlib import Path
+args = sys.argv[1:]
+out_idx = args.index("-o") + 1
+out_path = Path(args[out_idx])
+# Valid minimal VP8L lossless bitstream header starting with 0x2f signature byte
+vp8l_stream = b"\\x2f\\x00\\x00\\x00\\x10\\x07\\x10\\x11\\x11\\x88\\x88\\xfe\\x07\\x00"
+payload = b"VP8L" + struct.pack("<I", len(vp8l_stream)) + vp8l_stream
+webp = b"RIFF" + struct.pack("<I", 4 + len(payload)) + b"WEBP" + payload
+out_path.write_bytes(webp)
+`,
+      { mode: 0o755 },
+    );
+
     const outDir = path.join(tmpDir, "exports");
     const manifestPath = path.join(outDir, "manifest.json");
     const rendersPath = path.join(outDir, "renders.json");
 
+    // 1. Verify --verify-only fails when baseline manifest.json does not exist yet (and does not create it)
+    const missingBaselineRes = runPython(PY_EXPORT, [
+      "--sketch",
+      cleanSketch,
+      "--output-dir",
+      outDir,
+      "--sketchtool",
+      mockSketchtool,
+      "--cwebp",
+      mockCwebp,
+      "--manifest",
+      manifestPath,
+      "--verify-only",
+    ]);
+    assert.equal(missingBaselineRes.status, 1);
+    const missingBaselineReport = JSON.parse(missingBaselineRes.stdout);
+    assert.equal(missingBaselineReport.passed, false);
+    assert.equal(
+      missingBaselineReport.manifestMismatches[0].type,
+      "missing_baseline_file",
+    );
+    assert.equal(fs.existsSync(manifestPath), false);
+
+    // 2. Verify missing cwebp binary fails explicitly when --webp is active
+    const missingCwebpRes = runPython(PY_EXPORT, [
+      "--sketch",
+      cleanSketch,
+      "--output-dir",
+      outDir,
+      "--sketchtool",
+      mockSketchtool,
+      "--cwebp",
+      path.join(tmpDir, "nonexistent-cwebp"),
+      "--webp",
+    ]);
+    assert.equal(missingCwebpRes.status, 1);
+
+    // 3. Full export with valid mock-cwebp
     const exportRes = runPython(PY_EXPORT, [
       "--sketch",
       cleanSketch,
@@ -779,6 +1117,8 @@ elif kind == "layers":
       outDir,
       "--sketchtool",
       mockSketchtool,
+      "--cwebp",
+      mockCwebp,
       "--manifest",
       manifestPath,
       "--renders",
@@ -801,7 +1141,7 @@ elif kind == "layers":
     assert.equal(report.clockPdfChecks[0].hasSFNSRegular, true);
     assert.equal(report.clockPdfChecks[0].hasTrueTypeSubtype, true);
 
-    // Run --verify-only against the generated manifest.json
+    // 4. Run --verify-only against the generated manifest.json
     const verifyRes = runPython(PY_EXPORT, [
       "--sketch",
       cleanSketch,
@@ -809,6 +1149,8 @@ elif kind == "layers":
       outDir,
       "--sketchtool",
       mockSketchtool,
+      "--cwebp",
+      mockCwebp,
       "--manifest",
       manifestPath,
       "--verify-only",

@@ -303,7 +303,7 @@ function deriveTargets(
   entries: SkillEntry[],
 ): TargetDraft[] {
   const drafts: TargetDraft[] = [];
-  for (const member of publicMembers(entries)) {
+  for (const member of publicMembers(entries, undefined, process.platform)) {
     const root = roots[member.product];
     if (!root) continue;
     // A skill's key is its top-level name; a fixed document's key is its published relative path.
@@ -460,7 +460,7 @@ function inspectUnlisted(
   for (const product of ["codex", "claude", "antigravity"] as const) {
     const root = roots[product];
     if (!root) continue;
-    const layout = publicMembers(entries, product);
+    const layout = publicMembers(entries, product, process.platform);
     const members = new Set(
       layout
         .filter((member) => member.category === "skill")

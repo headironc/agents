@@ -267,7 +267,8 @@ def _build_lightweight_readback_js(doc_id: str, edits: List[Dict[str, Any]], pag
             "if (!doc) { throw new Error('Reopened document not found: ' + targetDocId) }",
             "const scopePage = targetPageId ? doc.pages.find(p => String(p.id) === targetPageId) : doc.pages[0]",
             "const readbacks = []",
-            "for (const edit of edits) {",
+            "for (let editIndex = 0; editIndex < edits.length; editIndex++) {",
+            "  const edit = edits[editIndex]",
             "  const matches = sketch.find('#' + edit.layerID, scopePage || doc)",
             "  const layer = matches && matches.length > 0 ? matches[0] : doc.getLayerWithID(edit.layerID)",
             "  if (!layer) { throw new Error('Target layer missing on reopen: ' + edit.layerID) }",
@@ -277,7 +278,7 @@ def _build_lightweight_readback_js(doc_id: str, edits: List[Dict[str, Any]], pag
             "    ovVal = ov ? ov.value : null",
             "  }",
             "  const borderThickness = (layer.style && layer.style.borders && layer.style.borders.length > 0) ? layer.style.borders[0].thickness : null",
-            "  readbacks.push({ layerID: String(layer.id), text: layer.text || null, overrideValue: ovVal, borderThickness })",
+            "  readbacks.push({ editIndex, layerID: String(layer.id), overrideID: edit.overrideID || null, text: layer.text || null, overrideValue: ovVal, borderThickness })",
             "}",
             "console.log(JSON.stringify({ ok: true, docId: String(doc.id), readbacks }))",
         ]
@@ -302,6 +303,22 @@ def _build_close_doc_js(doc_id: str, anchor_id: str) -> str:
     )
 
 
+def _build_close_all_non_anchor_js(anchor_id: str) -> str:
+    anchor_json = json.dumps(anchor_id)
+    return "\n".join(
+        [
+            "const sketch = require('sketch')",
+            f"const anchorId = {anchor_json}",
+            "const docs = sketch.getDocuments()",
+            "for (const d of docs) {",
+            "  if (String(d.id) !== anchorId) { d.close() }",
+            "}",
+            "const remaining = sketch.getDocuments().filter(d => String(d.id) !== anchorId).map(d => String(d.id))",
+            "console.log(JSON.stringify({ closed: true, remainingNonAnchor: remaining }))",
+        ]
+    )
+
+
 def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
     """Extract per-object structural snapshot from a .sketch ZIP archive offline."""
     snapshot: Dict[str, Dict[str, Any]] = {}
@@ -310,6 +327,74 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
             if not (member == "document.json" or (member.startswith("pages/") and member.endswith(".json"))):
                 continue
             data = json.loads(zf.read(member).decode("utf-8"))
+
+            if member == "document.json":
+                for st in (data.get("layerTextStyles") or {}).get("objects") or []:
+                    if not isinstance(st, dict):
+                        continue
+                    sid = str(st.get("do_objectID", ""))
+                    if not sid:
+                        continue
+                    enc_attrs = (
+                        ((st.get("value") or {}).get("textStyle") or {}).get("encodedAttributes")
+                        or {}
+                    )
+                    font_desc = (
+                        (enc_attrs.get("MSAttributedStringFontAttribute") or {}).get("attributes")
+                        if isinstance(enc_attrs.get("MSAttributedStringFontAttribute"), dict)
+                        else None
+                    )
+                    snapshot[f"sharedTextStyle:{sid}"] = {
+                        "_class": st.get("_class", "sharedStyle"),
+                        "name": st.get("name"),
+                        "fontDescriptor": font_desc,
+                        "paragraphStyle": enc_attrs.get("paragraphStyle"),
+                    }
+                for fst in data.get("foreignTextStyles") or []:
+                    if not isinstance(fst, dict):
+                        continue
+                    local_st = fst.get("localSharedStyle") or {}
+                    sid = str(local_st.get("do_objectID", ""))
+                    if not sid:
+                        continue
+                    enc_attrs = (
+                        ((local_st.get("value") or {}).get("textStyle") or {}).get(
+                            "encodedAttributes"
+                        )
+                        or {}
+                    )
+                    font_desc = (
+                        (enc_attrs.get("MSAttributedStringFontAttribute") or {}).get("attributes")
+                        if isinstance(enc_attrs.get("MSAttributedStringFontAttribute"), dict)
+                        else None
+                    )
+                    snapshot[f"foreignTextStyle:{sid}"] = {
+                        "_class": local_st.get("_class", "sharedStyle"),
+                        "name": local_st.get("name"),
+                        "fontDescriptor": font_desc,
+                        "paragraphStyle": enc_attrs.get("paragraphStyle"),
+                    }
+                for lst in (data.get("layerStyles") or {}).get("objects") or []:
+                    if not isinstance(lst, dict):
+                        continue
+                    sid = str(lst.get("do_objectID", ""))
+                    if sid:
+                        snapshot[f"sharedLayerStyle:{sid}"] = {
+                            "_class": lst.get("_class", "sharedStyle"),
+                            "name": lst.get("name"),
+                            "borders": ((lst.get("value") or {}).get("borders")),
+                            "fills": ((lst.get("value") or {}).get("fills")),
+                        }
+                for sw in (data.get("sharedSwatches") or {}).get("objects") or []:
+                    if not isinstance(sw, dict):
+                        continue
+                    sw_id = str(sw.get("do_objectID", ""))
+                    if sw_id:
+                        snapshot[f"swatch:{sw_id}"] = {
+                            "_class": sw.get("_class", "swatch"),
+                            "name": sw.get("name"),
+                            "value": sw.get("value"),
+                        }
 
             def walk(node: Dict[str, Any]) -> None:
                 oid = str(node.get("do_objectID", ""))
@@ -454,44 +539,61 @@ def run_mcp_roundtrip(
         # Step 2: Open disposable copy with `open -g -a /Applications/Sketch.app`
         open_cmd_1 = _launch_sketch_background(sketch_path, sketch_app, open_bin)
         doc_id: Optional[str] = None
-        deadline = time.perf_counter() + poll_timeout
-        while time.perf_counter() < deadline:
-            probe = client.run_code(
-                "roundtrip-step2-wait-open",
-                _build_wait_open_js(anchor_id, sketch_path.name),
+        close_res_1: Optional[Dict[str, Any]] = None
+        try:
+            deadline = time.perf_counter() + poll_timeout
+            while time.perf_counter() < deadline:
+                probe = client.run_code(
+                    "roundtrip-step2-wait-open",
+                    _build_wait_open_js(anchor_id, sketch_path.name),
+                )
+                if probe.get("ready") and probe.get("docId"):
+                    doc_id = str(probe["docId"])
+                    break
+                time.sleep(0.15)
+            if not doc_id:
+                return {
+                    "tool": "sketch_mcp_roundtrip.py",
+                    "passed": False,
+                    "failedStep": "step2_open_copy",
+                    "reason": f"Timed out waiting for {sketch_path.name} to open in background",
+                }
+
+            # Step 3 & Step 4: Pre-edit screenshot -> lightweight JS edit + processPendingChanges + save -> post-edit screenshot -> doc.close()
+            before_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+            before_png_path = screenshots_dir / "before.png"
+            before_png_path.write_bytes(before_png_bytes)
+            before_sha256 = hashlib.sha256(before_png_bytes).hexdigest()
+
+            mutate_res = client.run_code(
+                "roundtrip-step3-mutate-and-save",
+                _build_lightweight_mutate_js(doc_id, edits, target_page_id),
             )
-            if probe.get("ready") and probe.get("docId"):
-                doc_id = str(probe["docId"])
-                break
-            time.sleep(0.15)
-        if not doc_id:
-            return {
-                "tool": "sketch_mcp_roundtrip.py",
-                "passed": False,
-                "failedStep": "step2_open_copy",
-                "reason": f"Timed out waiting for {sketch_path.name} to open in background",
-            }
 
-        # Step 3 & Step 4: Pre-edit screenshot -> lightweight JS edit + processPendingChanges + save -> post-edit screenshot -> doc.close()
-        before_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
-        before_png_path = screenshots_dir / "before.png"
-        before_png_path.write_bytes(before_png_bytes)
-        before_sha256 = hashlib.sha256(before_png_bytes).hexdigest()
+            after_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+            after_png_path = screenshots_dir / "after.png"
+            after_png_path.write_bytes(after_png_bytes)
+            after_sha256 = hashlib.sha256(after_png_bytes).hexdigest()
 
-        mutate_res = client.run_code(
-            "roundtrip-step3-mutate-and-save",
-            _build_lightweight_mutate_js(doc_id, edits, target_page_id),
-        )
-
-        after_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
-        after_png_path = screenshots_dir / "after.png"
-        after_png_path.write_bytes(after_png_bytes)
-        after_sha256 = hashlib.sha256(after_png_bytes).hexdigest()
-
-        close_res_1 = client.run_code(
-            "roundtrip-step4-close-copy",
-            _build_close_doc_js(doc_id, anchor_id),
-        )
+            close_res_1 = client.run_code(
+                "roundtrip-step4-close-copy",
+                _build_close_doc_js(doc_id, anchor_id),
+            )
+        finally:
+            if close_res_1 is None:
+                try:
+                    if doc_id:
+                        client.run_code(
+                            "roundtrip-step4-emergency-close",
+                            _build_close_doc_js(doc_id, anchor_id),
+                        )
+                    else:
+                        client.run_code(
+                            "roundtrip-step4-emergency-close-all",
+                            _build_close_all_non_anchor_js(anchor_id),
+                        )
+                except Exception:
+                    pass
 
         # Step 5: Offline Python zipfile diff between pre-save and post-save .sketch
         offline_diff = diff_sketch_archives_offline(
@@ -501,55 +603,88 @@ def run_mcp_roundtrip(
         # Step 6: Reopen copy via `open -g -a /Applications/Sketch.app`, readback, screenshot SHA-256, close, assert matching: []
         open_cmd_2 = _launch_sketch_background(sketch_path, sketch_app, open_bin)
         reopen_doc_id: Optional[str] = None
-        deadline2 = time.perf_counter() + poll_timeout
-        while time.perf_counter() < deadline2:
-            probe2 = client.run_code(
-                "roundtrip-step6-wait-reopen",
-                _build_wait_open_js(anchor_id, sketch_path.name),
+        close_res_2: Optional[Dict[str, Any]] = None
+        try:
+            deadline2 = time.perf_counter() + poll_timeout
+            while time.perf_counter() < deadline2:
+                probe2 = client.run_code(
+                    "roundtrip-step6-wait-reopen",
+                    _build_wait_open_js(anchor_id, sketch_path.name),
+                )
+                if probe2.get("ready") and probe2.get("docId"):
+                    reopen_doc_id = str(probe2["docId"])
+                    break
+                time.sleep(0.15)
+            if not reopen_doc_id:
+                return {
+                    "tool": "sketch_mcp_roundtrip.py",
+                    "passed": False,
+                    "failedStep": "step6_reopen",
+                    "reason": f"Timed out waiting for {sketch_path.name} to reopen",
+                }
+
+            readback_res = client.run_code(
+                "roundtrip-step6-readback",
+                _build_lightweight_readback_js(reopen_doc_id, edits, target_page_id),
             )
-            if probe2.get("ready") and probe2.get("docId"):
-                reopen_doc_id = str(probe2["docId"])
-                break
-            time.sleep(0.15)
-        if not reopen_doc_id:
-            return {
-                "tool": "sketch_mcp_roundtrip.py",
-                "passed": False,
-                "failedStep": "step6_reopen",
-                "reason": f"Timed out waiting for {sketch_path.name} to reopen",
-            }
+            reopen_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+            reopen_png_path = screenshots_dir / "reopen.png"
+            reopen_png_path.write_bytes(reopen_png_bytes)
+            reopen_sha256 = hashlib.sha256(reopen_png_bytes).hexdigest()
 
-        readback_res = client.run_code(
-            "roundtrip-step6-readback",
-            _build_lightweight_readback_js(reopen_doc_id, edits, target_page_id),
-        )
-        reopen_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
-        reopen_png_path = screenshots_dir / "reopen.png"
-        reopen_png_path.write_bytes(reopen_png_bytes)
-        reopen_sha256 = hashlib.sha256(reopen_png_bytes).hexdigest()
+            close_res_2 = client.run_code(
+                "roundtrip-step6-close-reopen",
+                _build_close_doc_js(reopen_doc_id, anchor_id),
+            )
+        finally:
+            if close_res_2 is None:
+                try:
+                    if reopen_doc_id:
+                        client.run_code(
+                            "roundtrip-step6-emergency-close",
+                            _build_close_doc_js(reopen_doc_id, anchor_id),
+                        )
+                    else:
+                        client.run_code(
+                            "roundtrip-step6-emergency-close-all",
+                            _build_close_all_non_anchor_js(anchor_id),
+                        )
+                except Exception:
+                    pass
 
-        close_res_2 = client.run_code(
-            "roundtrip-step6-close-reopen",
-            _build_close_doc_js(reopen_doc_id, anchor_id),
-        )
         final_slot_check = client.run_code(
             "roundtrip-step6-final-slot-check",
             _build_slot_check_js(anchor_id),
         )
 
     persistence_verified = True
-    readback_items = {
-        str(r.get("layerID")): r for r in (readback_res.get("readbacks") or [])
-    }
-    for edit in edits:
+    raw_readbacks = [
+        r for r in (readback_res.get("readbacks") or []) if isinstance(r, dict)
+    ]
+    readbacks_by_index: Dict[int, Dict[str, Any]] = {}
+    readbacks_by_key: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for pos, r in enumerate(raw_readbacks):
+        e_idx = r.get("editIndex")
+        if isinstance(e_idx, int):
+            readbacks_by_index[e_idx] = r
+        else:
+            readbacks_by_index[pos] = r
+        lid_key = str(r.get("layerID", ""))
+        ov_key = str(r.get("overrideID") or "")
+        readbacks_by_key[(lid_key, ov_key)] = r
+
+    for edit_idx, edit in enumerate(edits):
         lid = str(edit.get("layerID", ""))
-        rb = readback_items.get(lid)
-        if not rb:
+        ov_id = str(edit.get("overrideID") or "")
+        rb = readbacks_by_index.get(edit_idx) or readbacks_by_key.get((lid, ov_id))
+        if not rb or str(rb.get("layerID", "")) != lid:
             persistence_verified = False
             break
         if "text" in edit and rb.get("text") != edit["text"]:
             persistence_verified = False
         if "overrideValue" in edit and rb.get("overrideValue") != edit["overrideValue"]:
+            persistence_verified = False
+        if "borderThickness" in edit and rb.get("borderThickness") != edit["borderThickness"]:
             persistence_verified = False
 
     screenshot_sha_match = after_sha256 == reopen_sha256

@@ -40,7 +40,7 @@ export const skills = {
     "gh",
     "gh-identity",
     "project-guide",
-    "sketch-native",
+    ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "wechatide",
   ],
   claude: [
@@ -49,7 +49,7 @@ export const skills = {
     "gh",
     "gh-identity",
     "project-guide",
-    "sketch-native",
+    ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "wechatide",
   ],
   antigravity: [

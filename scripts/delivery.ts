@@ -12,6 +12,7 @@ export const memberCategories = [
 
 export const products = ["codex", "claude", "antigravity"] as const;
 export type Product = (typeof products)[number];
+export const darwinOnlySkills = new Set(["sketch-native"]);
 const sharedPolicies = ["writing", "tool-contracts", "review"];
 const codexPolicies = ["rust", "sql", "models", "claude-code", "antigravity"];
 // Deployed executables a consuming project runs directly, published beside the rules they enforce.
@@ -45,15 +46,23 @@ export type PublicMember = {
 export function publicMembers(
   entries: SkillEntry[],
   selected?: Product,
+  platform?: NodeJS.Platform,
 ): PublicMember[] {
   const skills = (product: Product) =>
     [
       ...new Set(
         selectSkillEntries(entries, product).map((entry) => entry.topLevel),
       ),
-    ].sort((left, right) =>
-      Buffer.compare(Buffer.from(left), Buffer.from(right)),
-    );
+    ]
+      .filter(
+        (name) =>
+          platform === undefined ||
+          platform === "darwin" ||
+          !darwinOnlySkills.has(name),
+      )
+      .sort((left, right) =>
+        Buffer.compare(Buffer.from(left), Buffer.from(right)),
+      );
   const members: PublicMember[] = [
     {
       category: "guide",

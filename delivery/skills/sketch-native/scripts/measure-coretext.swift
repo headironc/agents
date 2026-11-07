@@ -1,8 +1,10 @@
 #!/usr/bin/env swift
+import Foundation
+#if canImport(CoreFoundation) && canImport(CoreGraphics) && canImport(CoreText)
 import CoreFoundation
 import CoreGraphics
 import CoreText
-import Foundation
+#endif
 
 struct MeasureInputItem: Codable {
     let id: String
@@ -77,6 +79,7 @@ func printHelp() {
     print(help)
 }
 
+#if canImport(CoreFoundation) && canImport(CoreGraphics) && canImport(CoreText)
 func createResolvedFont(fontName: String?, uiUsage: String?, size: CGFloat) -> (CTFont, Bool) {
     let usage = (uiUsage ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     let rawName = (fontName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -255,6 +258,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
         bakedHeight: round(totalHeight)
     )
 }
+#endif
 
 struct WrappedInput: Codable {
     let items: [MeasureInputItem]
@@ -326,7 +330,12 @@ if let direct = try? decoder.decode([MeasureInputItem].self, from: inputData) {
     exit(2)
 }
 
+#if canImport(CoreFoundation) && canImport(CoreGraphics) && canImport(CoreText)
 let results = items.map { measureItem($0) }
+#else
+fputs("Error: measure-coretext.swift requires macOS CoreText.\n", stderr)
+exit(2)
+#endif
 let report = MeasureBatchReport(
     tool: "measure-coretext.swift",
     engine: "macOS-CoreText-CTTypesetter",
