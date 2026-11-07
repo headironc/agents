@@ -28,7 +28,7 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 DEFAULT_SKETCHTOOL = (
@@ -459,10 +459,39 @@ def inspect_sketch_artboards_and_clocks(
     clock_layers: List[Dict[str, Any]] = []
 
     with zipfile.ZipFile(sketch_path, "r") as zf:
-        for member in sorted(zf.namelist()):
+        namelist = sorted(zf.namelist())
+        symbol_masters: Dict[str, Dict[str, Any]] = {}
+
+        if "document.json" in namelist:
+            doc_data = json.loads(zf.read("document.json").decode("utf-8"))
+            for fsym in doc_data.get("foreignSymbols") or []:
+                if not isinstance(fsym, dict):
+                    continue
+                sm = fsym.get("symbolMaster") or fsym.get("originalMaster") or {}
+                if isinstance(sm, dict) and sm:
+                    sid = str(sm.get("symbolID") or sm.get("do_objectID") or "")
+                    if sid:
+                        symbol_masters[sid] = sm
+
+        pages_list: List[Tuple[str, Dict[str, Any]]] = []
+        for member in namelist:
             if not (member.startswith("pages/") and member.endswith(".json")):
                 continue
             page = json.loads(zf.read(member).decode("utf-8"))
+            pages_list.append((member, page))
+
+            def index_masters(node: Dict[str, Any]) -> None:
+                if node.get("_class") == "symbolMaster":
+                    sid = str(node.get("symbolID") or node.get("do_objectID") or "")
+                    if sid:
+                        symbol_masters[sid] = node
+                for ch in node.get("layers") or []:
+                    if isinstance(ch, dict):
+                        index_masters(ch)
+
+            index_masters(page)
+
+        for _, page in pages_list:
             page_id = str(page.get("do_objectID", ""))
             page_name = str(page.get("name", ""))
 
@@ -483,12 +512,127 @@ def inspect_sketch_artboards_and_clocks(
                     }
                 )
 
+                def walk_symbol_master(
+                    sm_node: Dict[str, Any],
+                    root_instance_id: str,
+                    ancestors: List[str],
+                    ox: float,
+                    oy: float,
+                    path_prefix: str,
+                    string_overrides: Dict[str, str],
+                    symbol_id_overrides: Dict[str, str],
+                    visited_syms: Set[str],
+                ) -> None:
+                    sm_name = str(sm_node.get("name", ""))
+                    master_anc = ancestors + ([sm_name] if sm_name else [])
+
+                    def walk_master_child(
+                        mnode: Dict[str, Any],
+                        cur_anc: List[str],
+                        mx: float,
+                        my: float,
+                    ) -> None:
+                        if not bool(mnode.get("isVisible", True)):
+                            return
+                        mcls = mnode.get("_class")
+                        mf = mnode.get("frame") or {}
+                        cx = mx + float(mf.get("x", 0.0))
+                        cy = my + float(mf.get("y", 0.0))
+                        mname = str(mnode.get("name", ""))
+                        moid = str(mnode.get("do_objectID", ""))
+                        full_key = f"{path_prefix}{moid}" if moid else ""
+
+                        if mcls == "text":
+                            attr_str = mnode.get("attributedString") or {}
+                            raw_txt = str(attr_str.get("string", ""))
+                            txt = str(
+                                string_overrides.get(full_key, raw_txt)
+                                if full_key
+                                else raw_txt
+                            ).strip()
+                            if _is_statusbar_clock_layer(txt, mname, cur_anc, cy):
+                                clock_layers.append(
+                                    {
+                                        "pageID": page_id,
+                                        "artboardID": ab_id,
+                                        "layerID": moid or root_instance_id,
+                                        "instanceID": root_instance_id,
+                                        "layerName": mname,
+                                        "text": txt,
+                                    }
+                                )
+                        elif mcls == "symbolInstance":
+                            eff_sym_id = str(
+                                symbol_id_overrides.get(
+                                    full_key, mnode.get("symbolID", "")
+                                )
+                                if full_key
+                                else mnode.get("symbolID", "")
+                            )
+                            if (
+                                eff_sym_id
+                                and eff_sym_id.lower() != "none"
+                                and eff_sym_id not in visited_syms
+                            ):
+                                nested_sm = symbol_masters.get(eff_sym_id)
+                                if nested_sm is not None:
+                                    next_prefix = (
+                                        f"{full_key}/" if full_key else path_prefix
+                                    )
+                                    merged_str_ovr = dict(string_overrides)
+                                    merged_sym_ovr = dict(symbol_id_overrides)
+                                    for nov in mnode.get("overrideValues") or []:
+                                        if not isinstance(nov, dict):
+                                            continue
+                                        nov_name = str(nov.get("overrideName", ""))
+                                        if "_" not in nov_name:
+                                            continue
+                                        nprefix, nprop = nov_name.rsplit("_", 1)
+                                        nval = nov.get("value")
+                                        scoped_key = f"{next_prefix}{nprefix}"
+                                        if (
+                                            nprop == "stringValue"
+                                            and isinstance(nval, str)
+                                        ):
+                                            merged_str_ovr.setdefault(
+                                                scoped_key, nval
+                                            )
+                                        elif (
+                                            nprop == "symbolID"
+                                            and isinstance(nval, str)
+                                        ):
+                                            merged_sym_ovr.setdefault(
+                                                scoped_key, nval
+                                            )
+                                    walk_symbol_master(
+                                        nested_sm,
+                                        root_instance_id,
+                                        cur_anc + ([mname] if mname else []),
+                                        cx,
+                                        cy,
+                                        next_prefix,
+                                        merged_str_ovr,
+                                        merged_sym_ovr,
+                                        visited_syms | {eff_sym_id},
+                                    )
+
+                        next_anc = cur_anc + ([mname] if mname else [])
+                        for mch in mnode.get("layers") or []:
+                            if isinstance(mch, dict):
+                                walk_master_child(mch, next_anc, cx, cy)
+
+                    for ch in sm_node.get("layers") or []:
+                        if isinstance(ch, dict):
+                            walk_master_child(ch, master_anc, ox, oy)
+
                 def walk(
                     node: Dict[str, Any],
                     ancestors: List[str],
                     ox: float,
                     oy: float,
                 ) -> None:
+                    if not bool(node.get("isVisible", True)):
+                        return
                     is_ab = node.get("_class") == "artboard"
                     nf = node.get("frame") or {}
                     cur_x = 0.0 if is_ab else ox + float(nf.get("x", 0.0))
@@ -506,6 +650,36 @@ def inspect_sketch_artboards_and_clocks(
                                     "layerName": lname,
                                     "text": txt,
                                 }
+                            )
+                    elif node.get("_class") == "symbolInstance":
+                        sym_id = str(node.get("symbolID", ""))
+                        inst_id = str(node.get("do_objectID", ""))
+                        string_ovr: Dict[str, str] = {}
+                        sym_id_ovr: Dict[str, str] = {}
+                        for ov in node.get("overrideValues") or []:
+                            if not isinstance(ov, dict):
+                                continue
+                            ov_name = str(ov.get("overrideName", ""))
+                            if "_" not in ov_name:
+                                continue
+                            prefix_key, prop = ov_name.rsplit("_", 1)
+                            val = ov.get("value")
+                            if prop == "stringValue" and isinstance(val, str):
+                                string_ovr[prefix_key] = val
+                            elif prop == "symbolID" and isinstance(val, str):
+                                sym_id_ovr[prefix_key] = val
+                        sm = symbol_masters.get(sym_id) if sym_id else None
+                        if sm is not None and sym_id:
+                            walk_symbol_master(
+                                sm,
+                                inst_id,
+                                ancestors + ([lname] if lname else []),
+                                cur_x,
+                                cur_y,
+                                "",
+                                string_ovr,
+                                sym_id_ovr,
+                                {sym_id},
                             )
                     next_anc = ancestors + ([lname] if not is_ab else [])
                     for ch in node.get("layers") or []:
@@ -665,44 +839,54 @@ def run_export_and_manifest(
         _ensure_private_export_dir(pdf_dir)
         for clock in clock_layers:
             lid = clock["layerID"]
+            inst_id = str(clock.get("instanceID") or "")
+            candidate_ids = [lid] + ([inst_id] if inst_id and inst_id != lid else [])
             stage_pdf_dir = Path(
                 tempfile.mkdtemp(prefix=f".stage-{lid}-", dir=str(pdf_dir))
             )
             try:
-                cmd = [
-                    sketchtool,
-                    "export",
-                    "layers",
-                    str(sketch_path),
-                    f"--item={lid}",
-                    "--formats=pdf",
-                    "--use-id-for-name=YES",
-                    f"--output={stage_pdf_dir}",
-                ]
-                proc = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=60, check=False
-                )
-                if proc.returncode != 0:
-                    clock_pdf_checks.append(
-                        {
-                            **clock,
-                            "valid": False,
-                            "error": proc.stderr.strip(),
-                        }
+                staged_pdf: Optional[Path] = None
+                last_err = ""
+                for cid in candidate_ids:
+                    cmd = [
+                        sketchtool,
+                        "export",
+                        "layers",
+                        str(sketch_path),
+                        f"--item={cid}",
+                        "--formats=pdf",
+                        "--use-id-for-name=YES",
+                        f"--output={stage_pdf_dir}",
+                    ]
+                    proc = subprocess.run(
+                        cmd, capture_output=True, text=True, timeout=60, check=False
                     )
-                    continue
-                staged_pdf = stage_pdf_dir / f"{lid}.pdf"
-                if not (staged_pdf.exists() or staged_pdf.is_symlink()):
+                    if proc.returncode != 0:
+                        last_err = proc.stderr.strip()
+                        continue
+                    cand_pdf = stage_pdf_dir / f"{cid}.pdf"
+                    if cand_pdf.exists() or cand_pdf.is_symlink():
+                        staged_pdf = cand_pdf
+                        break
+                    last_err = f"No exact PDF ({cid}.pdf) exported for layer {cid}"
+
+                if staged_pdf is None:
                     clock_pdf_checks.append(
                         {
                             **clock,
                             "valid": False,
-                            "error": f"No exact PDF ({lid}.pdf) exported for layer {lid}",
+                            "error": last_err
+                            or f"No exact PDF ({lid}.pdf) exported for layer {lid}",
                         }
                     )
                     continue
                 _validate_regular_owned_file(staged_pdf)
-                final_pdf = pdf_dir / f"{lid}.pdf"
+                pdf_filename = (
+                    f"{inst_id}_{lid}.pdf"
+                    if inst_id and (pdf_dir / f"{lid}.pdf").exists()
+                    else f"{lid}.pdf"
+                )
+                final_pdf = pdf_dir / pdf_filename
                 _validate_existing_output_target(final_pdf)
                 os.replace(staged_pdf, final_pdf)
             finally:

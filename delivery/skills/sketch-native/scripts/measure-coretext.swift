@@ -99,18 +99,42 @@ func createResolvedFont(fontName: String?, uiUsage: String?, size: CGFloat) -> (
         "CTFontRegularUsage",
         "CTFontEmphasizedUsage",
         "CTFontMediumUsage",
+        "CTFontSemiboldUsage",
+        "CTFontBoldUsage",
         ".SFNS-Regular",
+        ".SFNS-Medium",
         ".SFUI-Regular",
         "system",
         "System"
     ]
     if !usage.isEmpty || systemTokens.contains(rawName) || rawName.isEmpty {
-        let uiType: CTFontUIFontType = (usage == "CTFontEmphasizedUsage" || rawName == "CTFontEmphasizedUsage")
+        let effectiveUsage: String
+        if !usage.isEmpty {
+            effectiveUsage = usage
+        } else if rawName.hasPrefix("CTFont") && rawName.hasSuffix("Usage") {
+            effectiveUsage = rawName
+        } else if rawName == ".SFNS-Medium" {
+            effectiveUsage = "CTFontMediumUsage"
+        } else {
+            effectiveUsage = "CTFontRegularUsage"
+        }
+        let attrs: [CFString: Any] = [
+            "NSCTFontUIUsageAttribute" as CFString: effectiveUsage as CFString,
+            kCTFontSizeAttribute: size
+        ]
+        let desc = CTFontDescriptorCreateWithAttributes(attrs as CFDictionary)
+        let descFont = CTFontCreateWithFontDescriptor(desc, size, nil)
+        let psName = CTFontCopyPostScriptName(descFont) as String
+        if psName.hasPrefix(".SF") || psName.contains("SFNS") || psName.contains("SFUI") {
+            return (descFont, true)
+        }
+        let uiType: CTFontUIFontType = (effectiveUsage == "CTFontEmphasizedUsage" || effectiveUsage == "CTFontBoldUsage")
             ? .emphasizedSystem
             : .system
         if let sysFont = CTFontCreateUIFontForLanguage(uiType, size, nil) {
             return (sysFont, true)
         }
+        return (descFont, true)
     }
     let font = CTFontCreateWithName(rawName as CFString, size, nil)
     return (font, false)

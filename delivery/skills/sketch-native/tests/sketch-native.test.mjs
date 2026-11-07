@@ -1850,6 +1850,204 @@ assert res2["accessible"] is True, res2
       "1",
     ]);
     assert.notEqual(poisonedRes.status, 0);
+
+    // 8. Verify status-bar clock inside a SymbolInstance (including foreignSymbols + _stringValue override) is collected and PDF-verified
+    const compClockSpec = createCleanSketchSpec(44);
+    const compAb =
+      compClockSpec["pages/20000000-0000-4000-8000-000000000001.json"].layers[1];
+    // Replace direct StatusBar group with a SymbolInstance referencing a foreign StatusBar symbolMaster
+    compClockSpec["document.json"].foreignSymbols = [
+      {
+        _class: "MSImmutableForeignSymbol",
+        do_objectID: "70000000-0000-4000-8000-000000000701",
+        symbolMaster: {
+          _class: "symbolMaster",
+          do_objectID: "70000000-0000-4000-8000-000000000702",
+          symbolID: "70000000-0000-4000-8000-000000000703",
+          name: "iOS / StatusBar",
+          frame: { _class: "rect", x: 0, y: 800, width: 375, height: 44 },
+          layers: [
+            {
+              _class: "text",
+              do_objectID: "70000000-0000-4000-8000-000000000704",
+              name: "ClockLabel",
+              textBehaviour: 0,
+              frame: { _class: "rect", x: 24, y: 14, width: 54, height: 18 },
+              attributedString: {
+                _class: "attributedString",
+                string: "00:00",
+                attributes: [
+                  {
+                    _class: "stringAttribute",
+                    location: 0,
+                    length: 5,
+                    attributes: {
+                      MSAttributedStringFontAttribute: {
+                        _class: "fontDescriptor",
+                        attributes: {
+                          NSCTFontUIUsageAttribute: "CTFontRegularUsage",
+                          size: 14,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ];
+    compAb.layers[0] = {
+      _class: "symbolInstance",
+      do_objectID: "70000000-0000-4000-8000-000000000705",
+      symbolID: "70000000-0000-4000-8000-000000000703",
+      name: "StatusBarInstance",
+      frame: { _class: "rect", x: 0, y: 0, width: 375, height: 44 },
+      overrideValues: [
+        {
+          _class: "overrideValue",
+          do_objectID: "70000000-0000-4000-8000-000000000706",
+          overrideName: "70000000-0000-4000-8000-000000000704_stringValue",
+          value: "9:41",
+        },
+      ],
+    };
+    const compClockBuilder = path.join(tmpDir, "comp-clock-spec.json");
+    const compClockSketch = path.join(tmpDir, "comp-clock.sketch");
+    const compClockOutDir = path.join(tmpDir, "comp-clock-exports");
+    fs.writeFileSync(compClockBuilder, JSON.stringify(compClockSpec));
+    buildSyntheticSketch(compClockSketch, compClockBuilder);
+
+    const compClockRes = runPython(PY_EXPORT, [
+      "--sketch",
+      compClockSketch,
+      "--output-dir",
+      compClockOutDir,
+      "--sketchtool",
+      mockSketchtool,
+      "--cwebp",
+      mockCwebp,
+      "--scales",
+      "1",
+      "--verify-clock-pdf",
+    ]);
+    assert.equal(
+      compClockRes.status,
+      0,
+      compClockRes.stdout + "\n" + compClockRes.stderr,
+    );
+    const compClockReport = JSON.parse(compClockRes.stdout);
+    assert.equal(compClockReport.passed, true);
+    assert.equal(compClockReport.clockPdfChecks.length, 1);
+    assert.equal(
+      compClockReport.clockPdfChecks[0].layerID,
+      "70000000-0000-4000-8000-000000000704",
+    );
+    assert.equal(
+      compClockReport.clockPdfChecks[0].instanceID,
+      "70000000-0000-4000-8000-000000000705",
+    );
+    assert.equal(compClockReport.clockPdfChecks[0].text, "9:41");
+    assert.equal(compClockReport.clockPdfChecks[0].valid, true);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("sketch-native: round-7 focus-ring border detection, shared style asset refs, and CTFontMediumUsage", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketch-r7-"));
+  try {
+    // 1. Verify CTFontMediumUsage resolves to .SFNS-Medium on macOS
+    if (process.platform === "darwin") {
+      const specPath = path.join(tmpDir, "ui-fonts.json");
+      fs.writeFileSync(
+        specPath,
+        JSON.stringify([
+          {
+            id: "reg",
+            text: "9:41",
+            uiUsage: "CTFontRegularUsage",
+            fontSize: 14,
+            width: 60,
+          },
+          {
+            id: "med",
+            text: "标题文案",
+            uiUsage: "CTFontMediumUsage",
+            fontSize: 16,
+            width: 120,
+          },
+          {
+            id: "emp",
+            text: "强调文案",
+            uiUsage: "CTFontEmphasizedUsage",
+            fontSize: 16,
+            width: 120,
+          },
+        ]),
+      );
+      const uiRes = runPython(PY_MEASURE, ["--input", specPath]);
+      assert.equal(uiRes.status, 0, uiRes.stderr);
+      const uiPayload = JSON.parse(uiRes.stdout);
+      const uiRows = uiPayload.results;
+      const byId = Object.fromEntries(uiRows.map((r) => [r.id, r]));
+      assert.equal(byId.reg.resolvedPostScriptName, ".SFNS-Regular");
+      assert.equal(byId.med.resolvedPostScriptName, ".SFNS-Medium");
+      assert.equal(byId.emp.resolvedPostScriptName, ".SFNS-Bold");
+    }
+
+    // 2. Verify ordinary-named layer with 2px Outside border is audited as a focus ring
+    //    AND shared styles with missing archive images / dangling swatchIDs are flagged
+    const r7Spec = createCleanSketchSpec(44);
+    const r7Page = r7Spec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const r7Stack = r7Page.layers[1].layers[1];
+    // Clip parent stack and remove 'focus' from button name + remove hasFocusRing
+    r7Stack.clippingBehavior = 1;
+    r7Stack.layers[0].name = "Button/Primary";
+    delete r7Stack.layers[0].hasFocusRing;
+
+    // Add missing image ref and dangling swatchID inside document.json.layerStyles
+    r7Spec["document.json"].layerStyles.objects.push({
+      _class: "sharedStyle",
+      do_objectID: "80000000-0000-4000-8000-000000000801",
+      name: "Fill/BrokenSharedStyle",
+      value: {
+        _class: "style",
+        fills: [
+          {
+            _class: "fill",
+            isEnabled: true,
+            color: {
+              _class: "color",
+              alpha: 1,
+              red: 1,
+              green: 0,
+              blue: 0,
+              swatchID: "DEAD0000-0000-4000-8000-000000000802",
+            },
+            image: {
+              _class: "MSJSONFileReference",
+              _ref_class: "MSImageData",
+              _ref: "images/MISSING_SHARED_STYLE.png",
+            },
+          },
+        ],
+      },
+    });
+
+    const r7Builder = path.join(tmpDir, "r7-spec.json");
+    const r7Sketch = path.join(tmpDir, "r7.sketch");
+    fs.writeFileSync(r7Builder, JSON.stringify(r7Spec));
+    buildSyntheticSketch(r7Sketch, r7Builder);
+
+    const r7AuditRes = runPython(PY_AUDIT, ["--sketch", r7Sketch]);
+    assert.equal(r7AuditRes.status, 1);
+    const r7Report = JSON.parse(r7AuditRes.stdout);
+    const r7Codes = new Set(r7Report.findings.map((f) => f.code));
+    assert.ok(r7Codes.has("FOCUS-RING-ANCESTOR-CLIPPED"));
+    assert.ok(r7Codes.has("REF-MISSING-IMAGE-DATA"));
+    assert.ok(r7Codes.has("REF-DANGLING-SWATCH-ID"));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

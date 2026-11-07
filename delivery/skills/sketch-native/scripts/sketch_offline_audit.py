@@ -311,7 +311,7 @@ def _is_focus_ring_layer(layer: Dict[str, Any]) -> bool:
             continue
         pos = int(border.get("position", 0))
         thickness = float(border.get("thickness", 0.0) or 0.0)
-        if pos == 2 and abs(thickness - 2.0) <= 0.5 and ("focus" in name or layer.get("hasFocusRing") is True):
+        if pos == 2 and abs(thickness - 2.0) <= 0.5:
             return True
     return bool(layer.get("hasFocusRing", False))
 
@@ -708,6 +708,8 @@ def run_offline_audit(
     if doc_data.get("do_objectID"):
         register_object_id(str(doc_data["do_objectID"]), "document.json:document")
 
+    collected_shared_styles: List[Tuple[Dict[str, Any], str]] = []
+
     def audit_shared_style_object(st: Dict[str, Any], label_prefix: str) -> None:
         sid = st.get("do_objectID")
         sname = str(st.get("name", ""))
@@ -729,6 +731,7 @@ def run_offline_audit(
         f_desc = t_style.get("MSAttributedStringFontAttribute")
         if isinstance(f_desc, dict):
             inspect_font_descriptor(f_desc, f"{label_prefix}:{sname}")
+        collected_shared_styles.append((st, label_prefix))
 
     for style_group_key in ("layerStyles", "layerTextStyles"):
         objs = (doc_data.get(style_group_key) or {}).get("objects") or []
@@ -871,6 +874,54 @@ def run_offline_audit(
                     )
                 )
 
+    def check_style_refs(
+        style_obj: Any,
+        page_id: str,
+        artboard_id: Optional[str],
+        owner_id: str,
+    ) -> None:
+        if not isinstance(style_obj, dict):
+            return
+        for fill in style_obj.get("fills") or []:
+            if isinstance(fill, dict):
+                check_color_obj(fill.get("color"), page_id, artboard_id, owner_id)
+                check_image_ref(fill.get("image"), page_id, artboard_id, owner_id)
+                grad = fill.get("gradient")
+                if isinstance(grad, dict):
+                    for stop in grad.get("stops") or []:
+                        if isinstance(stop, dict):
+                            check_color_obj(
+                                stop.get("color"), page_id, artboard_id, owner_id
+                            )
+        for border in style_obj.get("borders") or []:
+            if isinstance(border, dict):
+                check_color_obj(border.get("color"), page_id, artboard_id, owner_id)
+                grad = border.get("gradient")
+                if isinstance(grad, dict):
+                    for stop in grad.get("stops") or []:
+                        if isinstance(stop, dict):
+                            check_color_obj(
+                                stop.get("color"), page_id, artboard_id, owner_id
+                            )
+        for shadow_key in ("shadows", "innerShadows"):
+            for shadow in style_obj.get(shadow_key) or []:
+                if isinstance(shadow, dict):
+                    check_color_obj(
+                        shadow.get("color"), page_id, artboard_id, owner_id
+                    )
+        t_enc = (style_obj.get("textStyle") or {}).get("encodedAttributes") or {}
+        if isinstance(t_enc, dict):
+            check_color_obj(
+                t_enc.get("MSAttributedStringColorAttribute"),
+                page_id,
+                artboard_id,
+                owner_id,
+            )
+
+    for st_obj, st_prefix in collected_shared_styles:
+        st_id = str(st_obj.get("do_objectID") or st_obj.get("name") or st_prefix)
+        check_style_refs(st_obj.get("value"), "document.json", None, st_id)
+
     audit_roots: List[Tuple[str, Dict[str, Any]]] = list(sorted(pages_data.items()))
     if embedded_foreign_masters:
         audit_roots.append(
@@ -946,16 +997,7 @@ def run_offline_audit(
 
             # Style colors & image fills
             style = node.get("style") or {}
-            for fill in style.get("fills") or []:
-                if isinstance(fill, dict):
-                    check_color_obj(fill.get("color"), page_id, aid, oid)
-                    check_image_ref(fill.get("image"), page_id, aid, oid)
-            for border in style.get("borders") or []:
-                if isinstance(border, dict):
-                    check_color_obj(border.get("color"), page_id, aid, oid)
-            for shadow in style.get("shadows") or []:
-                if isinstance(shadow, dict):
-                    check_color_obj(shadow.get("color"), page_id, aid, oid)
+            check_style_refs(style, page_id, aid, oid)
             if cls == "bitmap":
                 check_image_ref(node.get("image"), page_id, aid, oid)
 
