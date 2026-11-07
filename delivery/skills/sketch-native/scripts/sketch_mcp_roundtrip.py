@@ -27,7 +27,9 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -41,6 +43,62 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 DEFAULT_MCP_URL = "http://localhost:31126/mcp"
 DEFAULT_SKETCH_APP = "/Applications/Sketch.app"
+
+
+def _ensure_private_dir(dir_path: Path, enforce_private_mode: bool = True) -> None:
+    """Create or validate an output directory, rejecting symlinked target directories."""
+    try:
+        st = os.lstat(dir_path)
+        if stat.S_ISLNK(st.st_mode):
+            raise RuntimeError(f"Refusing to use symlinked directory: {dir_path}")
+        if not stat.S_ISDIR(st.st_mode):
+            raise RuntimeError(f"Output directory path is not a directory: {dir_path}")
+        if (
+            enforce_private_mode
+            and hasattr(os, "getuid")
+            and st.st_uid == os.getuid()
+            and not (st.st_mode & stat.S_ISVTX)
+            and (st.st_mode & (stat.S_IWGRP | stat.S_IWOTH))
+        ):
+            os.chmod(dir_path, 0o700)
+    except FileNotFoundError:
+        if dir_path.parent != dir_path and dir_path.parent.is_symlink():
+            # Allow standard macOS system symlinks (/tmp -> /private/tmp, /var -> /private/var)
+            if str(dir_path.parent) not in ("/tmp", "/var"):
+                raise RuntimeError(
+                    f"Refusing to create directory under symlinked parent: {dir_path.parent}"
+                )
+        dir_path.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if enforce_private_mode:
+            os.chmod(dir_path, 0o700)
+
+
+def _write_bytes_nofollow(file_path: Path, data: bytes, mode: int = 0o600) -> None:
+    """Write bytes to file_path without following symlinks on parent or target file."""
+    if str(file_path.parent) not in ("/tmp", "/var") and file_path.parent.is_symlink():
+        raise RuntimeError(f"Refusing to write inside symlinked directory: {file_path.parent}")
+    _ensure_private_dir(file_path.parent, enforce_private_mode=False)
+    try:
+        st = os.lstat(file_path)
+        if stat.S_ISLNK(st.st_mode):
+            raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+    except FileNotFoundError:
+        pass
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(str(file_path), flags, mode)
+    try:
+        view = memoryview(data)
+        total = 0
+        while total < len(view):
+            written = os.write(fd, view[total:])
+            if written <= 0:
+                raise RuntimeError(f"Short write to {file_path}")
+            total += written
+    finally:
+        os.close(fd)
 
 
 class SketchMCPClient:
@@ -275,10 +333,11 @@ def _build_lightweight_readback_js(doc_id: str, edits: List[Dict[str, Any]], pag
             "  let ovVal = null",
             "  if (edit.overrideID && layer.overrides) {",
             "    const ov = layer.overrides.find(o => String(o.id) === String(edit.overrideID))",
-            "    ovVal = ov ? ov.value : null",
+            "    ovVal = (ov && ov.value !== undefined && ov.value !== null) ? String(ov.value) : null",
             "  }",
             "  const borderThickness = (layer.style && layer.style.borders && layer.style.borders.length > 0) ? layer.style.borders[0].thickness : null",
-            "  readbacks.push({ editIndex, layerID: String(layer.id), overrideID: edit.overrideID || null, text: layer.text || null, overrideValue: ovVal, borderThickness })",
+            "  const layerText = typeof layer.text === 'string' ? layer.text : null",
+            "  readbacks.push({ editIndex, layerID: String(layer.id), overrideID: edit.overrideID || null, text: layerText, overrideValue: ovVal, borderThickness })",
             "}",
             "console.log(JSON.stringify({ ok: true, docId: String(doc.id), readbacks }))",
         ]
@@ -493,7 +552,7 @@ def run_mcp_roundtrip(
     if not sketch_path.exists():
         raise FileNotFoundError(f"Disposable .sketch copy not found: {sketch_path}")
 
-    screenshots_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_private_dir(screenshots_dir)
     edits = edit_spec.get("edits") or []
     if len(edits) > 3:
         raise ValueError(
@@ -562,7 +621,7 @@ def run_mcp_roundtrip(
             # Step 3 & Step 4: Pre-edit screenshot -> lightweight JS edit + processPendingChanges + save -> post-edit screenshot -> doc.close()
             before_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
             before_png_path = screenshots_dir / "before.png"
-            before_png_path.write_bytes(before_png_bytes)
+            _write_bytes_nofollow(before_png_path, before_png_bytes)
             before_sha256 = hashlib.sha256(before_png_bytes).hexdigest()
 
             mutate_res = client.run_code(
@@ -572,7 +631,7 @@ def run_mcp_roundtrip(
 
             after_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
             after_png_path = screenshots_dir / "after.png"
-            after_png_path.write_bytes(after_png_bytes)
+            _write_bytes_nofollow(after_png_path, after_png_bytes)
             after_sha256 = hashlib.sha256(after_png_bytes).hexdigest()
 
             close_res_1 = client.run_code(
@@ -629,7 +688,7 @@ def run_mcp_roundtrip(
             )
             reopen_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
             reopen_png_path = screenshots_dir / "reopen.png"
-            reopen_png_path.write_bytes(reopen_png_bytes)
+            _write_bytes_nofollow(reopen_png_path, reopen_png_bytes)
             reopen_sha256 = hashlib.sha256(reopen_png_bytes).hexdigest()
 
             close_res_2 = client.run_code(
@@ -828,8 +887,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     out_str = json.dumps(report, ensure_ascii=False, indent=2)
     out_path = Path(args.output)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(out_str + "\n", encoding="utf-8")
+    _write_bytes_nofollow(out_path, (out_str + "\n").encode("utf-8"))
     print(out_str)
     return exit_code
 

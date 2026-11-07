@@ -36,8 +36,18 @@ PINGFANG_ASSET_ROOT = Path("/System/Library/AssetsV2")
 CLOCK_TEXT_RE = re.compile(r"^\d{1,2}:\d{2}$")
 
 
+def _can_read_font_file(path: Path) -> bool:
+    try:
+        if not os.access(path, os.R_OK):
+            return False
+        with path.open("rb") as fh:
+            return len(fh.read(4)) == 4
+    except OSError:
+        return False
+
+
 def check_pingfang_font_access() -> Dict[str, Any]:
-    """Verify that /System/Library/AssetsV2 is readable to avoid PingFang SC -> Heiti SC fallback."""
+    """Verify that an actual PingFang.ttc font asset is readable to avoid PingFang SC -> Heiti SC fallback."""
     if platform.system() != "Darwin":
         return {
             "platform": platform.system(),
@@ -58,18 +68,23 @@ def check_pingfang_font_access() -> Dict[str, Any]:
             if not os.access(font_dir, os.R_OK):
                 continue
             for ttc in font_dir.rglob("PingFang.ttc"):
-                if os.access(ttc, os.R_OK):
+                if _can_read_font_file(ttc):
                     found.append(str(ttc))
                     break
             if found:
                 break
-        accessible = len(found) > 0 or os.access(PINGFANG_ASSET_ROOT, os.R_OK)
-        return {
+        accessible = len(found) > 0
+        result: Dict[str, Any] = {
             "platform": "Darwin",
             "accessible": accessible,
             "pingfangPaths": found,
         }
-    except PermissionError as exc:
+        if not accessible:
+            result["reason"] = (
+                f"No readable PingFang.ttc found under {PINGFANG_ASSET_ROOT}/com_apple_MobileAsset_Font*"
+            )
+        return result
+    except OSError as exc:
         return {
             "platform": "Darwin",
             "accessible": False,
@@ -399,6 +414,10 @@ def run_export_and_manifest(
                 (r.get("artboardID"), r.get("scale")): r
                 for r in (existing.get("renders") or [])
             }
+            current_by_key = {
+                (cur["artboardID"], cur["scale"]): cur
+                for cur in exported_renders
+            }
             for cur in exported_renders:
                 key = (cur["artboardID"], cur["scale"])
                 prev = existing_by_key.get(key)
@@ -419,6 +438,27 @@ def run_export_and_manifest(
                             "actual": cur,
                         }
                     )
+            for key, prev in existing_by_key.items():
+                if key not in current_by_key:
+                    manifest_mismatches.append(
+                        {
+                            "type": "missing_in_export",
+                            "key": list(key),
+                            "expected": prev,
+                        }
+                    )
+            current_artboard_ids = {ab["artboardID"] for ab in artboards}
+            for prev_ab in existing.get("artboards") or []:
+                if isinstance(prev_ab, dict):
+                    prev_ab_id = prev_ab.get("id") or prev_ab.get("artboardID")
+                    if prev_ab_id and str(prev_ab_id) not in current_artboard_ids:
+                        manifest_mismatches.append(
+                            {
+                                "type": "missing_artboard_in_export",
+                                "artboardID": str(prev_ab_id),
+                                "expected": prev_ab,
+                            }
+                        )
         else:
             target_json_path.parent.mkdir(parents=True, exist_ok=True)
             target_json_path.write_text(

@@ -17,18 +17,25 @@ const PY_AUDIT = path.join(SCRIPTS_DIR, "sketch_offline_audit.py");
 const PY_ROUNDTRIP = path.join(SCRIPTS_DIR, "sketch_mcp_roundtrip.py");
 const PY_EXPORT = path.join(SCRIPTS_DIR, "sketch_export_manifest.py");
 
+const PY_ENV = {
+  ...process.env,
+  PYTHONDONTWRITEBYTECODE: "1",
+};
+
 function runPython(scriptPath, args, options = {}) {
-  return spawnSync("python3", [scriptPath, ...args], {
+  return spawnSync("python3", ["-B", scriptPath, ...args], {
     encoding: "utf8",
     timeout: 60000,
+    env: PY_ENV,
     ...options,
   });
 }
 
 function runPythonAsync(scriptPath, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn("python3", [scriptPath, ...args], {
+    const child = spawn("python3", ["-B", scriptPath, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
+      env: PY_ENV,
       ...options,
     });
     let stdout = "";
@@ -62,8 +69,9 @@ with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         else:
             zf.writestr(member, content.encode("latin-1"))
 `;
-  const res = spawnSync("python3", ["-c", pyCode, builderPath, sketchPath], {
+  const res = spawnSync("python3", ["-B", "-c", pyCode, builderPath, sketchPath], {
     encoding: "utf8",
+    env: PY_ENV,
   });
   assert.equal(res.status, 0, res.stderr);
 }
@@ -521,6 +529,61 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
 
     const multiAudit = runPython(PY_AUDIT, ["--sketch", multiSketch]);
     assert.equal(multiAudit.status, 0, multiAudit.stdout);
+
+    // Multi-run attributedString measurement: Run 1 is 14pt/20px, Run 2 is 36pt/52px on a single line
+    const multiRunSpec = createCleanSketchSpec({ textHeight: 44, hotspotY: 76 });
+    const mrPage =
+      multiRunSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const mrTextLayer = mrPage.layers[1].layers[1].layers[1];
+    mrTextLayer.frame.height = 20; // Stale height matching only Run 1 (20px) instead of Run 2 (52px)
+    mrTextLayer.attributedString = {
+      _class: "attributedString",
+      string: "¥ 2,480",
+      attributes: [
+        {
+          _class: "stringAttribute",
+          location: 0,
+          length: 2,
+          attributes: {
+            MSAttributedStringFontAttribute: {
+              _class: "fontDescriptor",
+              attributes: { name: "PingFangSC-Regular", size: 14 },
+            },
+            paragraphStyle: {
+              _class: "paragraphStyle",
+              minimumLineHeight: 20,
+              maximumLineHeight: 20,
+            },
+          },
+        },
+        {
+          _class: "stringAttribute",
+          location: 2,
+          length: 5,
+          attributes: {
+            MSAttributedStringFontAttribute: {
+              _class: "fontDescriptor",
+              attributes: { name: "PingFangSC-Medium", size: 36 },
+            },
+            paragraphStyle: {
+              _class: "paragraphStyle",
+              minimumLineHeight: 52,
+              maximumLineHeight: 52,
+            },
+          },
+        },
+      ],
+    };
+    const mrBuilder = path.join(tmpDir, "multirun-spec.json");
+    const mrSketch = path.join(tmpDir, "multirun.sketch");
+    fs.writeFileSync(mrBuilder, JSON.stringify(multiRunSpec));
+    buildSyntheticSketch(mrSketch, mrBuilder);
+
+    const mrAudit = runPython(PY_MEASURE, ["--sketch", mrSketch]);
+    assert.equal(mrAudit.status, 1);
+    const mrReport = JSON.parse(mrAudit.stdout);
+    assert.equal(mrReport.driftCount, 1);
+    assert.equal(mrReport.drifts[0].bakedHeight, 52);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -619,6 +682,29 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
     homeAb.layers[1].clippingBehavior = 1;
     // 3. Start artboard (isFlowHome: true) using "back" destination
     homeAb.layers[2].flow.destinationArtboardID = "back";
+    // 4. Imported foreignTextStyles containing forbidden Noto* font and Type/Platform sample/* name
+    badSpec["document.json"].foreignTextStyles = [
+      {
+        _class: "MSImmutableForeignTextStyle",
+        localSharedStyle: {
+          _class: "sharedStyle",
+          do_objectID: "70000000-0000-4000-8000-000000000077",
+          name: "Type/Platform sample/Caption",
+          value: {
+            _class: "style",
+            textStyle: {
+              _class: "textStyle",
+              encodedAttributes: {
+                MSAttributedStringFontAttribute: {
+                  _class: "fontDescriptor",
+                  attributes: { name: "NotoSansSC-Regular", size: 12 },
+                },
+              },
+            },
+          },
+        },
+      },
+    ];
 
     const badBuilder = path.join(tmpDir, "bad-spec.json");
     const badSketch = path.join(tmpDir, "bad.sketch");
@@ -631,6 +717,8 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
     assert.equal(failReport.passed, false);
     const codes = new Set(failReport.findings.map((f) => f.code));
     assert.ok(codes.has("FONT-HARDCODED-SFPRO"));
+    assert.ok(codes.has("FONT-FORBIDDEN-NOTO"));
+    assert.ok(codes.has("STYLE-FORBIDDEN-PLATFORM-SAMPLE"));
     assert.ok(codes.has("CLOCK-MISSING-CTFONT-REGULAR-USAGE"));
     assert.ok(codes.has("FOCUS-RING-ANCESTOR-CLIPPED"));
     assert.ok(codes.has("FLOW-START-ARTBOARD-BACK-TRAP"));
@@ -818,7 +906,9 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     for n, raw in members.items():
         zout.writestr(n, raw)
 `;
-          spawnSync("python3", ["-c", pyMutate, copySketch]);
+          spawnSync("python3", ["-B", "-c", pyMutate, copySketch], {
+            env: PY_ENV,
+          });
           replyObj = {
             ok: true,
             topCounts: {
@@ -989,12 +1079,13 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     const diffCheck = spawnSync(
       "python3",
       [
+        "-B",
         "-c",
         `import json, sys; from pathlib import Path; sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)}); import sketch_mcp_roundtrip as r; print(json.dumps(r.diff_sketch_archives_offline(Path(sys.argv[1]), Path(sys.argv[2]), set())))`,
         copySketch,
         driftedDocSketch,
       ],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: PY_ENV },
     );
     assert.equal(diffCheck.status, 0, diffCheck.stderr);
     const diffOut = JSON.parse(diffCheck.stdout);
@@ -1003,6 +1094,36 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
         (d) => d.layerID === "sharedTextStyle:60000000-0000-4000-8000-000000000001",
       ),
     );
+
+    // Verify empty-string readback JS preserves "" and symlinked output paths are rejected
+    const jsAndSymlinkCheck = spawnSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import json, os, sys
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as r
+js = r._build_lightweight_readback_js("doc-1", [{"layerID": "l-1", "text": ""}], "page-1")
+assert "typeof layer.text === 'string' ? layer.text : null" in js
+target_file = Path(sys.argv[1]) / "victim.txt"
+target_file.write_text("keep", encoding="utf-8")
+symlink_path = Path(sys.argv[1]) / "symlink-before.png"
+os.symlink(target_file, symlink_path)
+try:
+    r._write_bytes_nofollow(symlink_path, b"overwrite")
+    raise AssertionError("Expected symlink write to be rejected")
+except RuntimeError as exc:
+    assert "symlink" in str(exc).lower()
+assert target_file.read_text(encoding="utf-8") == "keep"
+print("ok")
+`,
+        tmpDir,
+      ],
+      { encoding: "utf8", env: PY_ENV },
+    );
+    assert.equal(jsAndSymlinkCheck.status, 0, jsAndSymlinkCheck.stderr);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -1156,6 +1277,66 @@ out_path.write_bytes(webp)
       "--verify-only",
     ]);
     assert.equal(verifyRes.status, 0, verifyRes.stdout);
+
+    // 5. Verify --verify-only detects deleted artboard / missing scale entry present in baseline manifest
+    const manifestWithExtra = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    manifestWithExtra.renders.push({
+      artboardID: "99999999-0000-4000-8000-000000000099",
+      artboardName: "DeletedArtboard",
+      scale: 1,
+      pngSha256: "0000",
+    });
+    fs.writeFileSync(manifestPath, JSON.stringify(manifestWithExtra, null, 2));
+
+    const verifyMissingRes = runPython(PY_EXPORT, [
+      "--sketch",
+      cleanSketch,
+      "--output-dir",
+      outDir,
+      "--sketchtool",
+      mockSketchtool,
+      "--cwebp",
+      mockCwebp,
+      "--manifest",
+      manifestPath,
+      "--scales",
+      "1,2",
+      "--verify-only",
+    ]);
+    assert.equal(verifyMissingRes.status, 1);
+    const verifyMissingReport = JSON.parse(verifyMissingRes.stdout);
+    assert.ok(
+      verifyMissingReport.manifestMismatches.some(
+        (m) => m.type === "missing_in_export",
+      ),
+    );
+
+    // 6. Verify check_pingfang_font_access() requires an actual readable PingFang.ttc file
+    const fontCheck = spawnSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import sys
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_export_manifest as m
+empty_root = Path(sys.argv[1]) / "empty-assets"
+font_sub = empty_root / "com_apple_MobileAsset_Font8"
+font_sub.mkdir(parents=True, exist_ok=True)
+m.PINGFANG_ASSET_ROOT = empty_root
+res = m.check_pingfang_font_access()
+assert res["accessible"] is False, res
+ttc = font_sub / "PingFang.ttc"
+ttc.write_bytes(b"ttcf0000")
+res2 = m.check_pingfang_font_access()
+assert res2["accessible"] is True, res2
+`,
+        tmpDir,
+      ],
+      { encoding: "utf8", env: PY_ENV },
+    );
+    assert.equal(fontCheck.status, 0, fontCheck.stderr);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

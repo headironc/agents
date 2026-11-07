@@ -455,36 +455,38 @@ def run_offline_audit(
                 )
             )
 
+    def audit_shared_style_object(st: Dict[str, Any], label_prefix: str) -> None:
+        sid = st.get("do_objectID")
+        if sid:
+            shared_style_ids.add(str(sid))
+        sname = str(st.get("name", ""))
+        if sname.startswith("Type/Platform sample/"):
+            platform_sample_hits.append({"styleID": sid, "name": sname})
+            findings.append(
+                _new_finding(
+                    "font_hygiene",
+                    "STYLE-FORBIDDEN-PLATFORM-SAMPLE",
+                    f"Forbidden sample shared style '{sname}' ({sid})",
+                )
+            )
+        val = st.get("value") or {}
+        t_style = (val.get("textStyle") or {}).get("encodedAttributes") or {}
+        f_desc = t_style.get("MSAttributedStringFontAttribute")
+        if isinstance(f_desc, dict):
+            inspect_font_descriptor(f_desc, f"{label_prefix}:{sname}")
+
     for style_group_key in ("layerStyles", "layerTextStyles"):
         objs = (doc_data.get(style_group_key) or {}).get("objects") or []
         for st in objs:
-            if not isinstance(st, dict):
-                continue
-            sid = st.get("do_objectID")
-            if sid:
-                shared_style_ids.add(str(sid))
-            sname = str(st.get("name", ""))
-            if sname.startswith("Type/Platform sample/"):
-                platform_sample_hits.append({"styleID": sid, "name": sname})
-                findings.append(
-                    _new_finding(
-                        "font_hygiene",
-                        "STYLE-FORBIDDEN-PLATFORM-SAMPLE",
-                        f"Forbidden sample shared style '{sname}' ({sid})",
-                    )
-                )
-            val = st.get("value") or {}
-            t_style = (val.get("textStyle") or {}).get("encodedAttributes") or {}
-            f_desc = t_style.get("MSAttributedStringFontAttribute")
-            if isinstance(f_desc, dict):
-                inspect_font_descriptor(f_desc, f"sharedStyle:{sname}")
+            if isinstance(st, dict):
+                audit_shared_style_object(st, "sharedStyle")
 
     for f_style_key in ("foreignLayerStyles", "foreignTextStyles"):
         for fst in doc_data.get(f_style_key) or []:
             if isinstance(fst, dict):
                 local_st = fst.get("localSharedStyle") or {}
-                if local_st.get("do_objectID"):
-                    shared_style_ids.add(str(local_st["do_objectID"]))
+                if isinstance(local_st, dict) and local_st:
+                    audit_shared_style_object(local_st, "foreignSharedStyle")
 
     for sw in (doc_data.get("sharedSwatches") or {}).get("objects") or []:
         if isinstance(sw, dict) and sw.get("do_objectID"):

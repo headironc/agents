@@ -6,6 +6,17 @@ import CoreGraphics
 import CoreText
 #endif
 
+struct TextRunInput: Codable {
+    let location: Int
+    let length: Int
+    let fontName: String?
+    let uiUsage: String?
+    let fontSize: Double?
+    let lineHeight: Double?
+    let paragraphSpacing: Double?
+    let kerning: Double?
+}
+
 struct MeasureInputItem: Codable {
     let id: String
     let text: String
@@ -17,6 +28,7 @@ struct MeasureInputItem: Codable {
     let paragraphSpacing: Double?
     let kerning: Double?
     let textBehaviour: Int?
+    let runs: [TextRunInput]?
 }
 
 struct MeasuredLine: Codable {
@@ -114,22 +126,10 @@ func defaultSingleLineHeight(font: CTFont, explicitLineHeight: Double?) -> Doubl
     return ceil(ascent + descent + leading)
 }
 
-func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
-    let size = CGFloat(max(1.0, item.fontSize))
-    let (ctFont, usedSystemUI) = createResolvedFont(
-        fontName: item.fontName,
-        uiUsage: item.uiUsage,
-        size: size
-    )
-    let resolvedPSName = (CTFontCopyPostScriptName(ctFont) as String)
-    let singleLineH = defaultSingleLineHeight(font: ctFont, explicitLineHeight: item.lineHeight)
-    let paraSpacing = max(0.0, item.paragraphSpacing ?? 0.0)
-    let kerningVal = item.kerning ?? 0.0
-    let constrainedWidth = max(1.0, item.width)
-
-    var minLH = CGFloat(singleLineH)
-    var maxLH = CGFloat(singleLineH)
-    var pSpace = CGFloat(paraSpacing)
+func makeParagraphStyle(lineHeight: Double, paragraphSpacing: Double) -> CTParagraphStyle {
+    var minLH = CGFloat(lineHeight)
+    var maxLH = CGFloat(lineHeight)
+    var pSpace = CGFloat(paragraphSpacing)
     let settings: [CTParagraphStyleSetting] = [
         withUnsafeBytes(of: &minLH) { raw in
             CTParagraphStyleSetting(
@@ -153,7 +153,56 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
             )
         }
     ]
-    let paragraphStyle = CTParagraphStyleCreate(settings, settings.count)
+    return CTParagraphStyleCreate(settings, settings.count)
+}
+
+func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
+    let size = CGFloat(max(1.0, item.fontSize))
+    let (ctFont, usedSystemUI) = createResolvedFont(
+        fontName: item.fontName,
+        uiUsage: item.uiUsage,
+        size: size
+    )
+    let resolvedPSName = (CTFontCopyPostScriptName(ctFont) as String)
+    let singleLineH = defaultSingleLineHeight(font: ctFont, explicitLineHeight: item.lineHeight)
+    let paraSpacing = max(0.0, item.paragraphSpacing ?? 0.0)
+    let kerningVal = item.kerning ?? 0.0
+    let constrainedWidth = max(1.0, item.width)
+    let paragraphStyle = makeParagraphStyle(lineHeight: singleLineH, paragraphSpacing: paraSpacing)
+
+    struct ResolvedRun {
+        let start: Int
+        let end: Int
+        let font: CTFont
+        let lineHeight: Double
+        let paragraphSpacing: Double
+        let kerning: Double
+    }
+    var resolvedRuns: [ResolvedRun] = []
+    if let rawRuns = item.runs {
+        for r in rawRuns where r.length > 0 {
+            let rSize = CGFloat(max(1.0, r.fontSize ?? item.fontSize))
+            let (rFont, _) = createResolvedFont(
+                fontName: r.fontName ?? item.fontName,
+                uiUsage: r.uiUsage ?? item.uiUsage,
+                size: rSize
+            )
+            let rLH = defaultSingleLineHeight(font: rFont, explicitLineHeight: r.lineHeight ?? item.lineHeight)
+            let rPSpace = max(0.0, r.paragraphSpacing ?? paraSpacing)
+            let rKern = r.kerning ?? kerningVal
+            resolvedRuns.append(
+                ResolvedRun(
+                    start: max(0, r.location),
+                    end: max(0, r.location + r.length),
+                    font: rFont,
+                    lineHeight: rLH,
+                    paragraphSpacing: rPSpace,
+                    kerning: rKern
+                )
+            )
+        }
+    }
+    let maxRunLineH = resolvedRuns.map { $0.lineHeight }.max() ?? singleLineH
 
     let nsText = item.text as NSString
     if nsText.length == 0 {
@@ -164,7 +213,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
             resolvedPostScriptName: resolvedPSName,
             usedSystemUIFont: usedSystemUI,
             fontSize: item.fontSize,
-            singleLineHeight: singleLineH,
+            singleLineHeight: maxRunLineH,
             width: constrainedWidth,
             paragraphSpacing: paraSpacing,
             lineCount: 1,
@@ -175,10 +224,10 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
                     length: 0,
                     text: "",
                     width: 0.0,
-                    lineHeight: singleLineH
+                    lineHeight: maxRunLineH
                 )
             ],
-            bakedHeight: round(singleLineH)
+            bakedHeight: round(maxRunLineH)
         )
     }
 
@@ -206,14 +255,32 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
             continue
         }
 
-        var attrs: [NSAttributedString.Key: Any] = [
+        var baseAttrs: [NSAttributedString.Key: Any] = [
             NSAttributedString.Key(kCTFontAttributeName as String): ctFont,
             NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraphStyle
         ]
         if kerningVal != 0.0 {
-            attrs[NSAttributedString.Key(kCTKernAttributeName as String)] = NSNumber(value: kerningVal)
+            baseAttrs[NSAttributedString.Key(kCTKernAttributeName as String)] = NSNumber(value: kerningVal)
         }
-        let attrStr = NSAttributedString(string: pText, attributes: attrs)
+        let attrStr = NSMutableAttributedString(string: pText, attributes: baseAttrs)
+        let pStart = globalUTF16Cursor
+        let pEnd = globalUTF16Cursor + pLen
+        for rr in resolvedRuns {
+            let interStart = max(pStart, rr.start)
+            let interEnd = min(pEnd, rr.end)
+            if interEnd > interStart {
+                let localRange = NSRange(location: interStart - pStart, length: interEnd - interStart)
+                let rPStyle = makeParagraphStyle(lineHeight: rr.lineHeight, paragraphSpacing: rr.paragraphSpacing)
+                var rAttrs: [NSAttributedString.Key: Any] = [
+                    NSAttributedString.Key(kCTFontAttributeName as String): rr.font,
+                    NSAttributedString.Key(kCTParagraphStyleAttributeName as String): rPStyle
+                ]
+                if rr.kerning != 0.0 {
+                    rAttrs[NSAttributedString.Key(kCTKernAttributeName as String)] = NSNumber(value: rr.kerning)
+                }
+                attrStr.setAttributes(rAttrs, range: localRange)
+            }
+        }
         let typesetter = CTTypesetterCreateWithAttributedString(attrStr as CFAttributedString)
 
         var start = 0
@@ -225,14 +292,28 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
             let lineWidth = CTLineGetTypographicBounds(ctLine, nil, nil, nil)
             let subRange = NSRange(location: range.location, length: range.length)
             let sliceText = pNS.substring(with: subRange)
+            let absLineStart = globalUTF16Cursor + range.location
+            let absLineEnd = absLineStart + range.length
+            var effectiveLineH = singleLineH
+            if !resolvedRuns.isEmpty {
+                var matchedMax: Double? = nil
+                for rr in resolvedRuns {
+                    if min(absLineEnd, rr.end) > max(absLineStart, rr.start) {
+                        matchedMax = max(matchedMax ?? 0.0, rr.lineHeight)
+                    }
+                }
+                if let m = matchedMax {
+                    effectiveLineH = m
+                }
+            }
             measuredLines.append(
                 MeasuredLine(
                     index: lineIndex,
-                    location: globalUTF16Cursor + range.location,
+                    location: absLineStart,
                     length: range.length,
                     text: sliceText,
                     width: (lineWidth * 100.0).rounded() / 100.0,
-                    lineHeight: singleLineH
+                    lineHeight: effectiveLineH
                 )
             )
             lineIndex += 1
@@ -242,7 +323,8 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
     }
 
     let nonEmptyParagraphBreaks = max(0, rawParagraphs.count - 1)
-    let totalHeight = Double(measuredLines.count) * singleLineH + Double(nonEmptyParagraphBreaks) * paraSpacing
+    let sumLineHeights = measuredLines.reduce(0.0) { $0 + $1.lineHeight }
+    let totalHeight = sumLineHeights + Double(nonEmptyParagraphBreaks) * paraSpacing
     return MeasureOutputItem(
         id: item.id,
         text: item.text,
@@ -250,7 +332,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
         resolvedPostScriptName: resolvedPSName,
         usedSystemUIFont: usedSystemUI,
         fontSize: item.fontSize,
-        singleLineHeight: singleLineH,
+        singleLineHeight: maxRunLineH,
         width: constrainedWidth,
         paragraphSpacing: paraSpacing,
         lineCount: measuredLines.count,

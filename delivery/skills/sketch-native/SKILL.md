@@ -176,11 +176,11 @@ Execute the 6-step non-activating roundtrip against a disposable `.sketch` copy 
 
 ```bash
 python3 delivery/skills/sketch-native/scripts/sketch_mcp_roundtrip.py \
-  --sketch /tmp/disposable-copy.sketch \
+  --sketch "$TASK_TEMP_DIR/disposable-copy.sketch" \
   --anchor-id 00000000-0000-0000-0000-000000000001 \
   --edit-spec edit-spec.json \
-  --screenshots-dir /tmp/roundtrip-screenshots \
-  --output roundtrip-report.json
+  --screenshots-dir "$TASK_TEMP_DIR/roundtrip-screenshots" \
+  --output "$TASK_TEMP_DIR/roundtrip-report.json"
 ```
 
 ### 4. Unsandboxed Batch Export & Manifest / PDF Font Verifier

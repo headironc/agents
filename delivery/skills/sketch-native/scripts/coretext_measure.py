@@ -140,7 +140,42 @@ def _extract_text_layer_spec(layer: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     para_spacing = float(para_style.get("paragraphSpacing", 0.0) or 0.0)
     kerning = float(first_attr.get("kerning", 0.0) or 0.0)
 
-    return {
+    runs: List[Dict[str, Any]] = []
+    for attr_entry in attrs_list:
+        if not isinstance(attr_entry, dict):
+            continue
+        loc = int(attr_entry.get("location", 0) or 0)
+        length = int(attr_entry.get("length", 0) or 0)
+        if length <= 0:
+            continue
+        sub_attrs = attr_entry.get("attributes") or {}
+        sub_font = (
+            sub_attrs.get("MSAttributedStringFontAttribute") or {}
+        ).get("attributes") or {}
+        sub_para = sub_attrs.get("paragraphStyle") or {}
+        sub_lh = sub_para.get("maximumLineHeight") or sub_para.get(
+            "minimumLineHeight"
+        )
+        runs.append(
+            {
+                "location": loc,
+                "length": length,
+                "fontName": sub_font.get("name", font_name),
+                "uiUsage": sub_font.get("NSCTFontUIUsageAttribute", ui_usage),
+                "fontSize": float(sub_font.get("size", font_size)),
+                "lineHeight": (
+                    float(sub_lh)
+                    if sub_lh is not None
+                    else (float(line_height) if line_height is not None else None)
+                ),
+                "paragraphSpacing": float(
+                    sub_para.get("paragraphSpacing", para_spacing) or 0.0
+                ),
+                "kerning": float(sub_attrs.get("kerning", kerning) or 0.0),
+            }
+        )
+
+    spec_out: Dict[str, Any] = {
         "id": str(layer.get("do_objectID", "")),
         "name": str(layer.get("name", "")),
         "text": text,
@@ -153,6 +188,9 @@ def _extract_text_layer_spec(layer: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "kerning": kerning,
         "currentHeight": float(frame.get("height", 0.0)),
     }
+    if runs:
+        spec_out["runs"] = runs
+    return spec_out
 
 
 def _index_symbol_masters(
@@ -396,6 +434,7 @@ def audit_and_rebake_sketch(
                     )
                     ov_id = f"{node.get('do_objectID')}::{ov_name}"
                     ov_spec = dict(m_spec)
+                    ov_spec.pop("runs", None)
                     ov_spec["id"] = ov_id
                     ov_spec["text"] = str(ov.get("value", ""))
                     ov_spec["width"] = max(1.0, scale_w)
