@@ -21,6 +21,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -33,7 +34,42 @@ DEFAULT_SKETCHTOOL = (
     "/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool"
 )
 PINGFANG_ASSET_ROOT = Path("/System/Library/AssetsV2")
+PINGFANG_FALLBACK_PATHS = [
+    Path(
+        "/System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc"
+    ),
+    Path("/System/Library/Fonts/PingFang.ttc"),
+]
 CLOCK_TEXT_RE = re.compile(r"^\d{1,2}:\d{2}$")
+
+
+def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
+    """Write text to file_path without following symlinks on parent or target file."""
+    parent = file_path.parent
+    if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
+        raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        st = os.lstat(file_path)
+        if stat.S_ISLNK(st.st_mode):
+            raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+    except FileNotFoundError:
+        pass
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(str(file_path), flags, mode)
+    try:
+        data = text.encode("utf-8")
+        view = memoryview(data)
+        total = 0
+        while total < len(view):
+            written = os.write(fd, view[total:])
+            if written <= 0:
+                raise RuntimeError(f"Short write to {file_path}")
+            total += written
+    finally:
+        os.close(fd)
 
 
 def _can_read_font_file(path: Path) -> bool:
@@ -47,7 +83,7 @@ def _can_read_font_file(path: Path) -> bool:
 
 
 def check_pingfang_font_access() -> Dict[str, Any]:
-    """Verify that an actual PingFang.ttc font asset is readable to avoid PingFang SC -> Heiti SC fallback."""
+    """Verify that an actual PingFang font asset is readable and AssetsV2 is not sandbox-blocked."""
     if platform.system() != "Darwin":
         return {
             "platform": platform.system(),
@@ -62,17 +98,39 @@ def check_pingfang_font_access() -> Dict[str, Any]:
             "pingfangPaths": [],
             "reason": f"{PINGFANG_ASSET_ROOT} does not exist",
         }
+    if not os.access(PINGFANG_ASSET_ROOT, os.R_OK):
+        return {
+            "platform": "Darwin",
+            "accessible": False,
+            "pingfangPaths": [],
+            "reason": f"Sandbox blocked read access to {PINGFANG_ASSET_ROOT}",
+        }
     try:
         found: List[str] = []
+        blocked_paths: List[str] = []
         for font_dir in PINGFANG_ASSET_ROOT.glob("com_apple_MobileAsset_Font*"):
             if not os.access(font_dir, os.R_OK):
+                blocked_paths.append(str(font_dir))
                 continue
-            for ttc in font_dir.rglob("PingFang.ttc"):
+            for ttc in font_dir.rglob("PingFang*.ttc"):
                 if _can_read_font_file(ttc):
                     found.append(str(ttc))
                     break
+                blocked_paths.append(str(ttc))
             if found:
                 break
+        if blocked_paths and not found:
+            return {
+                "platform": "Darwin",
+                "accessible": False,
+                "pingfangPaths": [],
+                "reason": f"Sandbox blocked font asset path(s): {blocked_paths[0]}",
+            }
+        if not found:
+            for fb in PINGFANG_FALLBACK_PATHS:
+                if fb.exists() and _can_read_font_file(fb):
+                    found.append(str(fb))
+                    break
         accessible = len(found) > 0
         result: Dict[str, Any] = {
             "platform": "Darwin",
@@ -81,7 +139,7 @@ def check_pingfang_font_access() -> Dict[str, Any]:
         }
         if not accessible:
             result["reason"] = (
-                f"No readable PingFang.ttc found under {PINGFANG_ASSET_ROOT}/com_apple_MobileAsset_Font*"
+                f"No readable PingFang font file found under {PINGFANG_ASSET_ROOT} or system font reserves"
             )
         return result
     except OSError as exc:
@@ -460,10 +518,9 @@ def run_export_and_manifest(
                             }
                         )
         else:
-            target_json_path.parent.mkdir(parents=True, exist_ok=True)
-            target_json_path.write_text(
+            _write_text_nofollow(
+                target_json_path,
                 json.dumps(manifest_payload, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
             )
 
     clock_pdfs_all_valid = all(c.get("valid", False) for c in clock_pdf_checks)
@@ -605,8 +662,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     out_str = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:
-        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.output).write_text(out_str + "\n", encoding="utf-8")
+        _write_text_nofollow(Path(args.output), out_str + "\n")
     print(out_str)
     return exit_code
 

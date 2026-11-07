@@ -466,6 +466,36 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         if attrs and isinstance(attrs[0], dict)
                         else None
                     )
+                    text_runs = (
+                        [
+                            {
+                                "location": seg.get("location"),
+                                "length": seg.get("length"),
+                                "fontDescriptor": (
+                                    (
+                                        (seg.get("attributes") or {}).get(
+                                            "MSAttributedStringFontAttribute"
+                                        )
+                                        or {}
+                                    ).get("attributes")
+                                    if isinstance(
+                                        (seg.get("attributes") or {}).get(
+                                            "MSAttributedStringFontAttribute"
+                                        ),
+                                        dict,
+                                    )
+                                    else None
+                                ),
+                                "paragraphStyle": (seg.get("attributes") or {}).get(
+                                    "paragraphStyle"
+                                ),
+                            }
+                            for seg in attrs
+                            if isinstance(seg, dict)
+                        ]
+                        if attr_str
+                        else None
+                    )
                     snapshot[oid] = {
                         "_class": node.get("_class"),
                         "name": node.get("name"),
@@ -481,6 +511,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         "flow": node.get("flow"),
                         "text": attr_str.get("string") if attr_str else None,
                         "fontDescriptor": first_font,
+                        "textRuns": text_runs,
                         "overrideValues": node.get("overrideValues"),
                         "borders": (node.get("style") or {}).get("borders"),
                     }

@@ -16,6 +16,7 @@ import json
 import os
 import platform
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -28,6 +29,35 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 SWIFT_SOURCE = SCRIPT_DIR / "measure-coretext.swift"
 
 
+def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
+    """Write text to file_path without following symlinks on parent or target file."""
+    parent = file_path.parent
+    if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
+        raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        st = os.lstat(file_path)
+        if stat.S_ISLNK(st.st_mode):
+            raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+    except FileNotFoundError:
+        pass
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(str(file_path), flags, mode)
+    try:
+        data = text.encode("utf-8")
+        view = memoryview(data)
+        total = 0
+        while total < len(view):
+            written = os.write(fd, view[total:])
+            if written <= 0:
+                raise RuntimeError(f"Short write to {file_path}")
+            total += written
+    finally:
+        os.close(fd)
+
+
 def _get_or_compile_swift_binary() -> Optional[Path]:
     if platform.system() != "Darwin" or not SWIFT_SOURCE.exists():
         return None
@@ -36,13 +66,25 @@ def _get_or_compile_swift_binary() -> Optional[Path]:
         return None
     source_bytes = SWIFT_SOURCE.read_bytes()
     digest = hashlib.sha256(source_bytes).hexdigest()[:16]
-    cache_dir = Path(tempfile.gettempdir()) / "sketch-native-coretext-cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    cache_base = Path.home() / ".cache" if Path.home().exists() else Path(tempfile.gettempdir())
+    cache_dir = cache_base / f"sketch-native-coretext-cache-{uid}"
+    cache_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    st_cache = os.lstat(cache_dir)
+    if stat.S_ISLNK(st_cache.st_mode) or not stat.S_ISDIR(st_cache.st_mode):
+        return None
+    if hasattr(os, "getuid") and st_cache.st_uid != uid:
+        return None
+    os.chmod(cache_dir, 0o700)
     binary_path = cache_dir / f"measure-coretext-{digest}"
-    if binary_path.exists() and os.access(binary_path, os.X_OK):
+    if binary_path.exists() and not binary_path.is_symlink() and os.access(binary_path, os.X_OK):
         return binary_path
 
-    tmp_bin = cache_dir / f"measure-coretext-{digest}.{os.getpid()}.tmp"
+    fd, tmp_bin_str = tempfile.mkstemp(
+        prefix=f".measure-coretext-{digest}-", suffix=".tmp", dir=str(cache_dir)
+    )
+    os.close(fd)
+    tmp_bin = Path(tmp_bin_str)
     try:
         proc = subprocess.run(
             [swiftc, "-O", str(SWIFT_SOURCE), "-o", str(tmp_bin)],
@@ -51,14 +93,14 @@ def _get_or_compile_swift_binary() -> Optional[Path]:
             timeout=60,
             check=False,
         )
-        if proc.returncode == 0 and tmp_bin.exists():
-            tmp_bin.chmod(0o755)
+        if proc.returncode == 0 and tmp_bin.exists() and not tmp_bin.is_symlink():
+            tmp_bin.chmod(0o700)
             tmp_bin.replace(binary_path)
             return binary_path
     except Exception:
         pass
     finally:
-        if tmp_bin.exists():
+        if tmp_bin.exists() or tmp_bin.is_symlink():
             try:
                 tmp_bin.unlink()
             except OSError:
@@ -194,7 +236,8 @@ def _extract_text_layer_spec(layer: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def _index_symbol_masters(
-    pages_data: Dict[str, Dict[str, Any]]
+    pages_data: Dict[str, Dict[str, Any]],
+    doc_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     masters: Dict[str, Dict[str, Any]] = {}
 
@@ -204,6 +247,14 @@ def _index_symbol_masters(
         for child in node.get("layers") or []:
             if isinstance(child, dict):
                 walk(child)
+
+    if isinstance(doc_data, dict):
+        for fsym in doc_data.get("foreignSymbols") or []:
+            if not isinstance(fsym, dict):
+                continue
+            sm = fsym.get("symbolMaster") or fsym.get("originalMaster") or {}
+            if isinstance(sm, dict):
+                walk(sm)
 
     for page in pages_data.values():
         walk(page)
@@ -260,6 +311,15 @@ def _resolve_nested_override_text_layer(
     return None
 
 
+def _participates_in_flex_flow(child: Dict[str, Any]) -> bool:
+    flex_item = child.get("flexItem") or {}
+    if bool(flex_item.get("ignoresStackLayout", False)):
+        return False
+    if bool(child.get("isVisible", True)):
+        return True
+    return bool(flex_item.get("preserveSpaceWhenHidden", False))
+
+
 def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
     """Re-pack a vertical MSImmutableFlexGroupLayout in Sketch's reversed index order, preserving justifyContent."""
     layout = group.get("groupLayout") or {}
@@ -279,9 +339,7 @@ def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
     children = [
         ch
         for ch in (group.get("layers") or [])
-        if isinstance(ch, dict)
-        and ch.get("isVisible", True)
-        and not bool((ch.get("flexItem") or {}).get("ignoresStackLayout", False))
+        if isinstance(ch, dict) and _participates_in_flex_flow(ch)
     ]
     visual_children = list(reversed(children))
     n = len(visual_children)
@@ -372,12 +430,16 @@ def audit_and_rebake_sketch(
     with zipfile.ZipFile(sketch_path, "r") as zf:
         members = {name: zf.read(name) for name in zf.namelist()}
 
+    doc_data: Dict[str, Any] = {}
+    if "document.json" in members:
+        doc_data = json.loads(members["document.json"].decode("utf-8"))
+
     pages_data: Dict[str, Dict[str, Any]] = {}
     for name, raw in members.items():
         if name.startswith("pages/") and name.endswith(".json"):
             pages_data[name] = json.loads(raw.decode("utf-8"))
 
-    symbol_masters = _index_symbol_masters(pages_data)
+    symbol_masters = _index_symbol_masters(pages_data, doc_data)
 
     measure_queue: List[Dict[str, Any]] = []
     targets_meta: List[Dict[str, Any]] = []
@@ -593,15 +655,58 @@ def audit_and_rebake_sketch(
                 rebaked_layers.append(drift_record)
 
     if rebake and dirty_pages:
+        st_sketch = os.lstat(sketch_path)
+        if stat.S_ISLNK(st_sketch.st_mode):
+            raise RuntimeError(
+                f"Refusing to rebake symlinked .sketch file: {sketch_path}"
+            )
+        parent_dir = sketch_path.resolve().parent
+        st_parent = os.lstat(parent_dir)
+        if hasattr(os, "getuid") and st_parent.st_uid != os.getuid() and not (
+            st_parent.st_mode & stat.S_ISVTX
+        ):
+            raise RuntimeError(
+                f"Refusing to rebake inside directory not owned by current user: {parent_dir}"
+            )
+        if (st_parent.st_mode & (stat.S_IWGRP | stat.S_IWOTH)) and not (
+            st_parent.st_mode & stat.S_ISVTX
+        ):
+            raise RuntimeError(
+                f"Refusing to rebake inside group/world-writable directory: {parent_dir}"
+            )
         for page_file in dirty_pages:
             members[page_file] = (
                 json.dumps(pages_data[page_file], ensure_ascii=False, indent=2) + "\n"
             ).encode("utf-8")
-        tmp_zip = sketch_path.with_suffix(".sketch.rebake.tmp")
-        with zipfile.ZipFile(tmp_zip, "w", compression=zipfile.ZIP_DEFLATED) as zout:
-            for name, raw in members.items():
-                zout.writestr(name, raw)
-        tmp_zip.replace(sketch_path)
+        fd, tmp_zip_str = tempfile.mkstemp(
+            prefix=f".{sketch_path.name}.rebake-",
+            suffix=".tmp",
+            dir=str(parent_dir),
+        )
+        tmp_zip = Path(tmp_zip_str)
+        try:
+            with os.fdopen(fd, "wb") as tmp_fh:
+                with zipfile.ZipFile(
+                    tmp_fh, "w", compression=zipfile.ZIP_DEFLATED
+                ) as zout:
+                    for name, raw in members.items():
+                        zout.writestr(name, raw)
+                tmp_fh.flush()
+                os.fsync(tmp_fh.fileno())
+            with zipfile.ZipFile(tmp_zip, "r") as zcheck:
+                if zcheck.testzip() is not None:
+                    raise RuntimeError("Rebaked temporary archive failed ZIP integrity check")
+            if stat.S_ISLNK(os.lstat(sketch_path).st_mode):
+                raise RuntimeError(
+                    f"Refusing to replace symlinked .sketch file: {sketch_path}"
+                )
+            os.replace(tmp_zip, sketch_path)
+        finally:
+            if tmp_zip.exists() or tmp_zip.is_symlink():
+                try:
+                    tmp_zip.unlink()
+                except OSError:
+                    pass
 
     remaining_drifts = [] if rebake else drifts
     passed = len(remaining_drifts) == 0
@@ -691,14 +796,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         }
         out_str = json.dumps(err_report, ensure_ascii=False, indent=2)
         if args.output:
-            Path(args.output).write_text(out_str + "\n", encoding="utf-8")
+            _write_text_nofollow(Path(args.output), out_str + "\n")
         print(out_str)
         return 2
 
     out_str = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:
-        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.output).write_text(out_str + "\n", encoding="utf-8")
+        _write_text_nofollow(Path(args.output), out_str + "\n")
     print(out_str)
     return exit_code
 

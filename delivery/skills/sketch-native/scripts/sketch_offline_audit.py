@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import stat
 import sys
 import time
 import zipfile
@@ -27,6 +29,35 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 CLOCK_TEXT_RE = re.compile(r"^\d{1,2}:\d{2}$")
 CLOCK_NAME_HINTS = ("status-time", "statusbar/time", "clock", "time", "状态栏时间")
+
+
+def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
+    """Write text to file_path without following symlinks on parent or target file."""
+    parent = file_path.parent
+    if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
+        raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        st = os.lstat(file_path)
+        if stat.S_ISLNK(st.st_mode):
+            raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+    except FileNotFoundError:
+        pass
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(str(file_path), flags, mode)
+    try:
+        data = text.encode("utf-8")
+        view = memoryview(data)
+        total = 0
+        while total < len(view):
+            written = os.write(fd, view[total:])
+            if written <= 0:
+                raise RuntimeError(f"Short write to {file_path}")
+            total += written
+    finally:
+        os.close(fd)
 
 
 def _new_finding(
@@ -147,6 +178,15 @@ def _is_focus_ring_layer(layer: Dict[str, Any]) -> bool:
     return bool(layer.get("hasFocusRing", False))
 
 
+def _participates_in_flex_flow(child: Dict[str, Any]) -> bool:
+    flex_item = child.get("flexItem") or {}
+    if bool(flex_item.get("ignoresStackLayout", False)):
+        return False
+    if bool(child.get("isVisible", True)):
+        return True
+    return bool(flex_item.get("preserveSpaceWhenHidden", False))
+
+
 def _check_flex_group_closure(
     group: Dict[str, Any],
     page_id: str,
@@ -178,9 +218,7 @@ def _check_flex_group_closure(
     flow_children = [
         ch
         for ch in (group.get("layers") or [])
-        if isinstance(ch, dict)
-        and ch.get("isVisible", True)
-        and not bool((ch.get("flexItem") or {}).get("ignoresStackLayout", False))
+        if isinstance(ch, dict) and _participates_in_flex_flow(ch)
     ]
     if not flow_children:
         return
@@ -362,6 +400,33 @@ def run_offline_audit(
         for member in sorted(namelist):
             if member.startswith("pages/") and member.endswith(".json"):
                 pages_data[member] = json.loads(zf.read(member).decode("utf-8"))
+
+        for page_ref in doc_data.get("pages") or []:
+            if not isinstance(page_ref, dict):
+                continue
+            ref_str = str(page_ref.get("_ref", "")).strip()
+            if not ref_str and page_ref.get("do_objectID"):
+                ref_str = f"pages/{page_ref['do_objectID']}"
+            if ref_str:
+                expected_member = (
+                    ref_str if ref_str.endswith(".json") else f"{ref_str}.json"
+                )
+                if expected_member not in pages_data:
+                    findings.append(
+                        _new_finding(
+                            "archive_and_ids",
+                            "ARCHIVE-MISSING-REFERENCED-PAGE",
+                            f"document.json references page '{expected_member}' which is missing from the archive",
+                        )
+                    )
+        if not pages_data:
+            findings.append(
+                _new_finding(
+                    "archive_and_ids",
+                    "ARCHIVE-NO-PAGES",
+                    "Archive contains no pages/*.json members",
+                )
+            )
 
     # Upstream source .sketch symbol/swatch/style IDs if provided
     upstream_symbol_ids: Set[str] = set()
@@ -1219,8 +1284,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     out_str = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:
-        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.output).write_text(out_str + "\n", encoding="utf-8")
+        _write_text_nofollow(Path(args.output), out_str + "\n")
     print(out_str)
     return exit_code
 

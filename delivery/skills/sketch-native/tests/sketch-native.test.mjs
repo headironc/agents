@@ -584,6 +584,59 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
     const mrReport = JSON.parse(mrAudit.stdout);
     assert.equal(mrReport.driftCount, 1);
     assert.equal(mrReport.drifts[0].bakedHeight, 52);
+
+    // Foreign symbolMaster in document.json.foreignSymbols + hidden sibling with preserveSpaceWhenHidden: true
+    const foreignSpec = createCleanSketchSpec({ textHeight: 44, hotspotY: 112 });
+    const fPage =
+      foreignSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const movedMaster = fPage.layers.shift(); // Remove symbolMaster from page
+    movedMaster.layers[0].textBehaviour = 1;
+    movedMaster.layers[0].frame.width = 180;
+    foreignSpec["document.json"].foreignSymbols = [
+      {
+        _class: "MSImmutableForeignSymbol",
+        symbolMaster: movedMaster,
+      },
+    ];
+    const fHomeAb = fPage.layers[0];
+    const fStack = fHomeAb.layers[1];
+    // Insert a hidden layer with preserveSpaceWhenHidden: true (height: 20, gap: 16 -> +36px offset)
+    fStack.layers.push({
+      _class: "rectangle",
+      do_objectID: "40000000-0000-4000-8000-000000000099",
+      name: "HiddenBannerReserved",
+      isVisible: false,
+      flexItem: {
+        _class: "MSImmutableFlexItem",
+        preserveSpaceWhenHidden: true,
+        ignoresStackLayout: false,
+      },
+      frame: { _class: "rect", x: 16, y: 16, width: 311, height: 20 },
+    });
+    // NoticeCopy is now second from top (y = 16 + 20 + 16 = 52), SubmitButtonFocus is third (y = 52 + 44 + 16 = 112)
+    fStack.layers[1].frame.y = 52;
+    fStack.layers[0].frame.y = 112;
+    fStack.frame.height = 16 + 20 + 16 + 44 + 16 + 48 + 16;
+    // Set foreign SymbolInstance override to a 2-line string while leaving instance height at 48 (stale by 22px)
+    fStack.layers[0].overrideValues[0].value =
+      "账户安全验证已开启，请在五分钟内完成确认。";
+    const foreignBuilder = path.join(tmpDir, "foreign-spec.json");
+    const foreignSketch = path.join(tmpDir, "foreign.sketch");
+    fs.writeFileSync(foreignBuilder, JSON.stringify(foreignSpec));
+    buildSyntheticSketch(foreignSketch, foreignBuilder);
+
+    const foreignRebake = runPython(PY_MEASURE, [
+      "--sketch",
+      foreignSketch,
+      "--rebake",
+    ]);
+    assert.equal(foreignRebake.status, 0, foreignRebake.stderr);
+    const foreignRebakeReport = JSON.parse(foreignRebake.stdout);
+    assert.equal(foreignRebakeReport.driftCount, 1);
+    assert.equal(foreignRebakeReport.drifts[0].bakedHeight, 70);
+
+    const foreignAudit = runPython(PY_AUDIT, ["--sketch", foreignSketch]);
+    assert.equal(foreignAudit.status, 0, foreignAudit.stdout);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -705,6 +758,19 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
         },
       },
     ];
+    // 5. Dangling page reference in document.json.pages
+    badSpec["document.json"].pages = [
+      {
+        _class: "MSJSONFileReference",
+        _ref_class: "MSImmutablePage",
+        _ref: "pages/20000000-0000-4000-8000-000000000001",
+      },
+      {
+        _class: "MSJSONFileReference",
+        _ref_class: "MSImmutablePage",
+        _ref: "pages/20000000-0000-4000-8000-999999999999",
+      },
+    ];
 
     const badBuilder = path.join(tmpDir, "bad-spec.json");
     const badSketch = path.join(tmpDir, "bad.sketch");
@@ -719,6 +785,7 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
     assert.ok(codes.has("FONT-HARDCODED-SFPRO"));
     assert.ok(codes.has("FONT-FORBIDDEN-NOTO"));
     assert.ok(codes.has("STYLE-FORBIDDEN-PLATFORM-SAMPLE"));
+    assert.ok(codes.has("ARCHIVE-MISSING-REFERENCED-PAGE"));
     assert.ok(codes.has("CLOCK-MISSING-CTFONT-REGULAR-USAGE"));
     assert.ok(codes.has("FOCUS-RING-ANCESTOR-CLIPPED"));
     assert.ok(codes.has("FLOW-START-ARTBOARD-BACK-TRAP"));
@@ -1065,13 +1132,28 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
       assert.equal(callArgs[1], "-a");
     }
 
-    // Verify offline diff catches sharedTextStyle fontDescriptor drift in document.json
+    // Verify offline diff catches sharedTextStyle fontDescriptor drift in document.json AND second-run textRuns font drift
     const driftedDocSketch = path.join(tmpDir, "drifted-doc.sketch");
     const driftedDocSpec = JSON.parse(fs.readFileSync(specPath, "utf8"));
     driftedDocSpec[
       "document.json"
     ].layerTextStyles.objects[0].value.textStyle.encodedAttributes.MSAttributedStringFontAttribute.attributes.name =
       "Heiti SC";
+    // Add a second run on NoticeCopy in driftedDocSpec while keeping first run identical
+    const noticeLayer =
+      driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"]
+        .layers[1].layers[1].layers[1];
+    noticeLayer.attributedString.attributes.push({
+      _class: "stringAttribute",
+      location: 10,
+      length: 5,
+      attributes: {
+        MSAttributedStringFontAttribute: {
+          _class: "fontDescriptor",
+          attributes: { name: "Heiti SC", size: 15 },
+        },
+      },
+    });
     const driftedDocSpecPath = path.join(tmpDir, "drifted-doc-spec.json");
     fs.writeFileSync(driftedDocSpecPath, JSON.stringify(driftedDocSpec));
     buildSyntheticSketch(driftedDocSketch, driftedDocSpecPath);
@@ -1092,6 +1174,11 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     assert.ok(
       diffOut.unexpectedDrifts.some(
         (d) => d.layerID === "sharedTextStyle:60000000-0000-4000-8000-000000000001",
+      ),
+    );
+    assert.ok(
+      diffOut.unexpectedDrifts.some(
+        (d) => d.layerID === "40000000-0000-4000-8000-000000000007",
       ),
     );
 
@@ -1321,10 +1408,12 @@ out_path.write_bytes(webp)
 from pathlib import Path
 sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
 import sketch_export_manifest as m
+m.platform.system = lambda: "Darwin"
 empty_root = Path(sys.argv[1]) / "empty-assets"
 font_sub = empty_root / "com_apple_MobileAsset_Font8"
 font_sub.mkdir(parents=True, exist_ok=True)
 m.PINGFANG_ASSET_ROOT = empty_root
+m.PINGFANG_FALLBACK_PATHS = []
 res = m.check_pingfang_font_access()
 assert res["accessible"] is False, res
 ttc = font_sub / "PingFang.ttc"
