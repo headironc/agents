@@ -163,6 +163,58 @@ def _validate_existing_in_dir_fd(
         raise RuntimeError(f"Refusing to overwrite hard-linked file: {display_path}")
 
 
+def _read_regular_owned_bytes_nofollow(file_path: Path) -> bytes:
+    """Read a regular current-user-owned file via a pinned parent directory descriptor and O_NOFOLLOW."""
+    dir_fd, leaf_name = _open_pinned_parent_dir(file_path, create=False)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    try:
+        try:
+            st = os.stat(leaf_name, dir_fd=dir_fd, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                f"Disposable .sketch copy not found: {file_path}"
+            ) from exc
+        if stat.S_ISLNK(st.st_mode):
+            raise RuntimeError(f"Refusing to read symlinked file: {file_path}")
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(f"Refusing to read non-regular file: {file_path}")
+        if hasattr(os, "getuid") and st.st_uid != os.getuid():
+            raise RuntimeError(
+                f"Refusing to read file not owned by current user: {file_path}"
+            )
+        if st.st_nlink > 1:
+            raise RuntimeError(f"Refusing to read hard-linked file: {file_path}")
+        try:
+            fd = os.open(leaf_name, os.O_RDONLY | nofollow, dir_fd=dir_fd)
+        except OSError as exc:
+            raise RuntimeError(f"Refusing to read symlinked file: {file_path}") from exc
+        try:
+            fst = os.fstat(fd)
+            if (
+                not stat.S_ISREG(fst.st_mode)
+                or fst.st_ino != st.st_ino
+                or fst.st_dev != st.st_dev
+            ):
+                raise RuntimeError(f"Race detected while opening file: {file_path}")
+            if hasattr(os, "getuid") and fst.st_uid != os.getuid():
+                raise RuntimeError(
+                    f"Refusing to read file not owned by current user: {file_path}"
+                )
+            if fst.st_nlink > 1:
+                raise RuntimeError(f"Refusing to read hard-linked file: {file_path}")
+            chunks: List[bytes] = []
+            while True:
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            return b"".join(chunks)
+        finally:
+            os.close(fd)
+    finally:
+        os.close(dir_fd)
+
+
 def _write_bytes_nofollow(file_path: Path, data: bytes, mode: int = 0o600) -> None:
     """Atomically write bytes to file_path via a pinned parent directory descriptor and renameat."""
     dir_fd, leaf_name = _open_pinned_parent_dir(file_path, create=True)
@@ -351,16 +403,16 @@ def _build_slot_check_js(anchor_id: str) -> str:
     )
 
 
-def _build_wait_open_js(anchor_id: str, target_filename: str) -> str:
+def _build_wait_open_js(anchor_id: str, expected_path: str) -> str:
     anchor_json = json.dumps(anchor_id)
-    fname_json = json.dumps(target_filename)
+    path_json = json.dumps(expected_path)
     return "\n".join(
         [
             "const sketch = require('sketch')",
             f"const anchorId = {anchor_json}",
-            f"const targetName = {fname_json}",
+            f"const expectedPath = {path_json}",
             "const docs = sketch.getDocuments()",
-            "const candidates = docs.filter(d => String(d.id) !== anchorId && (!d.path || String(d.path).endsWith(targetName)))",
+            "const candidates = docs.filter(d => String(d.id) !== anchorId && Boolean(d.path) && String(d.path) === expectedPath)",
             "const doc = candidates.length > 0 ? candidates[0] : null",
             "if (!doc) {",
             "  console.log(JSON.stringify({ ready: false }))",
@@ -493,9 +545,9 @@ def _build_close_copy_by_path_js(
             "  const idStr = String(d.id)",
             "  if (idStr === anchorId) continue",
             "  const pathStr = d.path ? String(d.path) : ''",
-            "  const idMatch = Boolean(expectedDocId) && idStr === expectedDocId",
             "  const pathMatch = Boolean(expectedPath) && Boolean(pathStr) && pathStr === expectedPath",
-            "  if (idMatch || pathMatch) { d.close() }",
+            "  const idMatch = !pathStr && Boolean(expectedDocId) && idStr === expectedDocId",
+            "  if (pathMatch || idMatch) { d.close() }",
             "}",
             "const remaining = sketch.getDocuments().filter(d => String(d.id) !== anchorId).map(d => String(d.id))",
             "console.log(JSON.stringify({ closed: true, remainingNonAnchor: remaining }))",
@@ -650,6 +702,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         "sharedStyleID": node.get("sharedStyleID"),
                         "overrideValues": node.get("overrideValues"),
                         "borders": (node.get("style") or {}).get("borders"),
+                        "fills": (node.get("style") or {}).get("fills"),
                     }
                 for child in children:
                     walk(child, oid or parent_id)
@@ -724,8 +777,7 @@ def run_mcp_roundtrip(
     poll_timeout: float = 8.0,
 ) -> Dict[str, Any]:
     start_ts = time.perf_counter()
-    if not sketch_path.exists():
-        raise FileNotFoundError(f"Disposable .sketch copy not found: {sketch_path}")
+    sketch_raw_bytes = _read_regular_owned_bytes_nofollow(sketch_path)
 
     _ensure_private_dir(screenshots_dir)
     edits = edit_spec.get("edits") or []
@@ -743,19 +795,21 @@ def run_mcp_roundtrip(
     for extra_id in edit_spec.get("allowedChangedIDs") or []:
         allowed_ids.add(str(extra_id))
 
-    expected_sketch_path = str(sketch_path.resolve())
-    expected_archive_doc_id = ""
-    try:
-        with zipfile.ZipFile(sketch_path, "r") as zf_meta:
-            if "document.json" in zf_meta.namelist():
-                doc_meta = json.loads(zf_meta.read("document.json").decode("utf-8"))
-                expected_archive_doc_id = str(doc_meta.get("do_objectID", "") or "")
-    except Exception:
-        expected_archive_doc_id = ""
-
     with tempfile.TemporaryDirectory(prefix="sketch-roundtrip-baseline-") as tmpdir:
+        os.chmod(tmpdir, 0o700)
         baseline_copy = Path(tmpdir) / "baseline-before-save.sketch"
-        shutil.copy2(sketch_path, baseline_copy)
+        working_copy = Path(tmpdir) / "working-disposable-copy.sketch"
+        _write_bytes_nofollow(baseline_copy, sketch_raw_bytes)
+        _write_bytes_nofollow(working_copy, sketch_raw_bytes)
+        expected_sketch_path = str(working_copy.resolve())
+        expected_archive_doc_id = ""
+        try:
+            with zipfile.ZipFile(working_copy, "r") as zf_meta:
+                if "document.json" in zf_meta.namelist():
+                    doc_meta = json.loads(zf_meta.read("document.json").decode("utf-8"))
+                    expected_archive_doc_id = str(doc_meta.get("do_objectID", "") or "")
+        except Exception:
+            expected_archive_doc_id = ""
 
         client = SketchMCPClient(endpoint=mcp_url)
 
@@ -781,7 +835,7 @@ def run_mcp_roundtrip(
             }
 
         # Step 2: Open disposable copy with `open -g -a /Applications/Sketch.app`
-        open_cmd_1 = _launch_sketch_background(sketch_path, sketch_app, open_bin)
+        open_cmd_1 = _launch_sketch_background(working_copy, sketch_app, open_bin)
         doc_id: Optional[str] = None
         close_res_1: Optional[Dict[str, Any]] = None
         try:
@@ -789,7 +843,7 @@ def run_mcp_roundtrip(
             while time.perf_counter() < deadline:
                 probe = client.run_code(
                     "roundtrip-step2-wait-open",
-                    _build_wait_open_js(anchor_id, sketch_path.name),
+                    _build_wait_open_js(anchor_id, expected_sketch_path),
                 )
                 if probe.get("ready") and probe.get("docId"):
                     doc_id = str(probe["docId"])
@@ -800,7 +854,7 @@ def run_mcp_roundtrip(
                     "tool": "sketch_mcp_roundtrip.py",
                     "passed": False,
                     "failedStep": "step2_open_copy",
-                    "reason": f"Timed out waiting for {sketch_path.name} to open in background",
+                    "reason": f"Timed out waiting for {working_copy.name} to open in background",
                 }
 
             # Step 3 & Step 4: Pre-edit screenshot -> lightweight JS edit + processPendingChanges + save -> post-edit screenshot -> doc.close()
@@ -845,11 +899,11 @@ def run_mcp_roundtrip(
 
         # Step 5: Offline Python zipfile diff between pre-save and post-save .sketch
         offline_diff = diff_sketch_archives_offline(
-            baseline_copy, sketch_path, allowed_ids
+            baseline_copy, working_copy, allowed_ids
         )
 
         # Step 6: Reopen copy via `open -g -a /Applications/Sketch.app`, readback, screenshot SHA-256, close, assert matching: []
-        open_cmd_2 = _launch_sketch_background(sketch_path, sketch_app, open_bin)
+        open_cmd_2 = _launch_sketch_background(working_copy, sketch_app, open_bin)
         reopen_doc_id: Optional[str] = None
         close_res_2: Optional[Dict[str, Any]] = None
         try:
@@ -857,7 +911,7 @@ def run_mcp_roundtrip(
             while time.perf_counter() < deadline2:
                 probe2 = client.run_code(
                     "roundtrip-step6-wait-reopen",
-                    _build_wait_open_js(anchor_id, sketch_path.name),
+                    _build_wait_open_js(anchor_id, expected_sketch_path),
                 )
                 if probe2.get("ready") and probe2.get("docId"):
                     reopen_doc_id = str(probe2["docId"])
@@ -868,7 +922,7 @@ def run_mcp_roundtrip(
                     "tool": "sketch_mcp_roundtrip.py",
                     "passed": False,
                     "failedStep": "step6_reopen",
-                    "reason": f"Timed out waiting for {sketch_path.name} to reopen",
+                    "reason": f"Timed out waiting for {working_copy.name} to reopen",
                 }
 
             readback_res = client.run_code(
@@ -1087,7 +1141,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         if spec_arg.startswith("{"):
             edit_spec = json.loads(spec_arg)
         else:
-            edit_spec = json.loads(Path(spec_arg).read_text(encoding="utf-8"))
+            edit_spec = json.loads(
+                _read_regular_owned_bytes_nofollow(Path(spec_arg)).decode("utf-8")
+            )
 
         report = run_mcp_roundtrip(
             sketch_path=Path(args.sketch),

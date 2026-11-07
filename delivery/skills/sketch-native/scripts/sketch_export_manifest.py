@@ -117,29 +117,35 @@ def _validate_pinned_dir_fd(dir_fd: int, display_path: Path) -> None:
             f"Refusing non-private (group/world accessible) export directory: {display_path}"
         )
     dup_fd = os.dup(dir_fd)
-    with os.scandir(dup_fd) as it:
-        for entry in it:
-            try:
-                cst = entry.stat(follow_symlinks=False)
-            except FileNotFoundError:
-                continue
-            child_disp = display_path / entry.name
-            if stat.S_ISLNK(cst.st_mode):
-                raise RuntimeError(
-                    f"Refusing export directory containing symlink entry: {child_disp}"
-                )
-            if hasattr(os, "getuid") and cst.st_uid != uid:
-                raise RuntimeError(
-                    f"Refusing export directory containing foreign-owned entry: {child_disp}"
-                )
-            if stat.S_ISREG(cst.st_mode) and cst.st_nlink > 1:
-                raise RuntimeError(
-                    f"Refusing export directory containing hard-linked entry: {child_disp}"
-                )
-            if cst.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
-                raise RuntimeError(
-                    f"Refusing export directory containing non-private entry: {child_disp}"
-                )
+    try:
+        with os.scandir(dup_fd) as it:
+            for entry in it:
+                try:
+                    cst = entry.stat(follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                child_disp = display_path / entry.name
+                if stat.S_ISLNK(cst.st_mode):
+                    raise RuntimeError(
+                        f"Refusing export directory containing symlink entry: {child_disp}"
+                    )
+                if hasattr(os, "getuid") and cst.st_uid != uid:
+                    raise RuntimeError(
+                        f"Refusing export directory containing foreign-owned entry: {child_disp}"
+                    )
+                if stat.S_ISREG(cst.st_mode) and cst.st_nlink > 1:
+                    raise RuntimeError(
+                        f"Refusing export directory containing hard-linked entry: {child_disp}"
+                    )
+                if cst.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+                    raise RuntimeError(
+                        f"Refusing export directory containing non-private entry: {child_disp}"
+                    )
+    finally:
+        try:
+            os.close(dup_fd)
+        except OSError:
+            pass
 
 
 def _open_pinned_export_dir(dir_path: Path) -> int:
@@ -234,6 +240,7 @@ def _create_pinned_stage_dir(
 def _cleanup_pinned_stage_dir(
     parent_dir_fd: int, stage_fd: int, stage_name: str
 ) -> None:
+    dup_fd: Optional[int] = None
     try:
         dup_fd = os.dup(stage_fd)
         with os.scandir(dup_fd) as it:
@@ -245,6 +252,11 @@ def _cleanup_pinned_stage_dir(
     except OSError:
         pass
     finally:
+        if dup_fd is not None:
+            try:
+                os.close(dup_fd)
+            except OSError:
+                pass
         try:
             os.close(stage_fd)
         except OSError:
@@ -999,20 +1011,26 @@ def _export_one_artboard_scale(
         allowed_png_names = (f"{ab_id}.png", f"{ab_id}@{scale}x.png")
         allowed_webp_names = (f"{ab_id}.webp", f"{ab_id}@{scale}x.webp")
         dup_fd = os.dup(scale_dir_fd)
-        with os.scandir(dup_fd) as it:
-            for entry in it:
-                if entry.name.startswith(ab_id):
-                    child_disp = scale_dir / entry.name
-                    if (
-                        entry.name not in allowed_png_names
-                        and entry.name not in allowed_webp_names
-                    ):
-                        raise RuntimeError(
-                            f"Refusing pre-existing unexpected render entry in export directory: {child_disp}"
+        try:
+            with os.scandir(dup_fd) as it:
+                for entry in it:
+                    if entry.name.startswith(ab_id):
+                        child_disp = scale_dir / entry.name
+                        if (
+                            entry.name not in allowed_png_names
+                            and entry.name not in allowed_webp_names
+                        ):
+                            raise RuntimeError(
+                                f"Refusing pre-existing unexpected render entry in export directory: {child_disp}"
+                            )
+                        _validate_existing_in_dir_fd(
+                            scale_dir_fd, entry.name, child_disp
                         )
-                    _validate_existing_in_dir_fd(
-                        scale_dir_fd, entry.name, child_disp
-                    )
+        finally:
+            try:
+                os.close(dup_fd)
+            except OSError:
+                pass
 
         stage_fd, stage_name = _create_pinned_stage_dir(
             scale_dir_fd, f".stage-{ab_id}-", scale_dir

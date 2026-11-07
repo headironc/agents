@@ -1163,6 +1163,7 @@ state_path = Path(${JSON.stringify(stateFile)})
 state = json.loads(state_path.read_text(encoding="utf-8"))
 state["openCalls"].append(sys.argv[1:])
 state["workOpen"] = True
+state["workPath"] = sys.argv[-1]
 state_path.write_text(json.dumps(state), encoding="utf-8")
 `,
     { mode: 0o755 },
@@ -1280,9 +1281,13 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     for n, raw in members.items():
         zout.writestr(n, raw)
 `;
-          spawnSync("python3", ["-B", "-c", pyMutate, copySketch], {
-            env: PY_ENV,
-          });
+          spawnSync(
+            "python3",
+            ["-B", "-c", pyMutate, state.workPath || copySketch],
+            {
+              env: PY_ENV,
+            },
+          );
           replyObj = {
             ok: true,
             topCounts: {
@@ -1477,9 +1482,20 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
       driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"]
         .layers[2];
     detailAb.layers.reverse(); // Reordering child layers changes childIDs on detailAb
-    // Also mutate SymbolInstance.symbolID on SubmitButtonFocus
+    // Also mutate SymbolInstance.symbolID on SubmitButtonFocus and style.fills on StatusBar group
     driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"].layers[1].layers[1].layers[0].symbolID =
       "81000000-0000-4000-8000-000000000003";
+    driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"].layers[1].layers[0].style =
+      {
+        _class: "style",
+        fills: [
+          {
+            _class: "fill",
+            isEnabled: true,
+            color: { _class: "color", alpha: 1, red: 0, green: 0, blue: 1 },
+          },
+        ],
+      };
     const driftedDocSpecPath = path.join(tmpDir, "drifted-doc-spec.json");
     fs.writeFileSync(driftedDocSpecPath, JSON.stringify(driftedDocSpec));
     buildSyntheticSketch(driftedDocSketch, driftedDocSpecPath);
@@ -1514,6 +1530,11 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     );
     assert.ok(
       diffOut.unexpectedDrifts.some(
+        (d) => d.layerID === "40000000-0000-4000-8000-000000000002" && Array.isArray(d.after.fills) && d.after.fills.length === 1,
+      ),
+    );
+    assert.ok(
+      diffOut.unexpectedDrifts.some(
         (d) => d.layerID === "40000000-0000-4000-8000-000000000007",
       ),
     );
@@ -1537,6 +1558,11 @@ os.symlink(target_file, symlink_path)
 try:
     r._write_bytes_nofollow(symlink_path, b"overwrite")
     raise AssertionError("Expected symlink write to be rejected")
+except RuntimeError as exc:
+    assert "symlink" in str(exc).lower()
+try:
+    r._read_regular_owned_bytes_nofollow(symlink_path)
+    raise AssertionError("Expected symlink input read to be rejected")
 except RuntimeError as exc:
     assert "symlink" in str(exc).lower()
 assert target_file.read_text(encoding="utf-8") == "keep"
@@ -2244,19 +2270,45 @@ test("sketch-native: round-7 focus-ring border detection, shared style asset ref
     assert.ok(r9Codes.has("REF-DANGLING-OVERRIDE-STYLE"));
     assert.ok(!r9Codes.has("FLOW-HOME-DEAD-BACK-BUTTON"));
 
-    // 5. Verify _build_close_copy_by_path_js only closes matching copy path/ID and preserves unrelated user docs
+    // 5. Verify _build_wait_open_js and _build_close_copy_by_path_js require full path match,
+    //    diff_sketch_archives_offline catches regular layer style.fills drift, and directory scans do not leak FDs
     const closeCheck = spawnSync(
       "python3",
       [
         "-B",
         "-c",
-        `import sys
+        `import os, sys
+from pathlib import Path
 sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
 import sketch_mcp_roundtrip as rt
-js = rt._build_close_copy_by_path_js("ANCHOR-1", "/tmp/copy.sketch", "COPY-DOC-1")
-assert "pathStr === expectedPath" in js, js
-assert "idStr === expectedDocId" in js, js
+import sketch_export_manifest as em
+
+wait_js = rt._build_wait_open_js("ANCHOR-1", "/tmp/copy.sketch")
+assert "Boolean(d.path) && String(d.path) === expectedPath" in wait_js, wait_js
+
+close_js = rt._build_close_copy_by_path_js("ANCHOR-1", "/tmp/copy.sketch", "COPY-DOC-1")
+assert "pathStr === expectedPath" in close_js, close_js
+assert "!pathStr && Boolean(expectedDocId) && idStr === expectedDocId" in close_js, close_js
+
+# Check FD count stays constant across 30 _validate_pinned_dir_fd scans
+test_dir = Path(sys.argv[1]) / "fd-leak-check"
+test_dir.mkdir(parents=True, exist_ok=True)
+os.chmod(test_dir, 0o700)
+dir_fd = em._open_pinned_export_dir(test_dir)
+try:
+    probe_before = os.dup(0)
+    os.close(probe_before)
+    for _ in range(30):
+        em._validate_pinned_dir_fd(dir_fd, test_dir)
+        sfd, sname = em._create_pinned_stage_dir(dir_fd, ".stage-", test_dir)
+        em._cleanup_pinned_stage_dir(dir_fd, sfd, sname)
+    probe_after = os.dup(0)
+    os.close(probe_after)
+    assert probe_after == probe_before, f"FD leaked: before={probe_before}, after={probe_after}"
+finally:
+    os.close(dir_fd)
 `,
+        tmpDir,
       ],
       { encoding: "utf8", env: PY_ENV },
     );
