@@ -112,9 +112,9 @@ def _validate_pinned_dir_fd(dir_fd: int, display_path: Path) -> None:
         raise RuntimeError(
             f"Refusing export directory not owned by current user: {display_path}"
         )
-    if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+    if st.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
         raise RuntimeError(
-            f"Refusing group- or world-writable export directory: {display_path}"
+            f"Refusing non-private (group/world accessible) export directory: {display_path}"
         )
     dup_fd = os.dup(dir_fd)
     with os.scandir(dup_fd) as it:
@@ -136,15 +136,21 @@ def _validate_pinned_dir_fd(dir_fd: int, display_path: Path) -> None:
                 raise RuntimeError(
                     f"Refusing export directory containing hard-linked entry: {child_disp}"
                 )
+            if cst.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+                raise RuntimeError(
+                    f"Refusing export directory containing non-private entry: {child_disp}"
+                )
 
 
 def _open_pinned_export_dir(dir_path: Path) -> int:
     parent_fd, leaf_name = _open_pinned_parent_dir(dir_path, create=True)
     nofollow = getattr(os, "O_NOFOLLOW", 0)
     dir_flag = getattr(os, "O_DIRECTORY", 0)
+    created = False
     try:
         try:
             os.mkdir(leaf_name, 0o700, dir_fd=parent_fd)
+            created = True
         except FileExistsError:
             pass
         try:
@@ -158,6 +164,8 @@ def _open_pinned_export_dir(dir_path: Path) -> int:
     finally:
         os.close(parent_fd)
     try:
+        if created:
+            os.fchmod(dir_fd, 0o700)
         _validate_pinned_dir_fd(dir_fd, dir_path)
         return dir_fd
     except Exception:
@@ -170,8 +178,10 @@ def _open_pinned_subdir(
 ) -> int:
     nofollow = getattr(os, "O_NOFOLLOW", 0)
     dir_flag = getattr(os, "O_DIRECTORY", 0)
+    created = False
     try:
         os.mkdir(sub_name, 0o700, dir_fd=parent_dir_fd)
+        created = True
     except FileExistsError:
         pass
     try:
@@ -183,6 +193,8 @@ def _open_pinned_subdir(
             f"Refusing symlinked or non-directory export subdirectory: {display_path}"
         ) from exc
     try:
+        if created:
+            os.fchmod(sub_fd, 0o700)
         _validate_pinned_dir_fd(sub_fd, display_path)
         return sub_fd
     except Exception:
@@ -205,6 +217,7 @@ def _create_pinned_stage_dir(
             stage_fd = os.open(
                 stage_name, os.O_RDONLY | dir_flag | nofollow, dir_fd=parent_dir_fd
             )
+            os.fchmod(stage_fd, 0o700)
             _validate_pinned_dir_fd(stage_fd, display_parent / stage_name)
             return stage_fd, stage_name
         except Exception:
@@ -247,6 +260,7 @@ def _read_regular_owned_bytes_at(
     leaf_name: str,
     display_path: Path,
     max_bytes: Optional[int] = None,
+    enforce_private_mode: bool = False,
 ) -> bytes:
     nofollow = getattr(os, "O_NOFOLLOW", 0)
     uid = os.getuid() if hasattr(os, "getuid") else 0
@@ -269,6 +283,12 @@ def _read_regular_owned_bytes_at(
         if st.st_nlink > 1:
             raise RuntimeError(
                 f"Refusing to read hard-linked file: {display_path}"
+            )
+        if enforce_private_mode:
+            os.fchmod(fd, 0o600)
+        elif st.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+            raise RuntimeError(
+                f"Refusing to read non-private file: {display_path}"
             )
         chunks: List[bytes] = []
         remaining = max_bytes
@@ -650,7 +670,11 @@ def convert_png_to_lossless_webp(
                 f"cwebp lossless conversion failed (exit {proc.returncode}): {proc.stderr.strip()}"
             )
         header = _read_regular_owned_bytes_at(
-            dir_fd, tmp_name, webp_path.parent / tmp_name, max_bytes=32
+            dir_fd,
+            tmp_name,
+            webp_path.parent / tmp_name,
+            max_bytes=32,
+            enforce_private_mode=True,
         )
         if not _is_valid_webp_header(header):
             raise RuntimeError(
@@ -1031,6 +1055,7 @@ def _export_one_artboard_scale(
                     candidate_name,
                     scale_dir / stage_name / candidate_name,
                     max_bytes=24,
+                    enforce_private_mode=True,
                 )
                 staged_leaf = candidate_name
                 break
@@ -1204,6 +1229,7 @@ def run_export_and_manifest(
                         staged_pdf_leaf,
                         pdf_dir / stage_pdf_name / staged_pdf_leaf,
                         max_bytes=16,
+                        enforce_private_mode=True,
                     )
                     default_pdf_exists = False
                     if inst_id:

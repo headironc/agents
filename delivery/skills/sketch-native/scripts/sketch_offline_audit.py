@@ -291,10 +291,21 @@ def _resolve_override_path_in_masters(
             if target_node.get("_class") != "symbolInstance":
                 return False, seg, cur_sym_id
             prefix_key = "/".join(prefix_segments)
+            for nov in target_node.get("overrideValues") or []:
+                if not isinstance(nov, dict):
+                    continue
+                nov_name = str(nov.get("overrideName", ""))
+                if nov_name.endswith("_symbolID") and isinstance(
+                    nov.get("value"), str
+                ):
+                    sub_prefix = nov_name[: -len("_symbolID")]
+                    symbol_swaps.setdefault(
+                        f"{prefix_key}/{sub_prefix}", str(nov["value"])
+                    )
             next_sym_id = symbol_swaps.get(
                 prefix_key, str(target_node.get("symbolID", ""))
             )
-            if not next_sym_id:
+            if not next_sym_id or next_sym_id.lower() == "none":
                 return False, seg, cur_sym_id
             cur_sym_id = next_sym_id
 
@@ -709,13 +720,21 @@ def run_offline_audit(
         register_object_id(str(doc_data["do_objectID"]), "document.json:document")
 
     collected_shared_styles: List[Tuple[Dict[str, Any], str]] = []
+    shared_layer_style_ids: Set[str] = set()
+    shared_text_style_ids: Set[str] = set()
 
-    def audit_shared_style_object(st: Dict[str, Any], label_prefix: str) -> None:
+    def audit_shared_style_object(
+        st: Dict[str, Any], label_prefix: str, is_text_style: bool
+    ) -> None:
         sid = st.get("do_objectID")
         sname = str(st.get("name", ""))
         if sid:
             sid_str = str(sid)
             shared_style_ids.add(sid_str)
+            if is_text_style:
+                shared_text_style_ids.add(sid_str)
+            else:
+                shared_layer_style_ids.add(sid_str)
             register_object_id(sid_str, f"document.json:{label_prefix}:{sname}")
         if sname.startswith("Type/Platform sample/"):
             platform_sample_hits.append({"styleID": sid, "name": sname})
@@ -733,18 +752,26 @@ def run_offline_audit(
             inspect_font_descriptor(f_desc, f"{label_prefix}:{sname}")
         collected_shared_styles.append((st, label_prefix))
 
-    for style_group_key in ("layerStyles", "layerTextStyles"):
+    for style_group_key, is_txt in (
+        ("layerStyles", False),
+        ("layerTextStyles", True),
+    ):
         objs = (doc_data.get(style_group_key) or {}).get("objects") or []
         for st in objs:
             if isinstance(st, dict):
-                audit_shared_style_object(st, "sharedStyle")
+                audit_shared_style_object(st, "sharedStyle", is_txt)
 
-    for f_style_key in ("foreignLayerStyles", "foreignTextStyles"):
+    for f_style_key, is_txt in (
+        ("foreignLayerStyles", False),
+        ("foreignTextStyles", True),
+    ):
         for fst in doc_data.get(f_style_key) or []:
             if isinstance(fst, dict):
                 local_st = fst.get("localSharedStyle") or {}
                 if isinstance(local_st, dict) and local_st:
-                    audit_shared_style_object(local_st, "foreignSharedStyle")
+                    audit_shared_style_object(
+                        local_st, "foreignSharedStyle", is_txt
+                    )
                 fst_oid = str(fst.get("do_objectID", "") or "")
                 if fst_oid and fst_oid != str((local_st or {}).get("do_objectID", "") or ""):
                     register_object_id(fst_oid, f"document.json:{f_style_key}")
@@ -973,9 +1000,12 @@ def run_offline_audit(
                 cur_abs_x = abs_x + nx
                 cur_abs_y = abs_y + ny
 
-            # Shared style reference check
+            # Shared style reference check (type-checked: text -> layerTextStyles, non-text -> layerStyles)
             sh_id = node.get("sharedStyleID")
-            if sh_id and str(sh_id) not in shared_style_ids:
+            expected_style_pool = (
+                shared_text_style_ids if cls == "text" else shared_layer_style_ids
+            )
+            if sh_id and str(sh_id) not in expected_style_pool:
                 dangling_styles.append(
                     {
                         "sharedStyleID": str(sh_id),
@@ -988,7 +1018,7 @@ def run_offline_audit(
                     _new_finding(
                         "reference_integrity",
                         "REF-DANGLING-SHARED-STYLE",
-                        f"Dangling sharedStyleID '{sh_id}' on layer '{node.get('name')}' ({oid})",
+                        f"Dangling or type-mismatched sharedStyleID '{sh_id}' on {cls} layer '{node.get('name')}' ({oid})",
                         page_id=page_id,
                         artboard_id=aid,
                         layer_id=oid,
@@ -1098,7 +1128,12 @@ def run_offline_audit(
                     elif prop_part in ("layerStyle", "textStyle") and isinstance(
                         ov_val, str
                     ) and ov_val:
-                        if ov_val not in shared_style_ids:
+                        target_style_pool = (
+                            shared_text_style_ids
+                            if prop_part == "textStyle"
+                            else shared_layer_style_ids
+                        )
+                        if ov_val not in target_style_pool:
                             dangling_overrides.append(
                                 {"overrideName": ov_name, "value": ov_val, "layerID": oid}
                             )
@@ -1106,7 +1141,7 @@ def run_offline_audit(
                                 _new_finding(
                                     "reference_integrity",
                                     "REF-DANGLING-OVERRIDE-STYLE",
-                                    f"Override '{ov_name}' references missing sharedStyleID '{ov_val}'",
+                                    f"Override '{ov_name}' references missing or type-mismatched {prop_part} sharedStyleID '{ov_val}'",
                                     page_id=page_id,
                                     artboard_id=aid,
                                     layer_id=oid,
@@ -1332,6 +1367,8 @@ def run_offline_audit(
                         m_node: Dict[str, Any],
                         prefix: str,
                         visited_syms: Set[str],
+                        cur_flow_map: Dict[str, str],
+                        cur_swap_map: Dict[str, str],
                     ) -> None:
                         m_sid = str(m_node.get("symbolID", ""))
                         if m_sid:
@@ -1347,8 +1384,8 @@ def run_offline_audit(
                             ch_flow = ch.get("flow")
                             eff_dest = ""
                             maintains = False
-                            if rel_path in flow_ov_map:
-                                eff_dest = flow_ov_map[rel_path]
+                            if rel_path in cur_flow_map:
+                                eff_dest = cur_flow_map[rel_path]
                                 if isinstance(ch_flow, dict):
                                     maintains = bool(
                                         ch_flow.get("maintainScrollPosition", False)
@@ -1402,22 +1439,68 @@ def run_offline_audit(
                                         }
                                     )
                             if ch.get("_class") == "symbolInstance":
-                                sub_sid = swap_ov_map.get(
+                                sub_sid = cur_swap_map.get(
                                     rel_path, str(ch.get("symbolID", ""))
                                 )
-                                if sub_sid and sub_sid in symbol_masters:
+                                if (
+                                    sub_sid
+                                    and sub_sid.lower() != "none"
+                                    and sub_sid in symbol_masters
+                                ):
+                                    next_flow_map = dict(cur_flow_map)
+                                    next_swap_map = dict(cur_swap_map)
+                                    for nov in ch.get("overrideValues") or []:
+                                        if not isinstance(nov, dict):
+                                            continue
+                                        nov_name = str(
+                                            nov.get("overrideName", "")
+                                        )
+                                        if nov_name.endswith("_flowDestination"):
+                                            sub_p = nov_name[
+                                                : -len("_flowDestination")
+                                            ]
+                                            nv = nov.get("value")
+                                            scoped_p = (
+                                                f"{rel_path}/{sub_p}"
+                                                if rel_path
+                                                else sub_p
+                                            )
+                                            next_flow_map.setdefault(
+                                                scoped_p,
+                                                "" if nv is None else str(nv),
+                                            )
+                                        elif nov_name.endswith("_symbolID"):
+                                            sub_p = nov_name[
+                                                : -len("_symbolID")
+                                            ]
+                                            nv = nov.get("value")
+                                            scoped_p = (
+                                                f"{rel_path}/{sub_p}"
+                                                if rel_path
+                                                else sub_p
+                                            )
+                                            next_swap_map.setdefault(
+                                                scoped_p,
+                                                "" if nv is None else str(nv),
+                                            )
                                     _walk_inst_flows(
                                         symbol_masters[sub_sid],
                                         rel_path,
                                         visited_syms,
+                                        next_flow_map,
+                                        next_swap_map,
                                     )
                             _walk_inst_flows(
                                 {"layers": ch.get("layers") or []},
                                 prefix,
                                 visited_syms,
+                                cur_flow_map,
+                                cur_swap_map,
                             )
 
-                    _walk_inst_flows(inst_master, "", set())
+                    _walk_inst_flows(
+                        inst_master, "", set(), flow_ov_map, swap_ov_map
+                    )
 
             next_ancestors = ancestors + [node]
             for child in node.get("layers") or []:

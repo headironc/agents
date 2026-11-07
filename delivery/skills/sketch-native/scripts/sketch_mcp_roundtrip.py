@@ -476,15 +476,26 @@ def _build_close_doc_js(doc_id: str, anchor_id: str) -> str:
     )
 
 
-def _build_close_all_non_anchor_js(anchor_id: str) -> str:
+def _build_close_copy_by_path_js(
+    anchor_id: str, expected_path: str, expected_doc_id: str = ""
+) -> str:
     anchor_json = json.dumps(anchor_id)
+    path_json = json.dumps(expected_path)
+    doc_id_json = json.dumps(expected_doc_id)
     return "\n".join(
         [
             "const sketch = require('sketch')",
             f"const anchorId = {anchor_json}",
+            f"const expectedPath = {path_json}",
+            f"const expectedDocId = {doc_id_json}",
             "const docs = sketch.getDocuments()",
             "for (const d of docs) {",
-            "  if (String(d.id) !== anchorId) { d.close() }",
+            "  const idStr = String(d.id)",
+            "  if (idStr === anchorId) continue",
+            "  const pathStr = d.path ? String(d.path) : ''",
+            "  const idMatch = Boolean(expectedDocId) && idStr === expectedDocId",
+            "  const pathMatch = Boolean(expectedPath) && Boolean(pathStr) && pathStr === expectedPath",
+            "  if (idMatch || pathMatch) { d.close() }",
             "}",
             "const remaining = sketch.getDocuments().filter(d => String(d.id) !== anchorId).map(d => String(d.id))",
             "console.log(JSON.stringify({ closed: true, remainingNonAnchor: remaining }))",
@@ -732,6 +743,16 @@ def run_mcp_roundtrip(
     for extra_id in edit_spec.get("allowedChangedIDs") or []:
         allowed_ids.add(str(extra_id))
 
+    expected_sketch_path = str(sketch_path.resolve())
+    expected_archive_doc_id = ""
+    try:
+        with zipfile.ZipFile(sketch_path, "r") as zf_meta:
+            if "document.json" in zf_meta.namelist():
+                doc_meta = json.loads(zf_meta.read("document.json").decode("utf-8"))
+                expected_archive_doc_id = str(doc_meta.get("do_objectID", "") or "")
+    except Exception:
+        expected_archive_doc_id = ""
+
     with tempfile.TemporaryDirectory(prefix="sketch-roundtrip-baseline-") as tmpdir:
         baseline_copy = Path(tmpdir) / "baseline-before-save.sketch"
         shutil.copy2(sketch_path, baseline_copy)
@@ -812,8 +833,12 @@ def run_mcp_roundtrip(
                         )
                     else:
                         client.run_code(
-                            "roundtrip-step4-emergency-close-all",
-                            _build_close_all_non_anchor_js(anchor_id),
+                            "roundtrip-step4-emergency-close-copy",
+                            _build_close_copy_by_path_js(
+                                anchor_id,
+                                expected_sketch_path,
+                                expected_archive_doc_id,
+                            ),
                         )
                 except Exception:
                     pass
@@ -869,8 +894,12 @@ def run_mcp_roundtrip(
                         )
                     else:
                         client.run_code(
-                            "roundtrip-step6-emergency-close-all",
-                            _build_close_all_non_anchor_js(anchor_id),
+                            "roundtrip-step6-emergency-close-copy",
+                            _build_close_copy_by_path_js(
+                                anchor_id,
+                                expected_sketch_path,
+                                doc_id or expected_archive_doc_id,
+                            ),
                         )
                 except Exception:
                     pass

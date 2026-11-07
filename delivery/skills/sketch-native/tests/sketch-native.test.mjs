@@ -2155,6 +2155,112 @@ test("sketch-native: round-7 focus-ring border detection, shared style asset ref
       const hSibReport = JSON.parse(hSibMeasure.stdout);
       assert.equal(hSibReport.driftCount, 0);
     }
+
+    // 4. Verify _textStyle override pointing to a layerStyle ID is rejected (type-checked style pools),
+    //    and nested SymbolInstance default _flowDestination override is merged during flow expansion
+    const r9Spec = createCleanSketchSpec(44);
+    r9Spec["document.json"].layerStyles.objects.push({
+      _class: "sharedStyle",
+      do_objectID: "91000000-0000-4000-8000-000000000901",
+      name: "Fill/CardSurface",
+      value: { _class: "style", fills: [] },
+    });
+    const r9Page = r9Spec["pages/20000000-0000-4000-8000-000000000001.json"];
+    // Add nested BackButton master with default flow="back", and outer Header master whose nested instance overrides _flowDestination to Detail artboard
+    r9Page.layers.push(
+      {
+        _class: "symbolMaster",
+        do_objectID: "91000000-0000-4000-8000-000000000902",
+        symbolID: "91000000-0000-4000-8000-000000000903",
+        name: "Atom/BackBtn",
+        frame: { _class: "rect", x: 0, y: 300, width: 48, height: 44 },
+        layers: [
+          {
+            _class: "MSImmutableHotspotLayer",
+            do_objectID: "91000000-0000-4000-8000-000000000904",
+            name: "BackHotspot",
+            frame: { _class: "rect", x: 0, y: 0, width: 48, height: 44 },
+            flow: {
+              _class: "MSImmutableFlowConnection",
+              do_objectID: "91000000-0000-4000-8000-000000000905",
+              destinationArtboardID: "back",
+              maintainScrollPosition: true,
+            },
+          },
+        ],
+      },
+      {
+        _class: "symbolMaster",
+        do_objectID: "91000000-0000-4000-8000-000000000906",
+        symbolID: "91000000-0000-4000-8000-000000000907",
+        name: "Organism/HomeHeader",
+        frame: { _class: "rect", x: 0, y: 360, width: 375, height: 44 },
+        layers: [
+          {
+            _class: "symbolInstance",
+            do_objectID: "91000000-0000-4000-8000-000000000908",
+            symbolID: "91000000-0000-4000-8000-000000000903",
+            name: "NestedBackBtn",
+            frame: { _class: "rect", x: 16, y: 0, width: 48, height: 44 },
+            overrideValues: [
+              {
+                _class: "overrideValue",
+                do_objectID: "91000000-0000-4000-8000-000000000909",
+                overrideName:
+                  "91000000-0000-4000-8000-000000000904_flowDestination",
+                value: "50000000-0000-4000-8000-000000000001",
+              },
+            ],
+          },
+        ],
+      },
+    );
+    // Place Organism/HomeHeader on Home artboard (isFlowHome: true) without re-overriding _flowDestination
+    r9Page.layers[1].layers.push({
+      _class: "symbolInstance",
+      do_objectID: "91000000-0000-4000-8000-000000000910",
+      symbolID: "91000000-0000-4000-8000-000000000907",
+      name: "HomeHeaderInst",
+      frame: { _class: "rect", x: 0, y: 500, width: 375, height: 44 },
+      overrideValues: [],
+    });
+    // Also add a type-mismatched _textStyle override pointing to the layerStyle ID 91000000-0000-4000-8000-000000000901
+    r9Page.layers[1].layers[1].layers[0].overrideValues.push({
+      _class: "overrideValue",
+      do_objectID: "91000000-0000-4000-8000-000000000911",
+      overrideName: "30000000-0000-4000-8000-000000000002_textStyle",
+      value: "91000000-0000-4000-8000-000000000901",
+    });
+
+    const r9Builder = path.join(tmpDir, "r9-spec.json");
+    const r9Sketch = path.join(tmpDir, "r9.sketch");
+    fs.writeFileSync(r9Builder, JSON.stringify(r9Spec));
+    buildSyntheticSketch(r9Sketch, r9Builder);
+
+    const r9Audit = runPython(PY_AUDIT, ["--sketch", r9Sketch]);
+    assert.equal(r9Audit.status, 1);
+    const r9Report = JSON.parse(r9Audit.stdout);
+    const r9Codes = new Set(r9Report.findings.map((f) => f.code));
+    assert.ok(r9Codes.has("REF-DANGLING-OVERRIDE-STYLE"));
+    assert.ok(!r9Codes.has("FLOW-HOME-DEAD-BACK-BUTTON"));
+
+    // 5. Verify _build_close_copy_by_path_js only closes matching copy path/ID and preserves unrelated user docs
+    const closeCheck = spawnSync(
+      "python3",
+      [
+        "-B",
+        "-c",
+        `import sys
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as rt
+js = rt._build_close_copy_by_path_js("ANCHOR-1", "/tmp/copy.sketch", "COPY-DOC-1")
+assert "pathStr === expectedPath" in js, js
+assert "idStr === expectedDocId" in js, js
+`,
+      ],
+      { encoding: "utf8", env: PY_ENV },
+    );
+    assert.equal(closeCheck.status, 0, closeCheck.stderr);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
