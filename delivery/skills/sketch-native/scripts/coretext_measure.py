@@ -1000,6 +1000,67 @@ def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
     return 0.0
 
 
+def _reflow_freeform_group_for_child(
+    group: Dict[str, Any],
+    target_child: Dict[str, Any],
+    old_child_h: float,
+    new_child_h: float,
+) -> Tuple[float, float]:
+    """Update a non-Flex group's child vertical coordinates and bounding height to match _simulate_master_tree_height."""
+    g_frame = group.get("frame")
+    if not isinstance(g_frame, dict):
+        return 0.0, 0.0
+    old_group_h = float(g_frame.get("height", 0.0))
+    if abs(new_child_h - old_child_h) <= 0.01:
+        return old_group_h, old_group_h
+
+    flow_children = [
+        ch
+        for ch in (group.get("layers") or [])
+        if isinstance(ch, dict) and _participates_in_flex_flow(ch)
+    ]
+    if not flow_children:
+        return old_group_h, old_group_h
+
+    iv: List[Tuple[Dict[str, Any], float, float, float]] = []
+    for ch in flow_children:
+        cf = ch.get("frame") or {}
+        cy = float(cf.get("y", 0.0))
+        if ch is target_child:
+            iv.append((ch, cy, old_child_h, new_child_h))
+        else:
+            ch_h = float(cf.get("height", 0.0))
+            iv.append((ch, cy, ch_h, ch_h))
+
+    sorted_iv = sorted(iv, key=lambda t: (t[1], -(t[1] + t[2])))
+    bands: List[List[Tuple[Dict[str, Any], float, float, float]]] = []
+    for item in sorted_iv:
+        _, y0, old_h, _ = item
+        if not bands:
+            bands.append([item])
+            continue
+        prev_old_bottom = max(py + p_old for _, py, p_old, _ in bands[-1])
+        if y0 < prev_old_bottom - 0.5:
+            bands[-1].append(item)
+        else:
+            bands.append([item])
+
+    accum_shift = 0.0
+    for band in bands:
+        if abs(accum_shift) > 0.01:
+            for ch, _, _, _ in band:
+                cf = ch.get("frame")
+                if isinstance(cf, dict):
+                    cf["y"] = round(float(cf.get("y", 0.0)) + accum_shift, 2)
+        old_b = max(py + p_old for _, py, p_old, _ in band)
+        new_b = max(py + p_new for _, py, _, p_new in band)
+        accum_shift += new_b - old_b
+
+    new_group_h = round(max(1.0, old_group_h + accum_shift), 2)
+    g_frame["height"] = new_group_h
+    return old_group_h, new_group_h
+
+
 def _collect_artboard_rects(
     node: Dict[str, Any], offset_x: float = 0.0, offset_y: float = 0.0
 ) -> Dict[str, Tuple[float, float, float, float]]:
@@ -1485,16 +1546,32 @@ def _audit_and_rebake_members(
         for meta, drift_record, expected_h in pending_rebakes:
             node = meta["node"]
             frame = node.get("frame") or {}
+            old_node_h = float(frame.get("height", 0.0))
             artboard = meta["artboard"]
             before_rects = (
                 _collect_artboard_rects(artboard) if artboard is not None else {}
             )
             frame["height"] = expected_h
+            cur_child = node
+            cur_old_h = old_node_h
+            cur_new_h = expected_h
             for anc in reversed(meta["ancestors"]):
-                if (anc.get("groupLayout") or {}).get(
-                    "_class"
-                ) == "MSImmutableFlexGroupLayout":
+                anc_layout = anc.get("groupLayout") or {}
+                if anc_layout.get("_class") == "MSImmutableFlexGroupLayout":
+                    anc_frame = anc.get("frame") or {}
+                    old_anc_h = float(anc_frame.get("height", 0.0))
                     _reflow_vertical_flex_group(anc)
+                    new_anc_h = float(anc_frame.get("height", old_anc_h))
+                    cur_child = anc
+                    cur_old_h = old_anc_h
+                    cur_new_h = new_anc_h
+                elif anc.get("_class") == "group":
+                    old_anc_h, new_anc_h = _reflow_freeform_group_for_child(
+                        anc, cur_child, cur_old_h, cur_new_h
+                    )
+                    cur_child = anc
+                    cur_old_h = old_anc_h
+                    cur_new_h = new_anc_h
             if artboard is not None:
                 after_rects = _collect_artboard_rects(artboard)
                 for top_child in artboard.get("layers") or []:

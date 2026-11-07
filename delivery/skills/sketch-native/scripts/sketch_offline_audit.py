@@ -200,9 +200,73 @@ def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
 
 MAX_ZIP_MEMBERS = 4096
 MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
-MAX_ZIP_JSON_MEMBER_BYTES = 32 * 1024 * 1024
+MAX_ZIP_JSON_MEMBER_BYTES = 8 * 1024 * 1024
+MAX_ZIP_TOTAL_JSON_BYTES = 16 * 1024 * 1024
 MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 MAX_ZIP_COMPRESSION_RATIO = 100.0
+MAX_ARCHIVE_PAGES = 64
+MAX_DOM_DICT_NODES = 30000
+MAX_DOM_CONTAINER_ITEMS = 120000
+MAX_DOM_STRING_CHARS = 2 * 1024 * 1024
+
+
+def _new_dom_budget() -> Dict[str, int]:
+    return {
+        "json_bytes": 0,
+        "pages": 0,
+        "dicts": 0,
+        "items": 0,
+        "chars": 0,
+    }
+
+
+def _loads_json_bounded(
+    raw_bytes: bytes,
+    member_name: str,
+    dom_budget: Optional[Dict[str, int]] = None,
+) -> Any:
+    """Parse JSON member while enforcing aggregate byte, object node, container item, and string character limits."""
+    budget = dom_budget if dom_budget is not None else _new_dom_budget()
+    budget["json_bytes"] += len(raw_bytes)
+    if budget["json_bytes"] > MAX_ZIP_TOTAL_JSON_BYTES:
+        raise RuntimeError(
+            f"Archive JSON total size ({budget['json_bytes']}) exceeds limit ({MAX_ZIP_TOTAL_JSON_BYTES})"
+        )
+    struct_tokens = (
+        raw_bytes.count(b"{") + raw_bytes.count(b"[") + raw_bytes.count(b",")
+    )
+    if struct_tokens > MAX_DOM_CONTAINER_ITEMS:
+        raise RuntimeError(
+            f"JSON member '{member_name}' structural complexity ({struct_tokens}) exceeds DOM item budget ({MAX_DOM_CONTAINER_ITEMS})"
+        )
+
+    def _obj_hook(obj: Dict[str, Any]) -> Dict[str, Any]:
+        budget["dicts"] += 1
+        if budget["dicts"] > MAX_DOM_DICT_NODES:
+            raise RuntimeError(
+                f"Sketch JSON DOM object count ({budget['dicts']}) exceeds limit ({MAX_DOM_DICT_NODES}) in '{member_name}'"
+            )
+        budget["items"] += len(obj)
+        for k, v in obj.items():
+            budget["chars"] += len(k)
+            if isinstance(v, str):
+                budget["chars"] += len(v)
+            elif isinstance(v, list):
+                budget["items"] += len(v)
+                for elem in v:
+                    if isinstance(elem, str):
+                        budget["chars"] += len(elem)
+        if budget["items"] > MAX_DOM_CONTAINER_ITEMS:
+            raise RuntimeError(
+                f"Sketch JSON DOM container item count ({budget['items']}) exceeds limit ({MAX_DOM_CONTAINER_ITEMS}) in '{member_name}'"
+            )
+        if budget["chars"] > MAX_DOM_STRING_CHARS:
+            raise RuntimeError(
+                f"Sketch JSON DOM string character count ({budget['chars']}) exceeds limit ({MAX_DOM_STRING_CHARS}) in '{member_name}'"
+            )
+        return obj
+
+    return json.loads(raw_bytes.decode("utf-8"), object_hook=_obj_hook)
 
 
 def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
@@ -686,24 +750,54 @@ def run_offline_audit(
                     )
                 )
 
-        doc_data = (
-            json.loads(
-                _read_zip_member_bounded(zf, "document.json").decode("utf-8")
-            )
-            if "document.json" in namelist
-            else {}
-        )
-        meta_data = (
-            json.loads(_read_zip_member_bounded(zf, "meta.json").decode("utf-8"))
-            if "meta.json" in namelist
-            else {}
-        )
-        pages_data: Dict[str, Dict[str, Any]] = {}
-        for member in sorted(namelist):
-            if member.startswith("pages/") and member.endswith(".json"):
-                pages_data[member] = json.loads(
-                    _read_zip_member_bounded(zf, member).decode("utf-8")
+        dom_budget = _new_dom_budget()
+        try:
+            doc_data = (
+                _loads_json_bounded(
+                    _read_zip_member_bounded(zf, "document.json"),
+                    "document.json",
+                    dom_budget,
                 )
+                if "document.json" in namelist
+                else {}
+            )
+            meta_data = (
+                _loads_json_bounded(
+                    _read_zip_member_bounded(zf, "meta.json"),
+                    "meta.json",
+                    dom_budget,
+                )
+                if "meta.json" in namelist
+                else {}
+            )
+            pages_data: Dict[str, Dict[str, Any]] = {}
+            for member in sorted(namelist):
+                if member.startswith("pages/") and member.endswith(".json"):
+                    dom_budget["pages"] += 1
+                    if dom_budget["pages"] > MAX_ARCHIVE_PAGES:
+                        raise RuntimeError(
+                            f"Archive page count ({dom_budget['pages']}) exceeds limit ({MAX_ARCHIVE_PAGES})"
+                        )
+                    pages_data[member] = _loads_json_bounded(
+                        _read_zip_member_bounded(zf, member),
+                        member,
+                        dom_budget,
+                    )
+        except RuntimeError as exc:
+            return {
+                "tool": "sketch_offline_audit.py",
+                "sketch": str(sketch_path),
+                "passed": False,
+                "elapsedMs": round((time.perf_counter() - start_ts) * 1000.0, 2),
+                "blockingCount": 1,
+                "findings": [
+                    _new_finding(
+                        "archive_and_ids",
+                        "ARCHIVE-ZIP-BUDGET-EXCEEDED",
+                        str(exc),
+                    )
+                ],
+            }
 
         for page_ref in doc_data.get("pages") or []:
             if not isinstance(page_ref, dict):
@@ -735,28 +829,39 @@ def run_offline_audit(
     # Upstream source .sketch symbol/swatch/style IDs if provided
     upstream_symbol_ids: Set[str] = set()
     upstream_style_ids: Set[str] = set()
+    upstream_layer_style_ids: Set[str] = set()
+    upstream_text_style_ids: Set[str] = set()
     upstream_swatch_ids: Set[str] = set()
     if source_sketch_path and source_sketch_path.exists() and zipfile.is_zipfile(source_sketch_path):
         with zipfile.ZipFile(source_sketch_path, "r") as uzf:
             _validate_zip_archive_budget(uzf)
+            up_dom_budget = _new_dom_budget()
             unamelist = set(uzf.namelist())
             if "document.json" in unamelist:
-                udoc = json.loads(
-                    _read_zip_member_bounded(uzf, "document.json").decode("utf-8")
+                udoc = _loads_json_bounded(
+                    _read_zip_member_bounded(uzf, "document.json"),
+                    "source:document.json",
+                    up_dom_budget,
                 )
                 for s in (udoc.get("layerStyles") or {}).get("objects") or []:
                     if s.get("do_objectID"):
-                        upstream_style_ids.add(str(s["do_objectID"]))
+                        sid_u = str(s["do_objectID"])
+                        upstream_style_ids.add(sid_u)
+                        upstream_layer_style_ids.add(sid_u)
                 for s in (udoc.get("layerTextStyles") or {}).get("objects") or []:
                     if s.get("do_objectID"):
-                        upstream_style_ids.add(str(s["do_objectID"]))
+                        sid_u = str(s["do_objectID"])
+                        upstream_style_ids.add(sid_u)
+                        upstream_text_style_ids.add(sid_u)
                 for sw in (udoc.get("sharedSwatches") or {}).get("objects") or []:
                     if sw.get("do_objectID"):
                         upstream_swatch_ids.add(str(sw["do_objectID"]))
             for member in unamelist:
                 if member.startswith("pages/") and member.endswith(".json"):
-                    upage = json.loads(
-                        _read_zip_member_bounded(uzf, member).decode("utf-8")
+                    upage = _loads_json_bounded(
+                        _read_zip_member_bounded(uzf, member),
+                        f"source:{member}",
+                        up_dom_budget,
                     )
 
                     def _walk_up(n: Dict[str, Any]) -> None:
@@ -861,8 +966,8 @@ def run_offline_audit(
         register_object_id(str(doc_data["do_objectID"]), "document.json:document")
 
     collected_shared_styles: List[Tuple[Dict[str, Any], str]] = []
-    shared_layer_style_ids: Set[str] = set()
-    shared_text_style_ids: Set[str] = set()
+    shared_layer_style_ids: Set[str] = set(upstream_layer_style_ids)
+    shared_text_style_ids: Set[str] = set(upstream_text_style_ids)
 
     def audit_shared_style_object(
         st: Dict[str, Any], label_prefix: str, is_text_style: bool
@@ -1432,12 +1537,15 @@ def run_offline_audit(
                             details={"width": nw, "height": nh},
                         )
                     )
+            eff_visible = bool(node.get("isVisible", True)) and all(
+                bool(a.get("isVisible", True)) for a in ancestors
+            )
             if isinstance(flow, dict):
                 dest = str(flow.get("destinationArtboardID", ""))
                 maintains_scroll = bool(flow.get("maintainScrollPosition", False))
                 is_in_master = (cur_artboard or {}).get("_class") == "symbolMaster"
                 if dest == "back":
-                    if not is_in_master:
+                    if not is_in_master and eff_visible:
                         back_flows.append(
                             {
                                 "pageID": page_id,
@@ -1467,7 +1575,7 @@ def run_offline_audit(
                                 layer_id=oid,
                             )
                         )
-                    elif not is_in_master:
+                    elif not is_in_master and eff_visible:
                         flow_edges.append(
                             {
                                 "pageID": page_id,
@@ -1510,6 +1618,7 @@ def run_offline_audit(
                         visited_syms: Set[str],
                         cur_flow_map: Dict[str, str],
                         cur_swap_map: Dict[str, str],
+                        parent_vis: bool,
                     ) -> None:
                         m_sid = str(m_node.get("symbolID", ""))
                         if m_sid:
@@ -1519,6 +1628,7 @@ def run_offline_audit(
                         for ch in m_node.get("layers") or []:
                             if not isinstance(ch, dict):
                                 continue
+                            ch_vis = parent_vis and bool(ch.get("isVisible", True))
                             ch_id = str(ch.get("do_objectID", ""))
                             ch_name = str(ch.get("name", ""))
                             rel_path = f"{prefix}/{ch_id}" if prefix else ch_id
@@ -1539,15 +1649,16 @@ def run_offline_audit(
                                     ch_flow.get("maintainScrollPosition", False)
                                 )
                             if eff_dest == "back":
-                                back_flows.append(
-                                    {
-                                        "pageID": page_id,
-                                        "sourceArtboardID": aid,
-                                        "layerID": f"{oid}/{rel_path}",
-                                        "layerName": f"{node.get('name')}/{ch_name}",
-                                        "maintainScrollPosition": maintains,
-                                    }
-                                )
+                                if ch_vis:
+                                    back_flows.append(
+                                        {
+                                            "pageID": page_id,
+                                            "sourceArtboardID": aid,
+                                            "layerID": f"{oid}/{rel_path}",
+                                            "layerName": f"{node.get('name')}/{ch_name}",
+                                            "maintainScrollPosition": maintains,
+                                        }
+                                    )
                             elif eff_dest:
                                 if eff_dest not in artboards_by_id:
                                     dangling_flows.append(
@@ -1568,7 +1679,7 @@ def run_offline_audit(
                                             layer_id=oid,
                                         )
                                     )
-                                else:
+                                elif ch_vis:
                                     flow_edges.append(
                                         {
                                             "pageID": page_id,
@@ -1630,6 +1741,7 @@ def run_offline_audit(
                                         visited_syms,
                                         next_flow_map,
                                         next_swap_map,
+                                        ch_vis,
                                     )
                             _walk_inst_flows(
                                 {"layers": ch.get("layers") or []},
@@ -1637,10 +1749,16 @@ def run_offline_audit(
                                 visited_syms,
                                 cur_flow_map,
                                 cur_swap_map,
+                                ch_vis,
                             )
 
                     _walk_inst_flows(
-                        inst_master, "", set(), flow_ov_map, swap_ov_map
+                        inst_master,
+                        "",
+                        set(),
+                        flow_ov_map,
+                        swap_ov_map,
+                        eff_visible,
                     )
 
             next_ancestors = ancestors + [node]

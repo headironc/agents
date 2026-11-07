@@ -2992,6 +2992,200 @@ try:
     raise AssertionError("Expected _validate_export_render_budget to reject oversized artboard")
 except RuntimeError as exc:
     assert "exceed" in str(exc), exc
+
+# 9. Verify hidden incoming flow edges do not mask FLOW-START-ARTBOARD-BACK-TRAP
+hidden_flow_sketch = Path(sys.argv[1]) / "hidden-flow.sketch"
+with zipfile.ZipFile(hidden_flow_sketch, "w") as zf:
+    zf.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc-hf"}))
+    zf.writestr("meta.json", json.dumps({"version": 164}))
+    zf.writestr(
+        "pages/p1.json",
+        json.dumps({
+            "_class": "page",
+            "do_objectID": "page-hf",
+            "name": "Page 1",
+            "layers": [
+                {
+                    "_class": "artboard",
+                    "do_objectID": "ab-a",
+                    "name": "Home",
+                    "isFlowHome": True,
+                    "frame": {"x": 0, "y": 0, "width": 393, "height": 852},
+                    "layers": [
+                        {
+                            "_class": "rectangle",
+                            "do_objectID": "btn-hidden-to-b",
+                            "name": "HiddenLink",
+                            "isVisible": False,
+                            "frame": {"x": 16, "y": 100, "width": 120, "height": 48},
+                            "flow": {"_class": "MSImmutableFlowConnection", "do_objectID": "fl-h", "destinationArtboardID": "ab-b"},
+                        }
+                    ],
+                },
+                {
+                    "_class": "artboard",
+                    "do_objectID": "ab-b",
+                    "name": "OrphanDetail",
+                    "frame": {"x": 450, "y": 0, "width": 393, "height": 852},
+                    "layers": [
+                        {
+                            "_class": "rectangle",
+                            "do_objectID": "btn-back-on-b",
+                            "name": "BackBtn",
+                            "isVisible": True,
+                            "frame": {"x": 16, "y": 44, "width": 48, "height": 44},
+                            "flow": {"_class": "MSImmutableFlowConnection", "do_objectID": "fl-b", "destinationArtboardID": "back"},
+                        }
+                    ],
+                },
+            ],
+        }),
+    )
+hf_audit = soa.run_offline_audit(hidden_flow_sketch)
+assert any(f["code"] == "FLOW-START-ARTBOARD-BACK-TRAP" for f in hf_audit["findings"]), hf_audit["findings"]
+
+# 10. Verify --source-sketch populates typed shared_text_style_ids and shared_layer_style_ids
+src_style_sketch = Path(sys.argv[1]) / "src-styles.sketch"
+dst_style_sketch = Path(sys.argv[1]) / "dst-styles.sketch"
+with zipfile.ZipFile(src_style_sketch, "w") as zf:
+    zf.writestr(
+        "document.json",
+        json.dumps({
+            "_class": "document",
+            "do_objectID": "doc-src-st",
+            "layerTextStyles": {"objects": [{"_class": "sharedStyle", "do_objectID": "up-txt-style-1", "name": "Body"}]},
+            "layerStyles": {"objects": [{"_class": "sharedStyle", "do_objectID": "up-layer-style-1", "name": "CardBg"}]},
+        }),
+    )
+    zf.writestr("meta.json", json.dumps({"version": 164}))
+    zf.writestr("pages/p1.json", json.dumps({"_class": "page", "do_objectID": "p-src-1", "layers": []}))
+with zipfile.ZipFile(dst_style_sketch, "w") as zf:
+    zf.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc-dst-st"}))
+    zf.writestr("meta.json", json.dumps({"version": 164}))
+    zf.writestr(
+        "pages/p1.json",
+        json.dumps({
+            "_class": "page",
+            "do_objectID": "p-dst-1",
+            "name": "Page 1",
+            "layers": [
+                {
+                    "_class": "artboard",
+                    "do_objectID": "ab-dst-1",
+                    "name": "Home",
+                    "frame": {"x": 0, "y": 0, "width": 393, "height": 852},
+                    "layers": [
+                        {
+                            "_class": "text",
+                            "do_objectID": "txt-using-up",
+                            "name": "Title",
+                            "sharedStyleID": "up-txt-style-1",
+                            "frame": {"x": 16, "y": 60, "width": 200, "height": 24},
+                            "attributedString": {"string": "Hello", "attributes": [{"location": 0, "length": 5, "attributes": {"MSAttributedStringFontAttribute": {"attributes": {"name": "PingFangSC-Regular", "size": 16}}}}]},
+                        },
+                        {
+                            "_class": "rectangle",
+                            "do_objectID": "rect-using-up",
+                            "name": "Card",
+                            "sharedStyleID": "up-layer-style-1",
+                            "frame": {"x": 16, "y": 100, "width": 200, "height": 80},
+                        },
+                    ],
+                }
+            ],
+        }),
+    )
+up_style_audit = soa.run_offline_audit(dst_style_sketch, source_sketch_path=src_style_sketch)
+assert not any(f["code"] == "REF-DANGLING-SHARED-STYLE" for f in up_style_audit["findings"]), up_style_audit["findings"]
+
+# 11. Verify _loads_json_bounded enforces DOM object/container complexity budget
+try:
+    soa._loads_json_bounded(
+        b"[" + b",".join([b"{}"] * (soa.MAX_DOM_DICT_NODES + 5)) + b"]",
+        "pages/dom-bomb.json",
+    )
+    raise AssertionError("Expected _loads_json_bounded to reject excessive DOM object count")
+except RuntimeError as exc:
+    assert "exceeds" in str(exc), exc
+
+# 12. Verify coretext_measure updates intermediate Freeform group bounds before reflowing outer Flex ancestors
+orig_ms2 = cm.measure_specs
+try:
+    cm.measure_specs = lambda items, swift_bin=None: {
+        "results": [
+            {
+                "id": it["id"],
+                "bakedHeight": 40.0,
+                "lineCount": 2,
+                "resolvedPostScriptName": "PingFangSC-Regular",
+            }
+            for it in items
+        ]
+    }
+    grp_members = {
+        "document.json": json.dumps({"_class": "document", "do_objectID": "doc-grp"}).encode("utf-8"),
+        "pages/p1.json": json.dumps({
+            "_class": "page",
+            "do_objectID": "page-grp",
+            "name": "Page 1",
+            "layers": [
+                {
+                    "_class": "symbolMaster",
+                    "do_objectID": "m-with-grp",
+                    "symbolID": "sym-with-grp",
+                    "name": "MasterWithGroup",
+                    "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+                    "groupLayout": {"_class": "MSImmutableFlexGroupLayout", "flexDirection": 1, "verticalSizing": 1, "padding": 0},
+                    "layers": [
+                        {
+                            "_class": "group",
+                            "do_objectID": "plain-grp",
+                            "name": "PlainGroup",
+                            "isVisible": True,
+                            "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+                            "layers": [
+                                {
+                                    "_class": "text",
+                                    "do_objectID": "grp-txt",
+                                    "name": "GroupText",
+                                    "isVisible": True,
+                                    "textBehaviour": 1,
+                                    "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+                                    "attributedString": {"string": "Two lines", "attributes": [{"location": 0, "length": 9, "attributes": {"MSAttributedStringFontAttribute": {"attributes": {"name": "PingFangSC-Regular", "size": 14}}}}]},
+                                }
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "_class": "artboard",
+                    "do_objectID": "ab-grp",
+                    "name": "Screen",
+                    "frame": {"x": 0, "y": 0, "width": 393, "height": 852},
+                    "layers": [
+                        {
+                            "_class": "symbolInstance",
+                            "do_objectID": "inst-grp",
+                            "symbolID": "sym-with-grp",
+                            "name": "InstGrp",
+                            "isVisible": True,
+                            "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+                            "overrideValues": [],
+                        }
+                    ],
+                },
+            ],
+        }).encode("utf-8"),
+    }
+    rebake_test_path = Path(sys.argv[1]) / "grp-rebake.sketch"
+    with zipfile.ZipFile(rebake_test_path, "w") as zf:
+        for k, v in grp_members.items():
+            zf.writestr(k, v)
+    cm.audit_and_rebake_sketch(rebake_test_path, rebake=True)
+    re_audit = cm.audit_and_rebake_sketch(rebake_test_path, rebake=False)
+    assert re_audit["passed"] is True and re_audit["driftCount"] == 0, re_audit
+finally:
+    cm.measure_specs = orig_ms2
 `,
         tmpDir,
       ],

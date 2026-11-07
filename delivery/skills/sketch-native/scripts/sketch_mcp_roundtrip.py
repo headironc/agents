@@ -26,9 +26,11 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import http.client
 import json
 import os
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -359,44 +361,99 @@ def _write_bytes_nofollow(file_path: Path, data: bytes, mode: int = 0o600) -> No
         os.close(dir_fd)
 
 
-def _verify_mcp_listener_peer(
-    endpoint: str,
-    sketch_app: str = DEFAULT_SKETCH_APP,
-    require_signed_sketch: bool = True,
-) -> None:
-    """Verify the loopback TCP listener belongs to the current user (and signed Sketch.app when required)."""
-    parsed = urllib.parse.urlparse(endpoint)
-    if parsed.scheme != "http" or (parsed.hostname or "").lower() not in (
-        "localhost",
-        "127.0.0.1",
-        "::1",
-    ):
-        raise RuntimeError(
-            f"Refusing non-loopback or non-HTTP MCP endpoint: {endpoint}"
-        )
-    port = parsed.port or 80
-    lsof_bin = (
-        "/usr/sbin/lsof"
-        if os.path.exists("/usr/sbin/lsof")
-        else shutil.which("lsof")
-    )
-    if not lsof_bin or not hasattr(os, "getuid"):
-        return
-    uid = os.getuid()
-    proc = subprocess.run(
-        [lsof_bin, "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-F", "ucp"],
+def _verify_pid_matches_sketch(
+    pid: int,
+    uid: int,
+    sketch_app: str,
+    require_signed_sketch: bool,
+) -> bool:
+    ps_bin = "/bin/ps" if os.path.exists("/bin/ps") else shutil.which("ps")
+    if not ps_bin:
+        return True
+    ps_proc = subprocess.run(
+        [ps_bin, "-p", str(pid), "-o", "uid=,comm="],
         capture_output=True,
         text=True,
         timeout=5,
         check=False,
     )
-    pids: List[int] = []
+    line = (ps_proc.stdout or "").strip()
+    if not line:
+        return False
+    parts = line.split(None, 1)
+    if len(parts) < 2:
+        return False
+    try:
+        ps_uid = int(parts[0])
+    except ValueError:
+        return False
+    if ps_uid != uid:
+        return False
+    comm_path = os.path.realpath(parts[1].strip())
+    if require_signed_sketch:
+        sketch_bundle_real = os.path.realpath(sketch_app)
+        if not (
+            comm_path == sketch_bundle_real
+            or comm_path.startswith(sketch_bundle_real + os.sep)
+        ):
+            return False
+        codesign_bin = (
+            "/usr/bin/codesign"
+            if os.path.exists("/usr/bin/codesign")
+            else shutil.which("codesign")
+        )
+        if codesign_bin:
+            cs_proc = subprocess.run(
+                [
+                    codesign_bin,
+                    "--verify",
+                    "--deep",
+                    "--strict",
+                    sketch_bundle_real,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            if cs_proc.returncode != 0:
+                raise RuntimeError(
+                    f"Refusing MCP listener: Sketch bundle failed codesign verification ({sketch_bundle_real})"
+                )
+    return True
+
+
+def _query_port_tcp_records(lsof_bin: str, port: int) -> List[Dict[str, Any]]:
+    proc = subprocess.run(
+        [lsof_bin, "-nP", f"-iTCP:{port}", "-F", "ucpnT"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    records: List[Dict[str, Any]] = []
     cur_pid: Optional[int] = None
     cur_uid: Optional[int] = None
+    cur_name: Optional[str] = None
+    cur_state: Optional[str] = None
+
+    def flush_fd() -> None:
+        nonlocal cur_name, cur_state
+        if cur_pid is not None and cur_uid is not None and cur_name is not None:
+            records.append(
+                {
+                    "pid": cur_pid,
+                    "uid": cur_uid,
+                    "name": cur_name,
+                    "state": cur_state or ("ESTABLISHED" if "->" in cur_name else "LISTEN"),
+                }
+            )
+        cur_name = None
+        cur_state = None
+
     for raw_line in (proc.stdout or "").splitlines():
         if raw_line.startswith("p"):
-            if cur_pid is not None and cur_uid == uid:
-                pids.append(cur_pid)
+            flush_fd()
             try:
                 cur_pid = int(raw_line[1:].strip())
             except ValueError:
@@ -407,78 +464,129 @@ def _verify_mcp_listener_peer(
                 cur_uid = int(raw_line[1:].strip())
             except ValueError:
                 cur_uid = None
-    if cur_pid is not None and cur_uid == uid:
-        pids.append(cur_pid)
+        elif raw_line.startswith("f"):
+            flush_fd()
+        elif raw_line.startswith("n"):
+            cur_name = raw_line[1:].strip()
+        elif raw_line.startswith("TST="):
+            cur_state = raw_line[4:].strip()
+    flush_fd()
+    return records
 
-    if not pids:
+
+def _format_lsof_endpoint(ip_str: str, port: int) -> str:
+    clean_ip = str(ip_str).strip().strip("[]")
+    if ":" in clean_ip:
+        return f"[{clean_ip}]:{port}"
+    return f"{clean_ip}:{port}"
+
+
+def _verify_mcp_listener_peer(
+    endpoint: str,
+    sketch_app: str = DEFAULT_SKETCH_APP,
+    require_signed_sketch: bool = True,
+    connected_sock: Optional[socket.socket] = None,
+) -> str:
+    """Verify the loopback TCP listener and exact connected socket peer belong to the current user's signed Sketch."""
+    parsed = urllib.parse.urlparse(endpoint)
+    host_low = (parsed.hostname or "").lower()
+    if parsed.scheme != "http" or host_low not in (
+        "localhost",
+        "127.0.0.1",
+        "::1",
+    ):
+        raise RuntimeError(
+            f"Refusing non-loopback or non-HTTP MCP endpoint: {endpoint}"
+        )
+    default_target_ip = "::1" if host_low == "::1" else "127.0.0.1"
+    port = parsed.port or 80
+    lsof_bin = (
+        "/usr/sbin/lsof"
+        if os.path.exists("/usr/sbin/lsof")
+        else shutil.which("lsof")
+    )
+    if not lsof_bin or not hasattr(os, "getuid"):
+        return default_target_ip
+    uid = os.getuid()
+    records = _query_port_tcp_records(lsof_bin, port)
+    listen_records = [r for r in records if r["state"] == "LISTEN"]
+    if not listen_records:
         raise RuntimeError(
             f"Refusing unauthenticated MCP listener on port {port}: no listener owned by current user (uid={uid})"
         )
 
-    ps_bin = "/bin/ps" if os.path.exists("/bin/ps") else shutil.which("ps")
-    sketch_bundle_real = os.path.realpath(sketch_app)
-    verified_proc = False
-    for pid in pids:
-        if ps_bin:
-            ps_proc = subprocess.run(
-                [ps_bin, "-p", str(pid), "-o", "uid=,comm="],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-            line = (ps_proc.stdout or "").strip()
-            if not line:
-                continue
-            parts = line.split(None, 1)
-            if len(parts) < 2:
-                continue
-            try:
-                ps_uid = int(parts[0])
-            except ValueError:
-                continue
-            if ps_uid != uid:
-                continue
-            comm_path = os.path.realpath(parts[1].strip())
-            if require_signed_sketch:
-                if not (
-                    comm_path == sketch_bundle_real
-                    or comm_path.startswith(sketch_bundle_real + os.sep)
-                ):
-                    continue
-                codesign_bin = (
-                    "/usr/bin/codesign"
-                    if os.path.exists("/usr/bin/codesign")
-                    else shutil.which("codesign")
-                )
-                if codesign_bin:
-                    cs_proc = subprocess.run(
-                        [
-                            codesign_bin,
-                            "--verify",
-                            "--deep",
-                            "--strict",
-                            sketch_bundle_real,
-                        ],
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
-                        check=False,
-                    )
-                    if cs_proc.returncode != 0:
-                        raise RuntimeError(
-                            f"Refusing MCP listener: Sketch bundle failed codesign verification ({sketch_bundle_real})"
-                        )
-            verified_proc = True
-            break
-        else:
-            verified_proc = True
-            break
+    verified_Cache: Dict[int, bool] = {}
 
-    if not verified_proc:
-        raise RuntimeError(
-            f"Refusing unauthenticated MCP listener on port {port}: listener process does not match current user's signed Sketch bundle ({sketch_app})"
-        )
+    def check_pid(pid_val: int, uid_val: int) -> bool:
+        if uid_val != uid:
+            return False
+        if pid_val not in verified_Cache:
+            verified_Cache[pid_val] = _verify_pid_matches_sketch(
+                pid_val, uid, sketch_app, require_signed_sketch
+            )
+        return verified_Cache[pid_val]
+
+    # Reject if ANY listener on this port across any loopback address is unverified or owned by another user
+    verified_listen_ips: List[str] = []
+    for rec in listen_records:
+        if not check_pid(rec["pid"], rec["uid"]):
+            raise RuntimeError(
+                f"Refusing unauthenticated MCP listener on port {port}: listener process (pid={rec['pid']}, uid={rec['uid']}, addr={rec['name']}) does not match current user's signed Sketch bundle ({sketch_app})"
+            )
+        lname = rec["name"]
+        if lname.startswith("127.0.0.1:") or lname.startswith("*:"):
+            if "127.0.0.1" not in verified_listen_ips:
+                verified_listen_ips.append("127.0.0.1")
+        if lname.startswith("[::1]:") or lname.startswith("*:"):
+            if "::1" not in verified_listen_ips:
+                verified_listen_ips.append("::1")
+
+    if connected_sock is not None:
+        local_ip, local_port = connected_sock.getsockname()[:2]
+        remote_ip, remote_port = connected_sock.getpeername()[:2]
+        remote_ep = _format_lsof_endpoint(str(remote_ip), int(remote_port))
+        local_ep = _format_lsof_endpoint(str(local_ip), int(local_port))
+        wildcard_ep = f"*:{int(remote_port)}"
+
+        covering_listeners = [
+            r
+            for r in listen_records
+            if r["name"] in (remote_ep, wildcard_ep)
+            and check_pid(r["pid"], r["uid"])
+        ]
+        if not covering_listeners:
+            raise RuntimeError(
+                f"Refusing unauthenticated MCP socket peer on {remote_ep}: no verified listener bound to connected address"
+            )
+
+        server_est = [
+            r
+            for r in records
+            if r["state"] == "ESTABLISHED"
+            and r["name"] == f"{remote_ep}->{local_ep}"
+        ]
+        for srec in server_est:
+            if not check_pid(srec["pid"], srec["uid"]):
+                raise RuntimeError(
+                    f"Refusing unauthenticated MCP connected socket peer {remote_ep}->{local_ep} (pid={srec['pid']}, uid={srec['uid']})"
+                )
+        return str(remote_ip)
+
+    if host_low == "127.0.0.1":
+        if "127.0.0.1" not in verified_listen_ips:
+            raise RuntimeError(
+                f"Refusing unauthenticated MCP listener on 127.0.0.1:{port}"
+            )
+        return "127.0.0.1"
+    if host_low == "::1":
+        if "::1" not in verified_listen_ips:
+            raise RuntimeError(
+                f"Refusing unauthenticated MCP listener on [::1]:{port}"
+            )
+        return "::1"
+    if verified_listen_ips:
+        return verified_listen_ips[0]
+    return default_target_ip
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -492,10 +600,86 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
         )
 
 
-_DIRECT_LOOPBACK_OPENER = urllib.request.build_opener(
-    urllib.request.ProxyHandler({}),
-    _NoRedirectHandler(),
-)
+class _VerifiedLoopbackHTTPConnection(http.client.HTTPConnection):
+    def __init__(
+        self,
+        host: str,
+        port: Optional[int] = None,
+        timeout: Any = socket._GLOBAL_DEFAULT_TIMEOUT,
+        *,
+        endpoint: str,
+        sketch_app: str,
+        require_signed_sketch: bool,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(host, port=port, timeout=timeout, **kwargs)
+        self._endpoint = endpoint
+        self._sketch_app = sketch_app
+        self._require_signed_sketch = require_signed_sketch
+
+    def connect(self) -> None:
+        target_ip = _verify_mcp_listener_peer(
+            self._endpoint,
+            sketch_app=self._sketch_app,
+            require_signed_sketch=self._require_signed_sketch,
+        )
+        self.sock = socket.create_connection(
+            (target_ip, self.port), self.timeout, self.source_address
+        )
+        try:
+            _verify_mcp_listener_peer(
+                self._endpoint,
+                sketch_app=self._sketch_app,
+                require_signed_sketch=self._require_signed_sketch,
+                connected_sock=self.sock,
+            )
+        except Exception:
+            self.close()
+            raise
+
+
+class _VerifiedLoopbackHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(
+        self,
+        endpoint: str,
+        sketch_app: str,
+        require_signed_sketch: bool,
+    ) -> None:
+        super().__init__()
+        self._endpoint = endpoint
+        self._sketch_app = sketch_app
+        self._require_signed_sketch = require_signed_sketch
+
+    def http_open(self, req: urllib.request.Request) -> Any:
+        return self.do_open(
+            self._build_conn,
+            req,
+        )
+
+    def _build_conn(self, host: str, **kwargs: Any) -> http.client.HTTPConnection:
+        return _VerifiedLoopbackHTTPConnection(
+            host,
+            endpoint=self._endpoint,
+            sketch_app=self._sketch_app,
+            require_signed_sketch=self._require_signed_sketch,
+            **kwargs,
+        )
+
+
+def _build_direct_loopback_opener(
+    endpoint: str,
+    sketch_app: str = DEFAULT_SKETCH_APP,
+    require_signed_sketch: bool = False,
+) -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        _NoRedirectHandler(),
+        _VerifiedLoopbackHTTPHandler(
+            endpoint=endpoint,
+            sketch_app=sketch_app,
+            require_signed_sketch=require_signed_sketch,
+        ),
+    )
 
 
 class SketchMCPClient:
@@ -545,7 +729,12 @@ class SketchMCPClient:
         req = urllib.request.Request(
             self.endpoint, data=raw_body, headers=headers, method="POST"
         )
-        with _DIRECT_LOOPBACK_OPENER.open(req, timeout=self.timeout) as resp:
+        opener = _build_direct_loopback_opener(
+            endpoint=self.endpoint,
+            sketch_app=self.sketch_app,
+            require_signed_sketch=self.require_signed_sketch,
+        )
+        with opener.open(req, timeout=self.timeout) as resp:
             sid = resp.headers.get("Mcp-Session-Id") or resp.headers.get("mcp-session-id")
             if sid:
                 self.session_id = sid
