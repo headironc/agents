@@ -1191,11 +1191,11 @@ def audit_and_rebake_sketch(
 def _audit_and_rebake_members(
     sketch_path: Path,
     members: Dict[str, bytes],
-    rebake: bool,
-    swift_bin: Optional[str],
-    rebake_dir_fd: Optional[int],
-    sketch_leaf: str,
-    initial_sketch_stat: Optional[os.stat_result],
+    rebake: bool = False,
+    swift_bin: Optional[str] = None,
+    rebake_dir_fd: Optional[int] = None,
+    sketch_leaf: str = "",
+    initial_sketch_stat: Optional[os.stat_result] = None,
 ) -> Dict[str, Any]:
     doc_data: Dict[str, Any] = {}
     if "document.json" in members:
@@ -1382,7 +1382,9 @@ def _audit_and_rebake_members(
     drifts: List[Dict[str, Any]] = []
     rebaked_layers: List[Dict[str, Any]] = []
     dirty_pages: set[str] = set()
+    pending_rebakes: List[Tuple[Dict[str, Any], Dict[str, Any], float]] = []
 
+    # Phase 1: Compute all expected heights against the unmodified initial master tree
     for meta in targets_meta:
         node = meta["node"]
         frame = node.get("frame") or {}
@@ -1476,50 +1478,55 @@ def _audit_and_rebake_members(
             if ov_details is not None:
                 drift_record["overrides"] = ov_details
             drifts.append(drift_record)
+            pending_rebakes.append((meta, drift_record, expected_h))
 
-            if rebake:
-                artboard = meta["artboard"]
-                before_rects = (
-                    _collect_artboard_rects(artboard) if artboard is not None else {}
-                )
-                frame["height"] = expected_h
-                for anc in reversed(meta["ancestors"]):
-                    if (anc.get("groupLayout") or {}).get(
-                        "_class"
-                    ) == "MSImmutableFlexGroupLayout":
-                        _reflow_vertical_flex_group(anc)
-                if artboard is not None:
-                    after_rects = _collect_artboard_rects(artboard)
-                    for top_child in artboard.get("layers") or []:
-                        if (
-                            isinstance(top_child, dict)
-                            and top_child.get("_class") == "MSImmutableHotspotLayer"
-                        ):
-                            hs_frame = top_child.get("frame") or {}
-                            hx = float(hs_frame.get("x", 0.0))
-                            hy = float(hs_frame.get("y", 0.0))
-                            hw = float(hs_frame.get("width", 0.0))
-                            hh = float(hs_frame.get("height", 0.0))
-                            for oid, (bx, by, bw, bh) in before_rects.items():
-                                if oid == top_child.get("do_objectID"):
-                                    continue
-                                if (
-                                    abs(hx - bx) <= 2.0
-                                    and abs(hy - by) <= 2.0
-                                    and abs(hw - bw) <= 2.0
-                                    and abs(hh - bh) <= 2.0
-                                ):
-                                    ax, ay, aw, ah = after_rects.get(
-                                        oid, (bx, by, bw, bh)
-                                    )
-                                    hs_frame["x"] = round(ax + (hx - bx), 2)
-                                    hs_frame["y"] = round(ay + (hy - by), 2)
-                                    hs_frame["width"] = round(aw + (hw - bw), 2)
-                                    hs_frame["height"] = round(ah + (hh - bh), 2)
-                                    break
+    # Phase 2: Apply rebake mutations after all heights have been simulated
+    if rebake:
+        for meta, drift_record, expected_h in pending_rebakes:
+            node = meta["node"]
+            frame = node.get("frame") or {}
+            artboard = meta["artboard"]
+            before_rects = (
+                _collect_artboard_rects(artboard) if artboard is not None else {}
+            )
+            frame["height"] = expected_h
+            for anc in reversed(meta["ancestors"]):
+                if (anc.get("groupLayout") or {}).get(
+                    "_class"
+                ) == "MSImmutableFlexGroupLayout":
+                    _reflow_vertical_flex_group(anc)
+            if artboard is not None:
+                after_rects = _collect_artboard_rects(artboard)
+                for top_child in artboard.get("layers") or []:
+                    if (
+                        isinstance(top_child, dict)
+                        and top_child.get("_class") == "MSImmutableHotspotLayer"
+                    ):
+                        hs_frame = top_child.get("frame") or {}
+                        hx = float(hs_frame.get("x", 0.0))
+                        hy = float(hs_frame.get("y", 0.0))
+                        hw = float(hs_frame.get("width", 0.0))
+                        hh = float(hs_frame.get("height", 0.0))
+                        for oid, (bx, by, bw, bh) in before_rects.items():
+                            if oid == top_child.get("do_objectID"):
+                                continue
+                            if (
+                                abs(hx - bx) <= 2.0
+                                and abs(hy - by) <= 2.0
+                                and abs(hw - bw) <= 2.0
+                                and abs(hh - bh) <= 2.0
+                            ):
+                                ax, ay, aw, ah = after_rects.get(
+                                    oid, (bx, by, bw, bh)
+                                )
+                                hs_frame["x"] = round(ax + (hx - bx), 2)
+                                hs_frame["y"] = round(ay + (hy - by), 2)
+                                hs_frame["width"] = round(aw + (hw - bw), 2)
+                                hs_frame["height"] = round(ah + (hh - bh), 2)
+                                break
 
-                dirty_pages.add(meta["pageFile"])
-                rebaked_layers.append(drift_record)
+            dirty_pages.add(meta["pageFile"])
+            rebaked_layers.append(drift_record)
 
     if rebake and dirty_pages and rebake_dir_fd is not None:
         for page_file in dirty_pages:

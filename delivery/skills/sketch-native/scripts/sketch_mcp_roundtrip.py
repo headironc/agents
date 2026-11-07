@@ -164,8 +164,15 @@ def _validate_existing_in_dir_fd(
         raise RuntimeError(f"Refusing to overwrite hard-linked file: {display_path}")
 
 
-def _read_regular_owned_bytes_nofollow(file_path: Path) -> bytes:
-    """Read a regular current-user-owned file via a pinned parent directory descriptor and O_NOFOLLOW."""
+MAX_SKETCH_ARCHIVE_BYTES = 64 * 1024 * 1024
+MAX_EDIT_SPEC_BYTES = 4 * 1024 * 1024
+MAX_MCP_RESPONSE_BYTES = 32 * 1024 * 1024
+
+
+def _open_regular_owned_fd_nofollow(
+    file_path: Path, max_bytes: int = MAX_SKETCH_ARCHIVE_BYTES
+) -> int:
+    """Open a regular current-user-owned file via a pinned parent directory descriptor and O_NOFOLLOW with size cap."""
     dir_fd, leaf_name = _open_pinned_parent_dir(file_path, create=False)
     nofollow = getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -185,6 +192,10 @@ def _read_regular_owned_bytes_nofollow(file_path: Path) -> bytes:
             )
         if st.st_nlink > 1:
             raise RuntimeError(f"Refusing to read hard-linked file: {file_path}")
+        if st.st_size > max_bytes:
+            raise RuntimeError(
+                f"Input file exceeds size limit ({st.st_size} > {max_bytes}): {file_path}"
+            )
         try:
             fd = os.open(leaf_name, os.O_RDONLY | nofollow, dir_fd=dir_fd)
         except OSError as exc:
@@ -203,16 +214,101 @@ def _read_regular_owned_bytes_nofollow(file_path: Path) -> bytes:
                 )
             if fst.st_nlink > 1:
                 raise RuntimeError(f"Refusing to read hard-linked file: {file_path}")
-            chunks: List[bytes] = []
+            if fst.st_size > max_bytes:
+                raise RuntimeError(
+                    f"Input file exceeds size limit ({fst.st_size} > {max_bytes}): {file_path}"
+                )
+            return fd
+        except Exception:
+            os.close(fd)
+            raise
+    finally:
+        os.close(dir_fd)
+
+
+def _read_regular_owned_bytes_nofollow(
+    file_path: Path, max_bytes: int = MAX_SKETCH_ARCHIVE_BYTES
+) -> bytes:
+    """Read a regular current-user-owned file via a pinned parent directory descriptor and O_NOFOLLOW with size cap."""
+    fd = _open_regular_owned_fd_nofollow(file_path, max_bytes=max_bytes)
+    try:
+        chunks: List[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError(
+                    f"Input file exceeds size limit ({total} > {max_bytes}): {file_path}"
+                )
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        os.close(fd)
+
+
+def _stream_fd_to_file_nofollow(
+    src_fd: int,
+    file_path: Path,
+    max_bytes: int = MAX_SKETCH_ARCHIVE_BYTES,
+    mode: int = 0o600,
+) -> None:
+    """Stream-copy from a pinned source descriptor to file_path with strict byte limit and atomic rename."""
+    os.lseek(src_fd, 0, os.SEEK_SET)
+    dir_fd, leaf_name = _open_pinned_parent_dir(file_path, create=True)
+    tmp_name: Optional[str] = None
+    try:
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        nofollow = getattr(os, "O_NOFOLLOW", 0)
+        fd: Optional[int] = None
+        for _ in range(64):
+            cand = f".{leaf_name}.{os.urandom(8).hex()}.tmp"
+            try:
+                fd = os.open(
+                    cand,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | nofollow,
+                    mode,
+                    dir_fd=dir_fd,
+                )
+                tmp_name = cand
+                break
+            except FileExistsError:
+                continue
+        if fd is None or tmp_name is None:
+            raise RuntimeError(f"Failed to allocate temp file for {file_path}")
+        try:
+            os.fchmod(fd, mode)
+            total_copied = 0
             while True:
-                chunk = os.read(fd, 65536)
+                chunk = os.read(src_fd, 65536)
                 if not chunk:
                     break
-                chunks.append(chunk)
-            return b"".join(chunks)
+                total_copied += len(chunk)
+                if total_copied > max_bytes:
+                    raise RuntimeError(
+                        f"Source file exceeds size limit while streaming ({total_copied} > {max_bytes})"
+                    )
+                view = memoryview(chunk)
+                off = 0
+                while off < len(view):
+                    written = os.write(fd, view[off:])
+                    if written <= 0:
+                        raise RuntimeError(f"Short write to {tmp_name}")
+                    off += written
+            os.fsync(fd)
         finally:
             os.close(fd)
+        _validate_existing_in_dir_fd(dir_fd, leaf_name, file_path)
+        os.replace(tmp_name, leaf_name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        tmp_name = None
     finally:
+        if tmp_name is not None:
+            try:
+                os.unlink(tmp_name, dir_fd=dir_fd)
+            except OSError:
+                pass
         os.close(dir_fd)
 
 
@@ -454,7 +550,12 @@ class SketchMCPClient:
             if sid:
                 self.session_id = sid
             ctype = (resp.headers.get("Content-Type") or "").lower()
-            body_text = resp.read().decode("utf-8", errors="replace").strip()
+            raw_resp = resp.read(MAX_MCP_RESPONSE_BYTES + 1)
+            if len(raw_resp) > MAX_MCP_RESPONSE_BYTES:
+                raise RuntimeError(
+                    f"MCP response exceeds size limit ({MAX_MCP_RESPONSE_BYTES} bytes)"
+                )
+            body_text = raw_resp.decode("utf-8", errors="replace").strip()
 
         if is_notification or not body_text:
             return {}
@@ -1083,8 +1184,6 @@ def run_mcp_roundtrip(
     poll_timeout: float = 8.0,
 ) -> Dict[str, Any]:
     start_ts = time.perf_counter()
-    sketch_raw_bytes = _read_regular_owned_bytes_nofollow(sketch_path)
-
     _ensure_private_dir(screenshots_dir)
     edits = edit_spec.get("edits") or []
     if len(edits) > 3:
@@ -1105,17 +1204,33 @@ def run_mcp_roundtrip(
         os.chmod(tmpdir, 0o700)
         baseline_copy = Path(tmpdir) / "baseline-before-save.sketch"
         working_copy = Path(tmpdir) / "working-disposable-copy.sketch"
-        _write_bytes_nofollow(baseline_copy, sketch_raw_bytes)
-        _write_bytes_nofollow(working_copy, sketch_raw_bytes)
-        expected_sketch_path = str(working_copy.resolve())
         expected_archive_doc_id = ""
+        src_fd = _open_regular_owned_fd_nofollow(
+            sketch_path, max_bytes=MAX_SKETCH_ARCHIVE_BYTES
+        )
         try:
-            with zipfile.ZipFile(working_copy, "r") as zf_meta:
-                if "document.json" in zf_meta.namelist():
-                    doc_meta = json.loads(zf_meta.read("document.json").decode("utf-8"))
-                    expected_archive_doc_id = str(doc_meta.get("do_objectID", "") or "")
-        except Exception:
-            expected_archive_doc_id = ""
+            meta_dup_fd = os.dup(src_fd)
+            with os.fdopen(meta_dup_fd, "rb") as meta_fh:
+                with zipfile.ZipFile(meta_fh, "r") as zf_meta:
+                    _validate_zip_archive_budget(zf_meta)
+                    if "document.json" in zf_meta.namelist():
+                        doc_meta = json.loads(
+                            _read_zip_member_bounded(
+                                zf_meta, "document.json"
+                            ).decode("utf-8")
+                        )
+                        expected_archive_doc_id = str(
+                            doc_meta.get("do_objectID", "") or ""
+                        )
+            _stream_fd_to_file_nofollow(
+                src_fd, baseline_copy, max_bytes=MAX_SKETCH_ARCHIVE_BYTES
+            )
+            _stream_fd_to_file_nofollow(
+                src_fd, working_copy, max_bytes=MAX_SKETCH_ARCHIVE_BYTES
+            )
+        finally:
+            os.close(src_fd)
+        expected_sketch_path = str(working_copy.resolve())
 
         client = SketchMCPClient(
             endpoint=mcp_url,
@@ -1489,7 +1604,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             edit_spec = json.loads(spec_arg)
         else:
             edit_spec = json.loads(
-                _read_regular_owned_bytes_nofollow(Path(spec_arg)).decode("utf-8")
+                _read_regular_owned_bytes_nofollow(
+                    Path(spec_arg), max_bytes=MAX_EDIT_SPEC_BYTES
+                ).decode("utf-8")
             )
 
         report = run_mcp_roundtrip(

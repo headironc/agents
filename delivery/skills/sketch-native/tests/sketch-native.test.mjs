@@ -2871,6 +2871,127 @@ for p, img_ref in ((bmp_before, "images/a.png"), (bmp_after, "images/b.png")):
 bmp_diff = rt.diff_sketch_archives_offline(bmp_before, bmp_after, set())
 assert bmp_diff["unexpectedDriftCount"] == 1, bmp_diff
 assert bmp_diff["unexpectedDrifts"][0]["layerID"] == "bmp-1", bmp_diff
+
+# 6. Verify rebake does not double-count nested instance height delta when master is scanned before page instance
+import sketch_export_manifest as sem
+
+orig_measure_specs = cm.measure_specs
+try:
+    cm.measure_specs = lambda items, swift_bin=None: {
+        "results": [
+            {
+                "id": it["id"],
+                "bakedHeight": 40.0,
+                "lineCount": 2,
+                "resolvedPostScriptName": "PingFangSC-Regular",
+            }
+            for it in items
+        ]
+    }
+    def make_members():
+        return {
+            "document.json": json.dumps({"_class": "document", "do_objectID": "doc-order"}).encode("utf-8"),
+            "pages/p1.json": json.dumps({
+                "_class": "page",
+                "do_objectID": "page-order",
+                "name": "Page 1",
+                "layers": [
+                    {
+                        "_class": "symbolMaster",
+                        "do_objectID": "inner-master",
+                        "symbolID": "sym-inner",
+                        "name": "InnerMaster",
+                        "frame": {"x": 0, "y": 0, "width": 100, "height": 20},
+                        "groupLayout": {"_class": "MSImmutableFlexGroupLayout", "flexDirection": 1, "verticalSizing": 1, "padding": 0},
+                        "layers": [
+                            {
+                                "_class": "text",
+                                "do_objectID": "inner-txt",
+                                "name": "InnerText",
+                                "isVisible": True,
+                                "textBehaviour": 1,
+                                "frame": {"x": 0, "y": 0, "width": 100, "height": 20},
+                                "attributedString": {"string": "Wrap text", "attributes": [{"location": 0, "length": 9, "attributes": {"MSAttributedStringFontAttribute": {"attributes": {"name": "PingFangSC-Regular", "size": 14}}}}]},
+                            }
+                        ],
+                    },
+                    {
+                        "_class": "symbolMaster",
+                        "do_objectID": "outer-master",
+                        "symbolID": "sym-outer",
+                        "name": "OuterMaster",
+                        "frame": {"x": 0, "y": 0, "width": 200, "height": 30},
+                        "groupLayout": {"_class": "MSImmutableFlexGroupLayout", "flexDirection": 0, "verticalSizing": 1, "padding": 0},
+                        "layers": [
+                            {
+                                "_class": "rectangle",
+                                "do_objectID": "static-rect",
+                                "name": "Icon",
+                                "isVisible": True,
+                                "frame": {"x": 0, "y": 0, "width": 30, "height": 30},
+                            },
+                            {
+                                "_class": "symbolInstance",
+                                "do_objectID": "nested-inst",
+                                "symbolID": "sym-inner",
+                                "name": "NestedInst",
+                                "isVisible": True,
+                                "frame": {"x": 40, "y": 0, "width": 100, "height": 20},
+                                "overrideValues": [],
+                            },
+                        ],
+                    },
+                    {
+                        "_class": "artboard",
+                        "do_objectID": "ab-order",
+                        "name": "Screen",
+                        "frame": {"x": 0, "y": 0, "width": 393, "height": 852},
+                        "layers": [
+                            {
+                                "_class": "symbolInstance",
+                                "do_objectID": "page-inst",
+                                "symbolID": "sym-outer",
+                                "name": "PageInst",
+                                "isVisible": True,
+                                "frame": {"x": 0, "y": 0, "width": 200, "height": 30},
+                                "overrideValues": [],
+                            }
+                        ],
+                    },
+                ],
+            }).encode("utf-8"),
+        }
+
+    audit_res = cm._audit_and_rebake_members(Path("order.sketch"), make_members(), rebake=False)
+    rebake_res = cm._audit_and_rebake_members(Path("order.sketch"), make_members(), rebake=True)
+    page_drift_audit = [d for d in audit_res["drifts"] if d["layerID"] == "page-inst"][0]
+    page_drift_rebake = [d for d in rebake_res["drifts"] if d["layerID"] == "page-inst"][0]
+    assert page_drift_audit["bakedHeight"] == 40.0, page_drift_audit
+    assert page_drift_rebake["bakedHeight"] == 40.0, page_drift_rebake
+finally:
+    cm.measure_specs = orig_measure_specs
+
+# 7. Verify run_mcp_roundtrip enforces ZIP archive budget before copying or launching Sketch
+try:
+    rt.run_mcp_roundtrip(
+        sketch_path=bomb_sketch,
+        anchor_id="anchor-1",
+        edit_spec={"edits": []},
+        screenshots_dir=Path(sys.argv[1]) / "rt-shots",
+    )
+    raise AssertionError("Expected run_mcp_roundtrip to reject high-ratio archive before opening Sketch")
+except RuntimeError as exc:
+    assert "compression ratio limit" in str(exc), exc
+
+# 8. Verify _validate_export_render_budget enforces artboard count, dimension, and total pixel budgets
+try:
+    sem._validate_export_render_budget(
+        [{"artboardID": "ab-huge", "width": 20000, "height": 20000}],
+        ["1", "2"],
+    )
+    raise AssertionError("Expected _validate_export_render_budget to reject oversized artboard")
+except RuntimeError as exc:
+    assert "exceed" in str(exc), exc
 `,
         tmpDir,
       ],

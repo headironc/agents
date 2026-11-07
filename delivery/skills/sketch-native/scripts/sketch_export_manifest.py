@@ -712,6 +712,101 @@ MAX_ZIP_JSON_MEMBER_BYTES = 32 * 1024 * 1024
 MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 MAX_ZIP_COMPRESSION_RATIO = 100.0
 
+MAX_EXPORT_ARTBOARDS = 128
+MAX_EXPORT_SCALES = 4
+MAX_EXPORT_SCALE_FACTOR = 4.0
+MAX_ARTBOARD_DIMENSION_PX = 16384
+MAX_SINGLE_RENDER_PIXELS = 64 * 1024 * 1024
+MAX_TOTAL_RENDER_TASKS = 256
+MAX_TOTAL_RENDER_PIXELS = 256 * 1024 * 1024
+MAX_CLOCK_PDF_EXPORTS = 128
+MAX_EXPORT_WORKERS = 8
+SCALE_TOKEN_RE = re.compile(r"^\d+(?:\.\d+)?$")
+
+
+def _validate_safe_item_id(item_id: str, label: str = "itemID") -> str:
+    cleaned = str(item_id or "").strip()
+    if (
+        not cleaned
+        or cleaned in (".", "..")
+        or "/" in cleaned
+        or "\\" in cleaned
+        or "\x00" in cleaned
+        or len(cleaned) > 128
+    ):
+        raise RuntimeError(f"Unsafe or invalid {label} in archive: {item_id!r}")
+    return cleaned
+
+
+def _validate_export_render_budget(
+    artboards: List[Dict[str, Any]],
+    scales: List[str],
+    clock_layers: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    """Enforce artboard count, dimension, scale factor, per-render pixel, and aggregate render work limits before queueing."""
+    if not scales or len(scales) > MAX_EXPORT_SCALES:
+        raise RuntimeError(
+            f"Export scale count ({len(scales)}) exceeds allowed range (1..{MAX_EXPORT_SCALES})"
+        )
+    parsed_scales: List[Tuple[str, float]] = []
+    for sc in scales:
+        sc_str = str(sc or "").strip()
+        if not SCALE_TOKEN_RE.match(sc_str):
+            raise RuntimeError(f"Invalid export scale token: {sc!r}")
+        sc_val = float(sc_str)
+        if sc_val <= 0.0 or sc_val > MAX_EXPORT_SCALE_FACTOR:
+            raise RuntimeError(
+                f"Export scale ({sc_val}) exceeds allowed range (0 < scale <= {MAX_EXPORT_SCALE_FACTOR})"
+            )
+        parsed_scales.append((sc_str, sc_val))
+
+    if len(artboards) > MAX_EXPORT_ARTBOARDS:
+        raise RuntimeError(
+            f"Archive artboard count ({len(artboards)}) exceeds export limit ({MAX_EXPORT_ARTBOARDS})"
+        )
+    total_tasks = len(artboards) * len(parsed_scales)
+    if total_tasks > MAX_TOTAL_RENDER_TASKS:
+        raise RuntimeError(
+            f"Total export render tasks ({total_tasks}) exceeds limit ({MAX_TOTAL_RENDER_TASKS})"
+        )
+
+    total_pixels = 0
+    for ab in artboards:
+        ab_id = _validate_safe_item_id(str(ab.get("artboardID", "")), "artboardID")
+        w = int(ab.get("width", 0))
+        h = int(ab.get("height", 0))
+        if w <= 0 or h <= 0 or w > MAX_ARTBOARD_DIMENSION_PX or h > MAX_ARTBOARD_DIMENSION_PX:
+            raise RuntimeError(
+                f"Artboard '{ab_id}' dimensions ({w}x{h}) exceed allowed bounds (1..{MAX_ARTBOARD_DIMENSION_PX} px)"
+            )
+        if w * h > MAX_SINGLE_RENDER_PIXELS:
+            raise RuntimeError(
+                f"Artboard '{ab_id}' area ({w * h} px) exceeds single-render pixel budget ({MAX_SINGLE_RENDER_PIXELS})"
+            )
+        for sc_str, sc_val in parsed_scales:
+            rw = int(round(w * sc_val))
+            rh = int(round(h * sc_val))
+            render_pixels = rw * rh
+            if render_pixels <= 0 or render_pixels > MAX_SINGLE_RENDER_PIXELS:
+                raise RuntimeError(
+                    f"Artboard '{ab_id}' at {sc_str}x ({rw}x{rh} = {render_pixels} px) exceeds single-render pixel budget ({MAX_SINGLE_RENDER_PIXELS})"
+                )
+            total_pixels += render_pixels
+            if total_pixels > MAX_TOTAL_RENDER_PIXELS:
+                raise RuntimeError(
+                    f"Aggregate export render workload ({total_pixels} px) exceeds total pixel budget ({MAX_TOTAL_RENDER_PIXELS})"
+                )
+
+    if clock_layers is not None:
+        if len(clock_layers) > MAX_CLOCK_PDF_EXPORTS:
+            raise RuntimeError(
+                f"Status-bar clock PDF layer count ({len(clock_layers)}) exceeds export limit ({MAX_CLOCK_PDF_EXPORTS})"
+            )
+        for cl in clock_layers:
+            _validate_safe_item_id(str(cl.get("layerID", "")), "clock layerID")
+            if cl.get("instanceID"):
+                _validate_safe_item_id(str(cl.get("instanceID", "")), "clock instanceID")
+
 
 def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
     """Validate ZIP member count, per-member size, total uncompressed size, and compression ratio before reading."""
@@ -824,17 +919,38 @@ def inspect_sketch_artboards_and_clocks(
             for top in page.get("layers") or []:
                 if not isinstance(top, dict) or top.get("_class") != "artboard":
                     continue
-                ab_id = str(top.get("do_objectID", ""))
+                ab_id = _validate_safe_item_id(
+                    str(top.get("do_objectID", "")), "artboardID"
+                )
                 ab_name = str(top.get("name", ""))
                 ab_frame = top.get("frame") or {}
+                ab_w = int(round(float(ab_frame.get("width", 0.0))))
+                ab_h = int(round(float(ab_frame.get("height", 0.0))))
+                if (
+                    ab_w <= 0
+                    or ab_h <= 0
+                    or ab_w > MAX_ARTBOARD_DIMENSION_PX
+                    or ab_h > MAX_ARTBOARD_DIMENSION_PX
+                ):
+                    raise RuntimeError(
+                        f"Artboard '{ab_id}' dimensions ({ab_w}x{ab_h}) exceed allowed bounds (1..{MAX_ARTBOARD_DIMENSION_PX} px)"
+                    )
+                if ab_w * ab_h > MAX_SINGLE_RENDER_PIXELS:
+                    raise RuntimeError(
+                        f"Artboard '{ab_id}' area ({ab_w * ab_h} px) exceeds single-render pixel budget ({MAX_SINGLE_RENDER_PIXELS})"
+                    )
+                if len(artboards) >= MAX_EXPORT_ARTBOARDS:
+                    raise RuntimeError(
+                        f"Archive artboard count exceeds export limit ({MAX_EXPORT_ARTBOARDS})"
+                    )
                 artboards.append(
                     {
                         "pageID": page_id,
                         "pageName": page_name,
                         "artboardID": ab_id,
                         "artboardName": ab_name,
-                        "width": int(round(float(ab_frame.get("width", 0.0)))),
-                        "height": int(round(float(ab_frame.get("height", 0.0)))),
+                        "width": ab_w,
+                        "height": ab_h,
                     }
                 )
 
@@ -1014,6 +1130,7 @@ def inspect_sketch_artboards_and_clocks(
 
                 walk(top, [ab_name], 0.0, 0.0)
 
+    _validate_export_render_budget(artboards, ["1"], clock_layers)
     return artboards, clock_layers
 
 
@@ -1032,7 +1149,9 @@ def _parse_png_dimensions_at(
 def _verify_pdf_sfns_regular_at(
     dir_fd: int, leaf_name: str, pdf_path: Path
 ) -> Dict[str, Any]:
-    raw = _read_regular_owned_bytes_at(dir_fd, leaf_name, pdf_path)
+    raw = _read_regular_owned_bytes_at(
+        dir_fd, leaf_name, pdf_path, max_bytes=16 * 1024 * 1024
+    )
     text_latin = raw.decode("latin-1", errors="ignore")
     has_sfns = ".SFNS-Regular" in text_latin or "SFNS-Regular" in text_latin
     has_truetype = "/Subtype /TrueType" in text_latin or "/Subtype/TrueType" in text_latin
@@ -1213,6 +1332,8 @@ def run_export_and_manifest(
 
     font_access = check_pingfang_font_access()
     artboards, clock_layers = inspect_sketch_artboards_and_clocks(sketch_path)
+    _validate_export_render_budget(artboards, scales, clock_layers)
+    worker_count = min(MAX_EXPORT_WORKERS, max(1, int(jobs)))
     out_dir_fd = _open_pinned_export_dir(output_dir)
     scale_dir_fds: Dict[str, int] = {}
     pdf_dir_fd: Optional[int] = None
@@ -1234,7 +1355,7 @@ def run_export_and_manifest(
             (ab, sc) for ab in artboards for sc in scales
         ]
         exported_renders: List[Dict[str, Any]] = []
-        with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        with ThreadPoolExecutor(max_workers=worker_count) as pool:
             futures = [
                 pool.submit(
                     _export_one_artboard_scale,
