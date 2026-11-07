@@ -637,6 +637,97 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
 
     const foreignAudit = runPython(PY_AUDIT, ["--sketch", foreignSketch]);
     assert.equal(foreignAudit.status, 0, foreignAudit.stdout);
+
+    // Side-by-side (Row) SymbolInstance overrides take max height (not sum), and horizontal Row Fit Stack reflows inside Column Stack
+    const rowSpec = createCleanSketchSpec({ textHeight: 22, hotspotY: 54 });
+    const rPage =
+      rowSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const rMaster = rPage.layers[0];
+    rMaster.frame.height = 22;
+    rMaster.layers = [
+      {
+        _class: "text",
+        do_objectID: "30000000-0000-4000-8000-000000000002",
+        name: "ColLeft",
+        isVisible: true,
+        textBehaviour: 1,
+        frame: { _class: "rect", x: 0, y: 0, width: 180, height: 22 },
+        attributedString: rMaster.layers[0].attributedString,
+      },
+      {
+        _class: "text",
+        do_objectID: "30000000-0000-4000-8000-000000000003",
+        name: "ColRight",
+        isVisible: true,
+        textBehaviour: 1,
+        frame: { _class: "rect", x: 190, y: 0, width: 180, height: 22 },
+        attributedString: rMaster.layers[0].attributedString,
+      },
+    ];
+    const rHomeAb = rPage.layers[1];
+    const rColStack = rHomeAb.layers[1];
+    // Wrap NoticeCopy inside a horizontal Row Fit Stack (flexDirection: 0, verticalSizing: 1)
+    const noticeText = rColStack.layers[1];
+    rColStack.layers[1] = {
+      _class: "group",
+      do_objectID: "40000000-0000-4000-8000-000000000077",
+      name: "RowWrapper",
+      isVisible: true,
+      frame: { _class: "rect", x: 16, y: 16, width: 311, height: 22 },
+      groupLayout: {
+        _class: "MSImmutableFlexGroupLayout",
+        flexDirection: 0,
+        justifyContent: 0,
+        alignItems: 0,
+        allGuttersGap: 8,
+        hasIndividualPadding: false,
+        padding: 0,
+        horizontalSizing: 0,
+        verticalSizing: 1,
+      },
+      layers: [
+        {
+          ...noticeText,
+          frame: { _class: "rect", x: 0, y: 0, width: 180, height: 22 },
+        },
+      ],
+    };
+    const rInst = rColStack.layers[0];
+    rInst.frame.width = 311;
+    rInst.frame.height = 22; // Both ColLeft and ColRight wrap to 2 lines (44px) -> Row instance expected height is 44 (not 22+22+22=66!)
+    rInst.overrideValues = [
+      {
+        _class: "overrideValue",
+        overrideName: "30000000-0000-4000-8000-000000000002_stringValue",
+        value: "账户安全验证已开启，请在五分钟内完成确认。",
+      },
+      {
+        _class: "overrideValue",
+        overrideName: "30000000-0000-4000-8000-000000000003_stringValue",
+        value: "若非本人操作，请立即点击下方按钮冻结账户。",
+      },
+    ];
+    rHomeAb.layers[2].frame.y = 80 + 54;
+    rHomeAb.layers[2].frame.height = 22;
+    const rowBuilder = path.join(tmpDir, "row-spec.json");
+    const rowSketch = path.join(tmpDir, "row.sketch");
+    fs.writeFileSync(rowBuilder, JSON.stringify(rowSpec));
+    buildSyntheticSketch(rowSketch, rowBuilder);
+
+    const rowRebake = runPython(PY_MEASURE, [
+      "--sketch",
+      rowSketch,
+      "--rebake",
+    ]);
+    assert.equal(rowRebake.status, 0, rowRebake.stderr);
+    const rowRebakeReport = JSON.parse(rowRebake.stdout);
+    const instDrift = rowRebakeReport.drifts.find(
+      (d) => d.kind === "symbolInstanceOverride",
+    );
+    assert.equal(instDrift.bakedHeight, 44);
+
+    const rowAudit = runPython(PY_AUDIT, ["--sketch", rowSketch]);
+    assert.equal(rowAudit.status, 0, rowAudit.stdout);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -647,10 +738,38 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
   try {
     const cleanBuilder = path.join(tmpDir, "clean-spec.json");
     const cleanSketch = path.join(tmpDir, "clean.sketch");
-    fs.writeFileSync(
-      cleanBuilder,
-      JSON.stringify(createCleanSketchSpec({ textHeight: 44, hotspotY: 76 })),
-    );
+    const cleanSpecWithBizTime = createCleanSketchSpec({
+      textHeight: 44,
+      hotspotY: 76,
+    });
+    // Add an ordinary business HH:mm text layer ("Appointment/StartTime" = "14:30") in PingFangSC-Regular
+    cleanSpecWithBizTime[
+      "pages/20000000-0000-4000-8000-000000000001.json"
+    ].layers[1].layers.push({
+      _class: "text",
+      do_objectID: "40000000-0000-4000-8000-000000000095",
+      name: "Appointment/StartTime",
+      textBehaviour: 0,
+      frame: { _class: "rect", x: 24, y: 320, width: 60, height: 22 },
+      attributedString: {
+        _class: "attributedString",
+        string: "14:30",
+        attributes: [
+          {
+            _class: "stringAttribute",
+            location: 0,
+            length: 5,
+            attributes: {
+              MSAttributedStringFontAttribute: {
+                _class: "fontDescriptor",
+                attributes: { name: "PingFangSC-Regular", size: 15 },
+              },
+            },
+          },
+        ],
+      },
+    });
+    fs.writeFileSync(cleanBuilder, JSON.stringify(cleanSpecWithBizTime));
     buildSyntheticSketch(cleanSketch, cleanBuilder);
 
     const passRes = runPython(PY_AUDIT, ["--sketch", cleanSketch]);
@@ -769,6 +888,44 @@ test("sketch_offline_audit.py passes clean .sketch and catches blocking violatio
         _class: "MSJSONFileReference",
         _ref_class: "MSImmutablePage",
         _ref: "pages/20000000-0000-4000-8000-999999999999",
+      },
+    ];
+    // 6. Embedded foreignSymbols[*].symbolMaster containing forbidden NotoSans-Regular text
+    badSpec["document.json"].foreignSymbols = [
+      {
+        _class: "MSImmutableForeignSymbol",
+        symbolMaster: {
+          _class: "symbolMaster",
+          do_objectID: "80000000-0000-4000-8000-000000000081",
+          symbolID: "80000000-0000-4000-8000-000000000082",
+          name: "Foreign/Chip",
+          frame: { _class: "rect", x: 0, y: 0, width: 80, height: 28 },
+          layers: [
+            {
+              _class: "text",
+              do_objectID: "80000000-0000-4000-8000-000000000083",
+              name: "ForeignChipText",
+              frame: { _class: "rect", x: 8, y: 4, width: 64, height: 20 },
+              attributedString: {
+                _class: "attributedString",
+                string: "标签",
+                attributes: [
+                  {
+                    _class: "stringAttribute",
+                    location: 0,
+                    length: 2,
+                    attributes: {
+                      MSAttributedStringFontAttribute: {
+                        _class: "fontDescriptor",
+                        attributes: { name: "NotoSans-Regular", size: 12 },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
       },
     ];
 
@@ -1139,7 +1296,7 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
       "document.json"
     ].layerTextStyles.objects[0].value.textStyle.encodedAttributes.MSAttributedStringFontAttribute.attributes.name =
       "Heiti SC";
-    // Add a second run on NoticeCopy in driftedDocSpec while keeping first run identical
+    // Add a second run on NoticeCopy in driftedDocSpec while keeping first run identical, and swap child layer order on Detail artboard
     const noticeLayer =
       driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"]
         .layers[1].layers[1].layers[1];
@@ -1154,6 +1311,10 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
         },
       },
     });
+    const detailAb =
+      driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"]
+        .layers[2];
+    detailAb.layers.reverse(); // Reordering child layers changes childIDs on detailAb
     const driftedDocSpecPath = path.join(tmpDir, "drifted-doc-spec.json");
     fs.writeFileSync(driftedDocSpecPath, JSON.stringify(driftedDocSpec));
     buildSyntheticSketch(driftedDocSketch, driftedDocSpecPath);
@@ -1224,10 +1385,38 @@ test("sketch_export_manifest.py exports 1x/2x PNG, lossless WebP, and verifies .
   try {
     const cleanBuilder = path.join(tmpDir, "clean-spec.json");
     const cleanSketch = path.join(tmpDir, "clean.sketch");
-    fs.writeFileSync(
-      cleanBuilder,
-      JSON.stringify(createCleanSketchSpec({ textHeight: 44, hotspotY: 76 })),
-    );
+    const cleanSpecWithBizTime = createCleanSketchSpec({
+      textHeight: 44,
+      hotspotY: 76,
+    });
+    // Add an ordinary business HH:mm text layer ("Appointment/StartTime" = "14:30") in PingFangSC-Regular
+    cleanSpecWithBizTime[
+      "pages/20000000-0000-4000-8000-000000000001.json"
+    ].layers[1].layers.push({
+      _class: "text",
+      do_objectID: "40000000-0000-4000-8000-000000000095",
+      name: "Appointment/StartTime",
+      textBehaviour: 0,
+      frame: { _class: "rect", x: 24, y: 320, width: 60, height: 22 },
+      attributedString: {
+        _class: "attributedString",
+        string: "14:30",
+        attributes: [
+          {
+            _class: "stringAttribute",
+            location: 0,
+            length: 5,
+            attributes: {
+              MSAttributedStringFontAttribute: {
+                _class: "fontDescriptor",
+                attributes: { name: "PingFangSC-Regular", size: 15 },
+              },
+            },
+          },
+        ],
+      },
+    });
+    fs.writeFileSync(cleanBuilder, JSON.stringify(cleanSpecWithBizTime));
     buildSyntheticSketch(cleanSketch, cleanBuilder);
 
     const mockSketchtool = path.join(tmpDir, "mock-sketchtool");

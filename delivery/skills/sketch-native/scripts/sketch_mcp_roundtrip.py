@@ -73,32 +73,59 @@ def _ensure_private_dir(dir_path: Path, enforce_private_mode: bool = True) -> No
             os.chmod(dir_path, 0o700)
 
 
+def _validate_existing_output_target(file_path: Path) -> None:
+    try:
+        st = os.lstat(file_path)
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(st.st_mode):
+        raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+    if not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise RuntimeError(
+            f"Refusing to overwrite file not owned by current user: {file_path}"
+        )
+    if st.st_nlink > 1:
+        raise RuntimeError(f"Refusing to overwrite hard-linked file: {file_path}")
+
+
 def _write_bytes_nofollow(file_path: Path, data: bytes, mode: int = 0o600) -> None:
-    """Write bytes to file_path without following symlinks on parent or target file."""
+    """Atomically write bytes to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
     if str(file_path.parent) not in ("/tmp", "/var") and file_path.parent.is_symlink():
         raise RuntimeError(f"Refusing to write inside symlinked directory: {file_path.parent}")
     _ensure_private_dir(file_path.parent, enforce_private_mode=False)
+    resolved_parent = (
+        file_path.parent.resolve()
+        if str(file_path.parent) in ("/tmp", "/var")
+        else file_path.parent
+    )
+    _validate_existing_output_target(file_path)
+    fd, tmp_str = tempfile.mkstemp(
+        prefix=f".{file_path.name}.", suffix=".tmp", dir=str(resolved_parent)
+    )
+    tmp_path = Path(tmp_str)
     try:
-        st = os.lstat(file_path)
-        if stat.S_ISLNK(st.st_mode):
-            raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
-        if not stat.S_ISREG(st.st_mode):
-            raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
-    except FileNotFoundError:
-        pass
-
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(str(file_path), flags, mode)
-    try:
-        view = memoryview(data)
-        total = 0
-        while total < len(view):
-            written = os.write(fd, view[total:])
-            if written <= 0:
-                raise RuntimeError(f"Short write to {file_path}")
-            total += written
+        try:
+            os.fchmod(fd, mode)
+            view = memoryview(data)
+            total = 0
+            while total < len(view):
+                written = os.write(fd, view[total:])
+                if written <= 0:
+                    raise RuntimeError(f"Short write to {tmp_path}")
+                total += written
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        _validate_existing_output_target(file_path)
+        os.replace(tmp_path, file_path)
     finally:
-        os.close(fd)
+        if tmp_path.exists() or tmp_path.is_symlink():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 class SketchMCPClient:
@@ -455,8 +482,13 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                             "value": sw.get("value"),
                         }
 
-            def walk(node: Dict[str, Any]) -> None:
+            def walk(node: Dict[str, Any], parent_id: Optional[str] = None) -> None:
                 oid = str(node.get("do_objectID", ""))
+                children = [
+                    child
+                    for child in (node.get("layers") or [])
+                    if isinstance(child, dict)
+                ]
                 if oid:
                     frame = node.get("frame") or {}
                     attr_str = node.get("attributedString") or {}
@@ -499,6 +531,10 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                     snapshot[oid] = {
                         "_class": node.get("_class"),
                         "name": node.get("name"),
+                        "parentID": parent_id,
+                        "childIDs": [
+                            str(c.get("do_objectID", "")) for c in children
+                        ],
                         "frame": {
                             "x": round(float(frame.get("x", 0.0)), 2),
                             "y": round(float(frame.get("y", 0.0)), 2),
@@ -515,9 +551,8 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         "overrideValues": node.get("overrideValues"),
                         "borders": (node.get("style") or {}).get("borders"),
                     }
-                for child in node.get("layers") or []:
-                    if isinstance(child, dict):
-                        walk(child)
+                for child in children:
+                    walk(child, oid or parent_id)
 
             walk(data)
     return snapshot

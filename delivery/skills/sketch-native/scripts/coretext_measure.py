@@ -29,33 +29,66 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 SWIFT_SOURCE = SCRIPT_DIR / "measure-coretext.swift"
 
 
+def _validate_existing_output_target(file_path: Path) -> None:
+    try:
+        st = os.lstat(file_path)
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(st.st_mode):
+        raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+    if not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise RuntimeError(
+            f"Refusing to overwrite file not owned by current user: {file_path}"
+        )
+    if st.st_nlink > 1:
+        raise RuntimeError(f"Refusing to overwrite hard-linked file: {file_path}")
+
+
 def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
-    """Write text to file_path without following symlinks on parent or target file."""
+    """Atomically write text to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
     parent = file_path.parent
     if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
         raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
     parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    resolved_parent = parent.resolve() if str(parent) in ("/tmp", "/var") else parent
+    st_parent = os.lstat(resolved_parent)
+    if not stat.S_ISDIR(st_parent.st_mode):
+        raise RuntimeError(f"Output parent is not a directory: {parent}")
+    if hasattr(os, "getuid") and st_parent.st_uid != os.getuid() and not (
+        st_parent.st_mode & stat.S_ISVTX
+    ):
+        raise RuntimeError(
+            f"Refusing to write inside directory not owned by current user: {parent}"
+        )
+    _validate_existing_output_target(file_path)
+    fd, tmp_str = tempfile.mkstemp(
+        prefix=f".{file_path.name}.", suffix=".tmp", dir=str(resolved_parent)
+    )
+    tmp_path = Path(tmp_str)
     try:
-        st = os.lstat(file_path)
-        if stat.S_ISLNK(st.st_mode):
-            raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
-        if not stat.S_ISREG(st.st_mode):
-            raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
-    except FileNotFoundError:
-        pass
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(str(file_path), flags, mode)
-    try:
-        data = text.encode("utf-8")
-        view = memoryview(data)
-        total = 0
-        while total < len(view):
-            written = os.write(fd, view[total:])
-            if written <= 0:
-                raise RuntimeError(f"Short write to {file_path}")
-            total += written
+        try:
+            os.fchmod(fd, mode)
+            data = text.encode("utf-8")
+            view = memoryview(data)
+            total = 0
+            while total < len(view):
+                written = os.write(fd, view[total:])
+                if written <= 0:
+                    raise RuntimeError(f"Short write to {tmp_path}")
+                total += written
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        _validate_existing_output_target(file_path)
+        os.replace(tmp_path, file_path)
     finally:
-        os.close(fd)
+        if tmp_path.exists() or tmp_path.is_symlink():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def _get_or_compile_swift_binary() -> Optional[Path]:
@@ -262,13 +295,17 @@ def _index_symbol_masters(
 
 
 def _find_layer_by_id(
-    root: Dict[str, Any], target_id: str
-) -> Optional[Dict[str, Any]]:
+    root: Dict[str, Any], target_id: str, ox: float = 0.0, oy: float = 0.0
+) -> Optional[Tuple[Dict[str, Any], float, float]]:
+    is_root = root.get("_class") in ("page", "artboard", "symbolMaster")
+    frame = root.get("frame") or {}
+    cur_x = 0.0 if is_root else ox + float(frame.get("x", 0.0))
+    cur_y = 0.0 if is_root else oy + float(frame.get("y", 0.0))
     if str(root.get("do_objectID", "")) == target_id:
-        return root
+        return root, cur_x, cur_y
     for child in root.get("layers") or []:
         if isinstance(child, dict):
-            found = _find_layer_by_id(child, target_id)
+            found = _find_layer_by_id(child, target_id, cur_x, cur_y)
             if found is not None:
                 return found
     return None
@@ -279,8 +316,8 @@ def _resolve_nested_override_text_layer(
     override_path: str,
     symbol_masters: Dict[str, Dict[str, Any]],
     instance_overrides: List[Dict[str, Any]],
-) -> Optional[Dict[str, Any]]:
-    """Resolve a potentially nested override path (<inst-id>/.../<text-id>) to its target text layer."""
+) -> Optional[Tuple[Dict[str, Any], float]]:
+    """Resolve a potentially nested override path (<inst-id>/.../<text-id>) to (target_text_layer, abs_y_in_root_master)."""
     segments = [seg for seg in override_path.split("/") if seg]
     if not segments:
         return None
@@ -293,10 +330,13 @@ def _resolve_nested_override_text_layer(
             swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
 
     cur_master = root_master
+    accum_y = 0.0
     for idx, seg_id in enumerate(segments):
-        found = _find_layer_by_id(cur_master, seg_id)
-        if found is None:
+        found_res = _find_layer_by_id(cur_master, seg_id)
+        if found_res is None:
             return None
+        found, _seg_x, seg_y = found_res
+        accum_y += seg_y
         if idx < len(segments) - 1:
             if found.get("_class") != "symbolInstance":
                 return None
@@ -307,7 +347,7 @@ def _resolve_nested_override_text_layer(
                 return None
             cur_master = next_master
         else:
-            return found
+            return found, accum_y
     return None
 
 
@@ -321,11 +361,12 @@ def _participates_in_flex_flow(child: Dict[str, Any]) -> bool:
 
 
 def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
-    """Re-pack a vertical MSImmutableFlexGroupLayout in Sketch's reversed index order, preserving justifyContent."""
+    """Re-pack a vertical or horizontal MSImmutableFlexGroupLayout in Sketch's reversed index order."""
     layout = group.get("groupLayout") or {}
     if layout.get("_class") != "MSImmutableFlexGroupLayout":
         return 0.0
-    if int(layout.get("flexDirection", 1)) != 1:
+    flex_dir = int(layout.get("flexDirection", 1))
+    if flex_dir not in (0, 1):
         return 0.0
 
     has_ind = bool(layout.get("hasIndividualPadding", False))
@@ -334,6 +375,7 @@ def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
     bottom_pad = float(layout.get("bottomPadding", base_pad) if has_ind else base_pad)
     gap = float(layout.get("allGuttersGap", 0.0) or 0.0)
     justify = int(layout.get("justifyContent", 0) or 0)
+    align_items = int(layout.get("alignItems", 0) or 0)
     vertical_sizing = int(layout.get("verticalSizing", 1))
 
     children = [
@@ -346,11 +388,35 @@ def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
     if n == 0:
         return 0.0
 
+    g_frame = group.get("frame")
+    if flex_dir == 0:
+        max_child_h = max(
+            float((ch.get("frame") or {}).get("height", 0.0)) for ch in visual_children
+        )
+        new_row_h = round(top_pad + max_child_h + bottom_pad, 2)
+        old_row_h = float((g_frame or {}).get("height", 0.0))
+        if isinstance(g_frame, dict) and vertical_sizing == 1:
+            g_frame["height"] = new_row_h
+        container_h = float((g_frame or {}).get("height", new_row_h))
+        inner_h = max(0.0, container_h - top_pad - bottom_pad)
+        for child in visual_children:
+            c_frame = child.get("frame")
+            if isinstance(c_frame, dict):
+                ch_h = float(c_frame.get("height", 0.0))
+                if align_items == 0:
+                    c_frame["y"] = round(top_pad, 2)
+                elif align_items == 1:
+                    c_frame["y"] = round(top_pad + (inner_h - ch_h) / 2.0, 2)
+                elif align_items == 2:
+                    c_frame["y"] = round(container_h - bottom_pad - ch_h, 2)
+        if isinstance(g_frame, dict) and vertical_sizing == 1:
+            return new_row_h - old_row_h
+        return 0.0
+
     children_total_h = sum(
         float((ch.get("frame") or {}).get("height", 0.0)) for ch in visual_children
     )
     content_h = children_total_h + gap * max(0, n - 1)
-    g_frame = group.get("frame")
 
     cursor_y = top_pad
     effective_gap = gap
@@ -483,11 +549,12 @@ def audit_and_rebake_sketch(
                     if not ov_name.endswith("_stringValue"):
                         continue
                     override_path = ov_name[: -len("_stringValue")]
-                    master_text = _resolve_nested_override_text_layer(
+                    resolved_target = _resolve_nested_override_text_layer(
                         master, override_path, symbol_masters, inst_overrides
                     )
-                    if master_text is None:
+                    if resolved_target is None:
                         continue
+                    master_text, master_text_y = resolved_target
                     m_spec = _extract_text_layer_spec(master_text)
                     if m_spec is None:
                         continue
@@ -505,10 +572,16 @@ def audit_and_rebake_sketch(
                         {
                             "overrideName": ov_name,
                             "spec": ov_spec,
+                            "masterTextY": float(master_text_y),
                             "masterTextBaseHeight": float(m_spec["currentHeight"]),
                         }
                     )
                 if override_entries:
+                    m_layout = master.get("groupLayout") or {}
+                    master_fixed_vert = (
+                        m_layout.get("_class") == "MSImmutableFlexGroupLayout"
+                        and int(m_layout.get("verticalSizing", 1)) == 0
+                    )
                     targets_meta.append(
                         {
                             "kind": "symbolInstanceOverride",
@@ -517,6 +590,7 @@ def audit_and_rebake_sketch(
                             "node": node,
                             "ancestors": list(ancestors),
                             "overrides": override_entries,
+                            "masterFixedVertical": master_fixed_vert,
                             "masterBaseHeight": float(
                                 m_frame.get("height", inst_frame.get("height", 0.0))
                             ),
@@ -553,32 +627,57 @@ def audit_and_rebake_sketch(
             resolved_ps = m_res["resolvedPostScriptName"]
             ov_details = None
         else:
-            total_delta_text = 0.0
             ov_details = []
             resolved_ps = ""
             total_lines = 0
+            ov_intervals: List[Tuple[float, float, float]] = []
             for ov_entry in meta["overrides"]:
                 ov_spec = ov_entry["spec"]
                 m_res = measured_by_id.get(ov_spec["id"])
                 if m_res is None:
                     continue
-                delta_text = float(m_res["bakedHeight"]) - float(
-                    ov_entry["masterTextBaseHeight"]
+                base_h = float(ov_entry["masterTextBaseHeight"])
+                meas_h = float(m_res["bakedHeight"])
+                delta_text = meas_h - base_h
+                ov_intervals.append(
+                    (float(ov_entry.get("masterTextY", 0.0)), base_h, meas_h)
                 )
-                total_delta_text += delta_text
                 total_lines += int(m_res["lineCount"])
                 resolved_ps = m_res["resolvedPostScriptName"]
                 ov_details.append(
                     {
                         "overrideName": ov_entry["overrideName"],
                         "specID": ov_spec["id"],
-                        "masterTextBaseHeight": ov_entry["masterTextBaseHeight"],
-                        "measuredTextHeight": float(m_res["bakedHeight"]),
+                        "masterTextBaseHeight": base_h,
+                        "measuredTextHeight": meas_h,
                         "deltaTextHeight": round(delta_text, 2),
                     }
                 )
             if not ov_details:
                 continue
+            if meta.get("masterFixedVertical"):
+                total_delta_text = 0.0
+            else:
+                # Merge overlapping vertical bands (e.g., side-by-side text overrides in a horizontal Row)
+                # so horizontal siblings take max bottom extent while stacked vertical bands sum deltas.
+                sorted_iv = sorted(ov_intervals, key=lambda t: (t[0], t[0] + t[1]))
+                bands: List[List[Tuple[float, float, float]]] = []
+                for y0, old_h, new_h in sorted_iv:
+                    if not bands:
+                        bands.append([(y0, old_h, new_h)])
+                        continue
+                    prev_old_bottom = max(
+                        py + p_old for py, p_old, _ in bands[-1]
+                    )
+                    if y0 < prev_old_bottom - 0.5:
+                        bands[-1].append((y0, old_h, new_h))
+                    else:
+                        bands.append([(y0, old_h, new_h)])
+                total_delta_text = 0.0
+                for band in bands:
+                    old_bottom = max(py + p_old for py, p_old, _ in band)
+                    new_bottom = max(py + p_new for py, _, p_new in band)
+                    total_delta_text += new_bottom - old_bottom
             expected_h = round(
                 max(1.0, float(meta["masterBaseHeight"]) + total_delta_text), 2
             )

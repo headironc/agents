@@ -21,6 +21,7 @@ import os
 import re
 import stat
 import sys
+import tempfile
 import time
 import zipfile
 from pathlib import Path
@@ -28,36 +29,97 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 CLOCK_TEXT_RE = re.compile(r"^\d{1,2}:\d{2}$")
-CLOCK_NAME_HINTS = ("status-time", "statusbar/time", "clock", "time", "状态栏时间")
+STATUSBAR_CONTEXT_HINTS = (
+    "statusbar",
+    "status-bar",
+    "status_bar",
+    "status-time",
+    "status time",
+    "状态栏",
+)
+
+
+def _is_statusbar_clock_layer(
+    txt_content: str,
+    layer_name: str,
+    ancestor_names: List[str],
+    abs_y: float,
+) -> bool:
+    """Identify iOS/mini-program status-bar system clock layers without misclassifying business HH:mm text."""
+    if not CLOCK_TEXT_RE.match(txt_content):
+        return False
+    lname_low = layer_name.strip().lower()
+    chain_low = " / ".join([*[a.lower() for a in ancestor_names], lname_low])
+    if any(h in chain_low for h in STATUSBAR_CONTEXT_HINTS):
+        return True
+    if abs_y <= 44.0 and (
+        txt_content in ("9:41", "09:41")
+        or lname_low in ("time", "clock", "9:41", "09:41", "时间")
+    ):
+        return True
+    return False
+
+
+def _validate_existing_output_target(file_path: Path) -> None:
+    try:
+        st = os.lstat(file_path)
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(st.st_mode):
+        raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+    if not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise RuntimeError(
+            f"Refusing to overwrite file not owned by current user: {file_path}"
+        )
+    if st.st_nlink > 1:
+        raise RuntimeError(f"Refusing to overwrite hard-linked file: {file_path}")
 
 
 def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
-    """Write text to file_path without following symlinks on parent or target file."""
+    """Atomically write text to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
     parent = file_path.parent
     if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
         raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
     parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    resolved_parent = parent.resolve() if str(parent) in ("/tmp", "/var") else parent
+    st_parent = os.lstat(resolved_parent)
+    if not stat.S_ISDIR(st_parent.st_mode):
+        raise RuntimeError(f"Output parent is not a directory: {parent}")
+    if hasattr(os, "getuid") and st_parent.st_uid != os.getuid() and not (
+        st_parent.st_mode & stat.S_ISVTX
+    ):
+        raise RuntimeError(
+            f"Refusing to write inside directory not owned by current user: {parent}"
+        )
+    _validate_existing_output_target(file_path)
+    fd, tmp_str = tempfile.mkstemp(
+        prefix=f".{file_path.name}.", suffix=".tmp", dir=str(resolved_parent)
+    )
+    tmp_path = Path(tmp_str)
     try:
-        st = os.lstat(file_path)
-        if stat.S_ISLNK(st.st_mode):
-            raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
-        if not stat.S_ISREG(st.st_mode):
-            raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
-    except FileNotFoundError:
-        pass
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(str(file_path), flags, mode)
-    try:
-        data = text.encode("utf-8")
-        view = memoryview(data)
-        total = 0
-        while total < len(view):
-            written = os.write(fd, view[total:])
-            if written <= 0:
-                raise RuntimeError(f"Short write to {file_path}")
-            total += written
+        try:
+            os.fchmod(fd, mode)
+            data = text.encode("utf-8")
+            view = memoryview(data)
+            total = 0
+            while total < len(view):
+                written = os.write(fd, view[total:])
+                if written <= 0:
+                    raise RuntimeError(f"Short write to {tmp_path}")
+                total += written
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        _validate_existing_output_target(file_path)
+        os.replace(tmp_path, file_path)
     finally:
-        os.close(fd)
+        if tmp_path.exists() or tmp_path.is_symlink():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def _new_finding(
@@ -335,6 +397,25 @@ def _check_flex_group_closure(
                     },
                 )
             )
+        max_child_h = max(
+            float((ch.get("frame") or {}).get("height", 0.0)) for ch in visual_children
+        )
+        expected_row_h = top_pad + max_child_h + bottom_pad
+        if vert_sizing == 1 and abs(g_h - expected_row_h) > tolerance:
+            findings.append(
+                _new_finding(
+                    "flex_and_focus",
+                    "FLEX-CONTAINER-HEIGHT-UNCLOSED",
+                    f"Flex Row '{group.get('name')}' height={g_h} does not close around tallest child+padding={expected_row_h}",
+                    page_id=page_id,
+                    artboard_id=artboard_id,
+                    layer_id=g_id,
+                    details={
+                        "actualHeight": g_h,
+                        "expectedHeight": round(expected_row_h, 2),
+                    },
+                )
+            )
 
 
 def run_offline_audit(
@@ -562,13 +643,16 @@ def run_offline_audit(
             if local_sw.get("do_objectID"):
                 swatch_ids.add(str(local_sw["do_objectID"]))
 
+    embedded_foreign_masters: List[Dict[str, Any]] = []
     for fsym in doc_data.get("foreignSymbols") or []:
         if isinstance(fsym, dict):
-            sm = fsym.get("symbolMaster") or {}
-            if sm.get("symbolID"):
-                foreign_symbol_ids.add(str(sm["symbolID"]))
-            if sm.get("do_objectID"):
-                symbol_masters[str(sm.get("symbolID") or sm["do_objectID"])] = sm
+            sm = fsym.get("symbolMaster") or fsym.get("originalMaster") or {}
+            if isinstance(sm, dict) and sm:
+                if sm.get("symbolID"):
+                    foreign_symbol_ids.add(str(sm["symbolID"]))
+                if sm.get("do_objectID") or sm.get("symbolID"):
+                    symbol_masters[str(sm.get("symbolID") or sm["do_objectID"])] = sm
+                embedded_foreign_masters.append(sm)
 
     # Pre-index all symbolMasters and artboards across pages
     artboards_by_id: Dict[str, Dict[str, Any]] = {}
@@ -663,8 +747,22 @@ def run_offline_audit(
                     )
                 )
 
-    for page_member, page_obj in sorted(pages_data.items()):
-        page_id = str(page_obj.get("do_objectID", page_member))
+    audit_roots: List[Tuple[str, Dict[str, Any]]] = list(sorted(pages_data.items()))
+    if embedded_foreign_masters:
+        audit_roots.append(
+            (
+                "document.json#foreignSymbols",
+                {
+                    "_class": "page",
+                    "do_objectID": "",
+                    "name": "ForeignSymbols",
+                    "layers": embedded_foreign_masters,
+                },
+            )
+        )
+
+    for page_member, page_obj in audit_roots:
+        page_id = str(page_obj.get("do_objectID") or page_member)
 
         def walk_layer(
             node: Dict[str, Any],
@@ -879,8 +977,13 @@ def run_offline_audit(
                             layer_id=oid,
                         )
                     )
-                is_clock = bool(CLOCK_TEXT_RE.match(txt_content)) or any(
-                    hint in lname.lower() for hint in CLOCK_NAME_HINTS
+                ancestor_names = [
+                    str(anc.get("name", ""))
+                    for anc in ancestors
+                    if anc.get("_class") not in ("page",)
+                ]
+                is_clock = _is_statusbar_clock_layer(
+                    txt_content, lname, ancestor_names, cur_abs_y
                 )
                 for seg in attr_str.get("attributes") or []:
                     if not isinstance(seg, dict):

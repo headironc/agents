@@ -25,6 +25,7 @@ import stat
 import struct
 import subprocess
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -41,35 +42,96 @@ PINGFANG_FALLBACK_PATHS = [
     Path("/System/Library/Fonts/PingFang.ttc"),
 ]
 CLOCK_TEXT_RE = re.compile(r"^\d{1,2}:\d{2}$")
+STATUSBAR_CONTEXT_HINTS = (
+    "statusbar",
+    "status-bar",
+    "status_bar",
+    "status-time",
+    "status time",
+    "状态栏",
+)
+
+
+def _is_statusbar_clock_layer(
+    txt_content: str,
+    layer_name: str,
+    ancestor_names: List[str],
+    abs_y: float,
+) -> bool:
+    if not CLOCK_TEXT_RE.match(txt_content):
+        return False
+    lname_low = layer_name.strip().lower()
+    chain_low = " / ".join([*[a.lower() for a in ancestor_names], lname_low])
+    if any(h in chain_low for h in STATUSBAR_CONTEXT_HINTS):
+        return True
+    if abs_y <= 44.0 and (
+        txt_content in ("9:41", "09:41")
+        or lname_low in ("time", "clock", "9:41", "09:41", "时间")
+    ):
+        return True
+    return False
+
+
+def _validate_existing_output_target(file_path: Path) -> None:
+    try:
+        st = os.lstat(file_path)
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(st.st_mode):
+        raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
+    if not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        raise RuntimeError(
+            f"Refusing to overwrite file not owned by current user: {file_path}"
+        )
+    if st.st_nlink > 1:
+        raise RuntimeError(f"Refusing to overwrite hard-linked file: {file_path}")
 
 
 def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
-    """Write text to file_path without following symlinks on parent or target file."""
+    """Atomically write text to file_path via an exclusive 0600 temp file, rejecting symlinks and foreign-owned targets."""
     parent = file_path.parent
     if str(parent) not in ("/tmp", "/var") and parent.is_symlink():
         raise RuntimeError(f"Refusing to write inside symlinked directory: {parent}")
     parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    resolved_parent = parent.resolve() if str(parent) in ("/tmp", "/var") else parent
+    st_parent = os.lstat(resolved_parent)
+    if not stat.S_ISDIR(st_parent.st_mode):
+        raise RuntimeError(f"Output parent is not a directory: {parent}")
+    if hasattr(os, "getuid") and st_parent.st_uid != os.getuid() and not (
+        st_parent.st_mode & stat.S_ISVTX
+    ):
+        raise RuntimeError(
+            f"Refusing to write inside directory not owned by current user: {parent}"
+        )
+    _validate_existing_output_target(file_path)
+    fd, tmp_str = tempfile.mkstemp(
+        prefix=f".{file_path.name}.", suffix=".tmp", dir=str(resolved_parent)
+    )
+    tmp_path = Path(tmp_str)
     try:
-        st = os.lstat(file_path)
-        if stat.S_ISLNK(st.st_mode):
-            raise RuntimeError(f"Refusing to write to symlinked file: {file_path}")
-        if not stat.S_ISREG(st.st_mode):
-            raise RuntimeError(f"Refusing to overwrite non-regular file: {file_path}")
-    except FileNotFoundError:
-        pass
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(str(file_path), flags, mode)
-    try:
-        data = text.encode("utf-8")
-        view = memoryview(data)
-        total = 0
-        while total < len(view):
-            written = os.write(fd, view[total:])
-            if written <= 0:
-                raise RuntimeError(f"Short write to {file_path}")
-            total += written
+        try:
+            os.fchmod(fd, mode)
+            data = text.encode("utf-8")
+            view = memoryview(data)
+            total = 0
+            while total < len(view):
+                written = os.write(fd, view[total:])
+                if written <= 0:
+                    raise RuntimeError(f"Short write to {tmp_path}")
+                total += written
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        _validate_existing_output_target(file_path)
+        os.replace(tmp_path, file_path)
     finally:
-        os.close(fd)
+        if tmp_path.exists() or tmp_path.is_symlink():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def _can_read_font_file(path: Path) -> bool:
@@ -251,25 +313,36 @@ def inspect_sketch_artboards_and_clocks(
                     }
                 )
 
-                def walk(node: Dict[str, Any]) -> None:
+                def walk(
+                    node: Dict[str, Any],
+                    ancestors: List[str],
+                    ox: float,
+                    oy: float,
+                ) -> None:
+                    is_ab = node.get("_class") == "artboard"
+                    nf = node.get("frame") or {}
+                    cur_x = 0.0 if is_ab else ox + float(nf.get("x", 0.0))
+                    cur_y = 0.0 if is_ab else oy + float(nf.get("y", 0.0))
+                    lname = str(node.get("name", ""))
                     if node.get("_class") == "text":
                         attr_str = node.get("attributedString") or {}
                         txt = str(attr_str.get("string", "")).strip()
-                        if CLOCK_TEXT_RE.match(txt):
+                        if _is_statusbar_clock_layer(txt, lname, ancestors, cur_y):
                             clock_layers.append(
                                 {
                                     "pageID": page_id,
                                     "artboardID": ab_id,
                                     "layerID": str(node.get("do_objectID", "")),
-                                    "layerName": str(node.get("name", "")),
+                                    "layerName": lname,
                                     "text": txt,
                                 }
                             )
+                    next_anc = ancestors + ([lname] if not is_ab else [])
                     for ch in node.get("layers") or []:
                         if isinstance(ch, dict):
-                            walk(ch)
+                            walk(ch, next_anc, cur_x, cur_y)
 
-                walk(top)
+                walk(top, [ab_name], 0.0, 0.0)
 
     return artboards, clock_layers
 
