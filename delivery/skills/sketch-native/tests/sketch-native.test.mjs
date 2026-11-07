@@ -847,6 +847,32 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
     assert.equal(nestedOvVerify.status, 0, nestedOvVerify.stdout);
     assert.equal(JSON.parse(nestedOvVerify.stdout).driftCount, 0);
 
+    // Verify fixed-height SymbolInstance (or custom-resized instance with 0 text delta) preserves its custom height (88 vs master 48)
+    const fixedInstSpec = createCleanSketchSpec({
+      textHeight: 44,
+      hotspotY: 76,
+    });
+    const fiPage =
+      fixedInstSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    fiPage.layers[0].layers[0].textBehaviour = 1;
+    fiPage.layers[0].groupLayout = {
+      _class: "MSImmutableFlexGroupLayout",
+      flexDirection: 1,
+      verticalSizing: 0,
+      padding: 0,
+    };
+    // Resize the instance on the page to 88px (master is 48px) and update parent CardStack height accordingly
+    fiPage.layers[1].layers[1].layers[0].frame.height = 88;
+    fiPage.layers[1].layers[1].frame.height = 16 + 44 + 16 + 88 + 16;
+    const fixedInstBuilder = path.join(tmpDir, "fixed-inst-spec.json");
+    const fixedInstSketch = path.join(tmpDir, "fixed-inst.sketch");
+    fs.writeFileSync(fixedInstBuilder, JSON.stringify(fixedInstSpec));
+    buildSyntheticSketch(fixedInstSketch, fixedInstBuilder);
+
+    const fixedInstAudit = runPython(PY_MEASURE, ["--sketch", fixedInstSketch]);
+    assert.equal(fixedInstAudit.status, 0, fixedInstAudit.stdout);
+    assert.equal(JSON.parse(fixedInstAudit.stdout).driftCount, 0);
+
     // Verify --rebake rejects paths under a symlinked ancestor directory
     const symParent = path.join(tmpDir, "sym-parent");
     fs.symlinkSync(tmpDir, symParent);
@@ -2665,6 +2691,113 @@ finally:
     origin_srv.shutdown()
     proxy_srv.server_close()
     origin_srv.server_close()
+
+import sketch_offline_audit as soa
+
+# 1. Verify horizontal Row Stack with justifyContent == 1 (Center) checks both main-axis X and vertical Fit height closure
+row_center = {
+    "_class": "group",
+    "do_objectID": "row-center-1",
+    "name": "RowCenter",
+    "frame": {"x": 0, "y": 0, "width": 200, "height": 100},
+    "groupLayout": {
+        "_class": "MSImmutableFlexGroupLayout",
+        "flexDirection": 0,
+        "justifyContent": 1,
+        "horizontalSizing": 0,
+        "verticalSizing": 1,
+        "padding": 0,
+        "allGuttersGap": 0,
+    },
+    "layers": [
+        {"_class": "rectangle", "do_objectID": "rc-1", "name": "Chip", "isVisible": True, "frame": {"x": 60, "y": 0, "width": 80, "height": 20}},
+    ],
+}
+row_findings = []
+soa._check_flex_group_closure(row_center, "page-1", "ab-1", row_findings)
+row_codes = [f["code"] for f in row_findings]
+assert "FLEX-CONTAINER-HEIGHT-UNCLOSED" in row_codes, row_findings
+assert "FLEX-CHILD-X-MISMATCH" not in row_codes, row_findings
+
+# 2. Verify top-level HotSpot on Freeform control does NOT trigger HOTSPOT-FLEX-DESYNC when artboard also has a Flex stack
+mix_sketch = Path(sys.argv[1]) / "mixed-freeform-flex.sketch"
+with zipfile.ZipFile(mix_sketch, "w") as zf:
+    zf.writestr("meta.json", json.dumps({"version": 164}))
+    zf.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc-mix"}))
+    zf.writestr(
+        "pages/p1.json",
+        json.dumps({
+            "_class": "page",
+            "do_objectID": "page-mix",
+            "name": "Page 1",
+            "layers": [
+                {
+                    "_class": "artboard",
+                    "do_objectID": "ab-mix",
+                    "name": "Detail",
+                    "frame": {"x": 0, "y": 0, "width": 375, "height": 812},
+                    "layers": [
+                        {
+                            "_class": "rectangle",
+                            "do_objectID": "nav-btn",
+                            "name": "NavActionBtn",
+                            "isVisible": True,
+                            "frame": {"x": 16, "y": 0, "width": 48, "height": 44},
+                        },
+                        {
+                            "_class": "group",
+                            "do_objectID": "body-flex",
+                            "name": "BodyStack",
+                            "isVisible": True,
+                            "frame": {"x": 16, "y": 80, "width": 343, "height": 48},
+                            "groupLayout": {
+                                "_class": "MSImmutableFlexGroupLayout",
+                                "flexDirection": 1,
+                                "horizontalSizing": 0,
+                                "verticalSizing": 1,
+                                "padding": 0,
+                            },
+                            "layers": [
+                                {
+                                    "_class": "rectangle",
+                                    "do_objectID": "flex-card",
+                                    "name": "CardItem",
+                                    "isVisible": True,
+                                    "frame": {"x": 0, "y": 0, "width": 343, "height": 48},
+                                }
+                            ],
+                        },
+                        {
+                            "_class": "MSImmutableHotspotLayer",
+                            "do_objectID": "hs-nav",
+                            "name": "HotSpot/Nav",
+                            "targetLayerID": "nav-btn",
+                            "frame": {"x": 16, "y": 0, "width": 48, "height": 44},
+                            "flow": {"_class": "MSImmutableFlowConnection", "do_objectID": "fl-nav", "destinationArtboardID": "ab-mix"},
+                        },
+                    ],
+                }
+            ],
+        }),
+    )
+mix_res = soa.run_offline_audit(mix_sketch)
+mix_codes = [f["code"] for f in mix_res["findings"]]
+assert "HOTSPOT-FLEX-DESYNC" not in mix_codes, mix_res["findings"]
+
+# 3. Verify ZIP bomb (>100x compression ratio) is rejected before reading members into memory
+bomb_sketch = Path(sys.argv[1]) / "bomb.sketch"
+with zipfile.ZipFile(bomb_sketch, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    zf.writestr("document.json", b'{"_class":"document","do_objectID":"d-bomb"}')
+    zf.writestr("meta.json", b'{"version":164}')
+    zf.writestr("unused-huge.bin", b"\\x00" * (4 * 1024 * 1024))
+bomb_audit = soa.run_offline_audit(bomb_sketch)
+assert bomb_audit["passed"] is False, bomb_audit
+assert any(f["code"] == "ARCHIVE-ZIP-BUDGET-EXCEEDED" for f in bomb_audit["findings"]), bomb_audit
+try:
+    cm.audit_and_rebake_sketch(bomb_sketch)
+    raise AssertionError("Expected audit_and_rebake_sketch to reject high-ratio ZIP member")
+except RuntimeError as exc:
+    assert "compression ratio limit" in str(exc), exc
 `,
         tmpDir,
       ],

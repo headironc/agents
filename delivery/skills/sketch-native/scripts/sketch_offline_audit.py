@@ -198,6 +198,75 @@ def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
         os.close(dir_fd)
 
 
+MAX_ZIP_MEMBERS = 4096
+MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
+MAX_ZIP_JSON_MEMBER_BYTES = 32 * 1024 * 1024
+MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
+MAX_ZIP_COMPRESSION_RATIO = 100.0
+
+
+def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
+    """Validate ZIP member count, per-member size, total uncompressed size, and compression ratio before reading."""
+    infolist = zf.infolist()
+    if len(infolist) > MAX_ZIP_MEMBERS:
+        raise RuntimeError(
+            f"Archive exceeds maximum member count ({len(infolist)} > {MAX_ZIP_MEMBERS})"
+        )
+    total_uncompressed = 0
+    for info in infolist:
+        parts = Path(info.filename).parts
+        if ".." in parts or info.filename.startswith("/"):
+            raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
+        fsize = int(info.file_size or 0)
+        csize = int(info.compress_size or 0)
+        if fsize < 0 or fsize > MAX_ZIP_SINGLE_MEMBER_BYTES:
+            raise RuntimeError(
+                f"ZIP member '{info.filename}' exceeds single-member size limit ({fsize} > {MAX_ZIP_SINGLE_MEMBER_BYTES})"
+            )
+        if fsize > 65536 and fsize > max(1, csize) * MAX_ZIP_COMPRESSION_RATIO:
+            raise RuntimeError(
+                f"ZIP member '{info.filename}' exceeds compression ratio limit ({fsize} / {max(1, csize)} > {MAX_ZIP_COMPRESSION_RATIO})"
+            )
+        total_uncompressed += fsize
+        if total_uncompressed > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES:
+            raise RuntimeError(
+                f"Archive exceeds total uncompressed size budget ({total_uncompressed} > {MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES})"
+            )
+    return infolist
+
+
+def _read_zip_member_bounded(
+    zf: zipfile.ZipFile,
+    member_name: str,
+    max_bytes: int = MAX_ZIP_JSON_MEMBER_BYTES,
+) -> bytes:
+    """Stream-read a ZIP member with strict uncompressed size and compression-ratio enforcement."""
+    info = zf.getinfo(member_name)
+    csize = max(1, int(info.compress_size or 0))
+    if int(info.file_size or 0) > max_bytes:
+        raise RuntimeError(
+            f"ZIP member '{member_name}' declared size ({info.file_size}) exceeds limit ({max_bytes})"
+        )
+    chunks: List[bytes] = []
+    total = 0
+    with zf.open(info, "r") as mfh:
+        while True:
+            chunk = mfh.read(65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError(
+                    f"ZIP member '{member_name}' decompressed size exceeds limit ({max_bytes})"
+                )
+            if total > 65536 and total > csize * MAX_ZIP_COMPRESSION_RATIO:
+                raise RuntimeError(
+                    f"ZIP member '{member_name}' decompressed ratio exceeds limit ({MAX_ZIP_COMPRESSION_RATIO}x)"
+                )
+            chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def _new_finding(
     category: str,
     code: str,
@@ -442,8 +511,55 @@ def _check_flex_group_closure(
                     },
                 )
             )
-    elif flex_dir == 0 and justify == 0:
+        max_child_w = max(
+            float((ch.get("frame") or {}).get("width", 0.0)) for ch in visual_children
+        )
+        expected_col_w = left_pad + max_child_w + right_pad
+        if horiz_sizing == 1 and abs(g_w - expected_col_w) > tolerance:
+            findings.append(
+                _new_finding(
+                    "flex_and_focus",
+                    "FLEX-CONTAINER-WIDTH-UNCLOSED",
+                    f"Flex Column '{group.get('name')}' width={g_w} does not close around widest child+padding={expected_col_w}",
+                    page_id=page_id,
+                    artboard_id=artboard_id,
+                    layer_id=g_id,
+                    details={
+                        "actualWidth": g_w,
+                        "expectedWidth": round(expected_col_w, 2),
+                    },
+                )
+            )
+    elif flex_dir == 0:
+        total_children_w = sum(
+            float((ch.get("frame") or {}).get("width", 0.0))
+            for ch in visual_children
+        )
+        n_children = len(visual_children)
+        natural_content_w = total_children_w + gap * max(0, n_children - 1)
+        expected_total_w = left_pad + natural_content_w + right_pad
+
         cursor_x = left_pad
+        step_gap = gap
+        if horiz_sizing != 1 and g_w > 0.0:
+            inner_w = max(0.0, g_w - left_pad - right_pad)
+            free_space = inner_w - natural_content_w
+            if justify == 1:  # Center
+                cursor_x = left_pad + free_space / 2.0
+            elif justify == 2:  # End
+                cursor_x = left_pad + free_space
+            elif justify == 3 and n_children > 1:  # SpaceBetween
+                cursor_x = left_pad
+                step_gap = max(0.0, (inner_w - total_children_w) / (n_children - 1))
+            elif justify == 4 and n_children > 0:  # SpaceAround
+                unit = max(0.0, (inner_w - total_children_w) / n_children)
+                cursor_x = left_pad + unit / 2.0
+                step_gap = unit
+            elif justify == 5 and n_children > 0:  # SpaceEvenly
+                unit = max(0.0, (inner_w - total_children_w) / (n_children + 1))
+                cursor_x = left_pad + unit
+                step_gap = unit
+
         for idx, ch in enumerate(visual_children):
             cf = ch.get("frame") or {}
             cx = float(cf.get("x", 0.0))
@@ -466,9 +582,8 @@ def _check_flex_group_closure(
                 )
             cursor_x += ch_w
             if idx < len(visual_children) - 1:
-                cursor_x += gap
+                cursor_x += step_gap
 
-        expected_total_w = cursor_x + right_pad
         if horiz_sizing == 1 and abs(g_w - expected_total_w) > tolerance:
             findings.append(
                 _new_finding(
@@ -534,6 +649,23 @@ def run_offline_audit(
         }
 
     with zipfile.ZipFile(sketch_path, "r") as zf:
+        try:
+            _validate_zip_archive_budget(zf)
+        except RuntimeError as exc:
+            return {
+                "tool": "sketch_offline_audit.py",
+                "sketch": str(sketch_path),
+                "passed": False,
+                "elapsedMs": round((time.perf_counter() - start_ts) * 1000.0, 2),
+                "blockingCount": 1,
+                "findings": [
+                    _new_finding(
+                        "archive_and_ids",
+                        "ARCHIVE-ZIP-BUDGET-EXCEEDED",
+                        str(exc),
+                    )
+                ],
+            }
         bad_member = zf.testzip()
         if bad_member is not None:
             findings.append(
@@ -555,19 +687,23 @@ def run_offline_audit(
                 )
 
         doc_data = (
-            json.loads(zf.read("document.json").decode("utf-8"))
+            json.loads(
+                _read_zip_member_bounded(zf, "document.json").decode("utf-8")
+            )
             if "document.json" in namelist
             else {}
         )
         meta_data = (
-            json.loads(zf.read("meta.json").decode("utf-8"))
+            json.loads(_read_zip_member_bounded(zf, "meta.json").decode("utf-8"))
             if "meta.json" in namelist
             else {}
         )
         pages_data: Dict[str, Dict[str, Any]] = {}
         for member in sorted(namelist):
             if member.startswith("pages/") and member.endswith(".json"):
-                pages_data[member] = json.loads(zf.read(member).decode("utf-8"))
+                pages_data[member] = json.loads(
+                    _read_zip_member_bounded(zf, member).decode("utf-8")
+                )
 
         for page_ref in doc_data.get("pages") or []:
             if not isinstance(page_ref, dict):
@@ -602,9 +738,12 @@ def run_offline_audit(
     upstream_swatch_ids: Set[str] = set()
     if source_sketch_path and source_sketch_path.exists() and zipfile.is_zipfile(source_sketch_path):
         with zipfile.ZipFile(source_sketch_path, "r") as uzf:
+            _validate_zip_archive_budget(uzf)
             unamelist = set(uzf.namelist())
             if "document.json" in unamelist:
-                udoc = json.loads(uzf.read("document.json").decode("utf-8"))
+                udoc = json.loads(
+                    _read_zip_member_bounded(uzf, "document.json").decode("utf-8")
+                )
                 for s in (udoc.get("layerStyles") or {}).get("objects") or []:
                     if s.get("do_objectID"):
                         upstream_style_ids.add(str(s["do_objectID"]))
@@ -616,7 +755,9 @@ def run_offline_audit(
                         upstream_swatch_ids.add(str(sw["do_objectID"]))
             for member in unamelist:
                 if member.startswith("pages/") and member.endswith(".json"):
-                    upage = json.loads(uzf.read(member).decode("utf-8"))
+                    upage = json.loads(
+                        _read_zip_member_bounded(uzf, member).decode("utf-8")
+                    )
 
                     def _walk_up(n: Dict[str, Any]) -> None:
                         if n.get("_class") == "symbolMaster" and n.get("symbolID"):
@@ -1518,6 +1659,9 @@ def run_offline_audit(
                 continue
             ab_id = str(top_layer.get("do_objectID", ""))
             flex_control_rects: List[Tuple[str, str, float, float, float, float]] = []
+            freeform_control_rects: List[Tuple[str, str, float, float, float, float]] = []
+            flex_container_rects: List[Tuple[float, float, float, float]] = []
+            flex_controls_by_id: Dict[str, Tuple[str, float, float, float, float]] = {}
 
             def collect_flex_controls(
                 n: Dict[str, Any], ox: float, oy: float, inside_flex: bool
@@ -1530,17 +1674,17 @@ def run_offline_audit(
                 ay = oy + float(nf.get("y", 0.0))
                 aw = float(nf.get("width", 0.0))
                 ah = float(nf.get("height", 0.0))
-                if inside_flex and n.get("_class") != "MSImmutableHotspotLayer":
-                    flex_control_rects.append(
-                        (
-                            str(n.get("do_objectID", "")),
-                            str(n.get("name", "")),
-                            ax,
-                            ay,
-                            aw,
-                            ah,
-                        )
-                    )
+                nid = str(n.get("do_objectID", ""))
+                nname = str(n.get("name", ""))
+                if is_flex:
+                    flex_container_rects.append((ax, ay, aw, ah))
+                if n.get("_class") != "MSImmutableHotspotLayer":
+                    if inside_flex:
+                        flex_control_rects.append((nid, nname, ax, ay, aw, ah))
+                        if nid:
+                            flex_controls_by_id[nid] = (nname, ax, ay, aw, ah)
+                    elif not is_flex:
+                        freeform_control_rects.append((nid, nname, ax, ay, aw, ah))
                 for ch in n.get("layers") or []:
                     if isinstance(ch, dict):
                         collect_flex_controls(ch, ax, ay, inside_flex or is_flex)
@@ -1563,19 +1707,50 @@ def run_offline_audit(
                 hy = float(hf.get("y", 0.0))
                 hw = float(hf.get("width", 0.0))
                 hh = float(hf.get("height", 0.0))
-                target_id = child.get("targetLayerID")
-                aligned = False
-                for cid, cname, cx, cy, cw, ch_h in flex_control_rects:
-                    if target_id and cid != target_id:
+                target_id = str(child.get("targetLayerID") or "")
+                if target_id:
+                    if target_id not in flex_controls_by_id:
                         continue
-                    if (
+                    _cname, cx, cy, cw, ch_h = flex_controls_by_id[target_id]
+                    aligned = (
                         abs(hx - cx) <= 2.0
                         and abs(hy - cy) <= 2.0
                         and abs(hw - cw) <= 4.0
                         and abs(hh - ch_h) <= 4.0
-                    ):
-                        aligned = True
-                        break
+                    )
+                else:
+                    aligned = False
+                    for _cid, _cname, cx, cy, cw, ch_h in flex_control_rects:
+                        if (
+                            abs(hx - cx) <= 2.0
+                            and abs(hy - cy) <= 2.0
+                            and abs(hw - cw) <= 4.0
+                            and abs(hh - ch_h) <= 4.0
+                        ):
+                            aligned = True
+                            break
+                    if not aligned:
+                        aligned_with_freeform = any(
+                            abs(hx - fx) <= 2.0
+                            and abs(hy - fy) <= 2.0
+                            and abs(hw - fw) <= 4.0
+                            and abs(hh - fh) <= 4.0
+                            for _fid, _fname, fx, fy, fw, fh in freeform_control_rects
+                        )
+                        if aligned_with_freeform:
+                            continue
+                        h_cx = hx + hw / 2.0
+                        h_cy = hy + hh / 2.0
+                        associated_with_flex = any(
+                            abs(hx - cx) <= 2.0 and abs(hw - cw) <= 4.0
+                            for _cid, _cname, cx, _cy, cw, _ch_h in flex_control_rects
+                        ) or any(
+                            fcx - 2.0 <= h_cx <= fcx + fcw + 2.0
+                            and fcy - 2.0 <= h_cy <= fcy + fch + 2.0
+                            for fcx, fcy, fcw, fch in flex_container_rects
+                        )
+                        if not associated_with_flex:
+                            continue
                 if not aligned:
                     findings.append(
                         _new_finding(

@@ -706,6 +706,75 @@ def convert_png_to_lossless_webp(
     return True
 
 
+MAX_ZIP_MEMBERS = 4096
+MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
+MAX_ZIP_JSON_MEMBER_BYTES = 32 * 1024 * 1024
+MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
+MAX_ZIP_COMPRESSION_RATIO = 100.0
+
+
+def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
+    """Validate ZIP member count, per-member size, total uncompressed size, and compression ratio before reading."""
+    infolist = zf.infolist()
+    if len(infolist) > MAX_ZIP_MEMBERS:
+        raise RuntimeError(
+            f"Archive exceeds maximum member count ({len(infolist)} > {MAX_ZIP_MEMBERS})"
+        )
+    total_uncompressed = 0
+    for info in infolist:
+        parts = Path(info.filename).parts
+        if ".." in parts or info.filename.startswith("/"):
+            raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
+        fsize = int(info.file_size or 0)
+        csize = int(info.compress_size or 0)
+        if fsize < 0 or fsize > MAX_ZIP_SINGLE_MEMBER_BYTES:
+            raise RuntimeError(
+                f"ZIP member '{info.filename}' exceeds single-member size limit ({fsize} > {MAX_ZIP_SINGLE_MEMBER_BYTES})"
+            )
+        if fsize > 65536 and fsize > max(1, csize) * MAX_ZIP_COMPRESSION_RATIO:
+            raise RuntimeError(
+                f"ZIP member '{info.filename}' exceeds compression ratio limit ({fsize} / {max(1, csize)} > {MAX_ZIP_COMPRESSION_RATIO})"
+            )
+        total_uncompressed += fsize
+        if total_uncompressed > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES:
+            raise RuntimeError(
+                f"Archive exceeds total uncompressed size budget ({total_uncompressed} > {MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES})"
+            )
+    return infolist
+
+
+def _read_zip_member_bounded(
+    zf: zipfile.ZipFile,
+    member_name: str,
+    max_bytes: int = MAX_ZIP_JSON_MEMBER_BYTES,
+) -> bytes:
+    """Stream-read a ZIP member with strict uncompressed size and compression-ratio enforcement."""
+    info = zf.getinfo(member_name)
+    csize = max(1, int(info.compress_size or 0))
+    if int(info.file_size or 0) > max_bytes:
+        raise RuntimeError(
+            f"ZIP member '{member_name}' declared size ({info.file_size}) exceeds limit ({max_bytes})"
+        )
+    chunks: List[bytes] = []
+    total = 0
+    with zf.open(info, "r") as mfh:
+        while True:
+            chunk = mfh.read(65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError(
+                    f"ZIP member '{member_name}' decompressed size exceeds limit ({max_bytes})"
+                )
+            if total > 65536 and total > csize * MAX_ZIP_COMPRESSION_RATIO:
+                raise RuntimeError(
+                    f"ZIP member '{member_name}' decompressed ratio exceeds limit ({MAX_ZIP_COMPRESSION_RATIO}x)"
+                )
+            chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def inspect_sketch_artboards_and_clocks(
     sketch_path: Path,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -713,11 +782,14 @@ def inspect_sketch_artboards_and_clocks(
     clock_layers: List[Dict[str, Any]] = []
 
     with zipfile.ZipFile(sketch_path, "r") as zf:
+        _validate_zip_archive_budget(zf)
         namelist = sorted(zf.namelist())
         symbol_masters: Dict[str, Dict[str, Any]] = {}
 
         if "document.json" in namelist:
-            doc_data = json.loads(zf.read("document.json").decode("utf-8"))
+            doc_data = json.loads(
+                _read_zip_member_bounded(zf, "document.json").decode("utf-8")
+            )
             for fsym in doc_data.get("foreignSymbols") or []:
                 if not isinstance(fsym, dict):
                     continue
@@ -731,7 +803,7 @@ def inspect_sketch_artboards_and_clocks(
         for member in namelist:
             if not (member.startswith("pages/") and member.endswith(".json")):
                 continue
-            page = json.loads(zf.read(member).decode("utf-8"))
+            page = json.loads(_read_zip_member_bounded(zf, member).decode("utf-8"))
             pages_list.append((member, page))
 
             def index_masters(node: Dict[str, Any]) -> None:

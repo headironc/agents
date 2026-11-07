@@ -903,6 +903,125 @@ def _collect_artboard_rects(
     return rects
 
 
+MAX_ZIP_MEMBERS = 4096
+MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
+MAX_ZIP_JSON_MEMBER_BYTES = 32 * 1024 * 1024
+MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
+MAX_ZIP_COMPRESSION_RATIO = 100.0
+
+
+def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
+    """Validate ZIP member count, per-member size, total uncompressed size, and compression ratio before reading."""
+    infolist = zf.infolist()
+    if len(infolist) > MAX_ZIP_MEMBERS:
+        raise RuntimeError(
+            f"Archive exceeds maximum member count ({len(infolist)} > {MAX_ZIP_MEMBERS})"
+        )
+    total_uncompressed = 0
+    for info in infolist:
+        parts = Path(info.filename).parts
+        if ".." in parts or info.filename.startswith("/"):
+            raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
+        fsize = int(info.file_size or 0)
+        csize = int(info.compress_size or 0)
+        if fsize < 0 or fsize > MAX_ZIP_SINGLE_MEMBER_BYTES:
+            raise RuntimeError(
+                f"ZIP member '{info.filename}' exceeds single-member size limit ({fsize} > {MAX_ZIP_SINGLE_MEMBER_BYTES})"
+            )
+        if fsize > 65536 and fsize > max(1, csize) * MAX_ZIP_COMPRESSION_RATIO:
+            raise RuntimeError(
+                f"ZIP member '{info.filename}' exceeds compression ratio limit ({fsize} / {max(1, csize)} > {MAX_ZIP_COMPRESSION_RATIO})"
+            )
+        total_uncompressed += fsize
+        if total_uncompressed > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES:
+            raise RuntimeError(
+                f"Archive exceeds total uncompressed size budget ({total_uncompressed} > {MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES})"
+            )
+    return infolist
+
+
+def _read_zip_member_bounded(
+    zf: zipfile.ZipFile,
+    member_name: str,
+    max_bytes: int = MAX_ZIP_JSON_MEMBER_BYTES,
+) -> bytes:
+    """Stream-read a ZIP member with strict uncompressed size and compression-ratio enforcement."""
+    info = zf.getinfo(member_name)
+    csize = max(1, int(info.compress_size or 0))
+    if int(info.file_size or 0) > max_bytes:
+        raise RuntimeError(
+            f"ZIP member '{member_name}' declared size ({info.file_size}) exceeds limit ({max_bytes})"
+        )
+    chunks: List[bytes] = []
+    total = 0
+    with zf.open(info, "r") as mfh:
+        while True:
+            chunk = mfh.read(65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError(
+                    f"ZIP member '{member_name}' decompressed size exceeds limit ({max_bytes})"
+                )
+            if total > 65536 and total > csize * MAX_ZIP_COMPRESSION_RATIO:
+                raise RuntimeError(
+                    f"ZIP member '{member_name}' decompressed ratio exceeds limit ({MAX_ZIP_COMPRESSION_RATIO}x)"
+                )
+            chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _read_sketch_json_members(zf: zipfile.ZipFile) -> Dict[str, bytes]:
+    """Validate archive budget and load only required JSON members (document.json and pages/*.json)."""
+    infolist = _validate_zip_archive_budget(zf)
+    members: Dict[str, bytes] = {}
+    for info in infolist:
+        name = info.filename
+        if name == "document.json" or (
+            name.startswith("pages/") and name.endswith(".json")
+        ):
+            members[name] = _read_zip_member_bounded(
+                zf, name, max_bytes=MAX_ZIP_JSON_MEMBER_BYTES
+            )
+    return members
+
+
+def _stream_copy_zip_member_bounded(
+    zf_in: zipfile.ZipFile,
+    info: zipfile.ZipInfo,
+    zout: zipfile.ZipFile,
+    running_total: int,
+) -> int:
+    """Stream-copy an unmodified ZIP member into zout with strict size and compression-ratio limits."""
+    csize = max(1, int(info.compress_size or 0))
+    member_total = 0
+    with zf_in.open(info, "r") as src_m, zout.open(info.filename, "w") as dst_m:
+        while True:
+            buf = src_m.read(65536)
+            if not buf:
+                break
+            member_total += len(buf)
+            running_total += len(buf)
+            if member_total > MAX_ZIP_SINGLE_MEMBER_BYTES:
+                raise RuntimeError(
+                    f"ZIP member '{info.filename}' exceeds single-member size limit during stream copy"
+                )
+            if (
+                member_total > 65536
+                and member_total > csize * MAX_ZIP_COMPRESSION_RATIO
+            ):
+                raise RuntimeError(
+                    f"ZIP member '{info.filename}' exceeds compression ratio limit during stream copy"
+                )
+            if running_total > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES:
+                raise RuntimeError(
+                    "Archive exceeds total uncompressed size budget during stream copy"
+                )
+            dst_m.write(buf)
+    return running_total
+
+
 def audit_and_rebake_sketch(
     sketch_path: Path,
     rebake: bool = False,
@@ -931,10 +1050,10 @@ def audit_and_rebake_sketch(
             )
             with os.fdopen(src_fd, "rb") as src_fh:
                 with zipfile.ZipFile(src_fh, "r") as zf:
-                    members = {name: zf.read(name) for name in zf.namelist()}
+                    members = _read_sketch_json_members(zf)
         else:
             with zipfile.ZipFile(sketch_path, "r") as zf:
-                members = {name: zf.read(name) for name in zf.namelist()}
+                members = _read_sketch_json_members(zf)
         return _audit_and_rebake_members(
             sketch_path=sketch_path,
             members=members,
@@ -1091,6 +1210,10 @@ def _audit_and_rebake_members(
                         m_layout.get("_class") == "MSImmutableFlexGroupLayout"
                         and int(m_layout.get("verticalSizing", 1)) == 0
                     )
+                    master_fit_vert = (
+                        m_layout.get("_class") == "MSImmutableFlexGroupLayout"
+                        and int(m_layout.get("verticalSizing", 1)) == 1
+                    )
                     master_is_horiz_flex = (
                         m_layout.get("_class") == "MSImmutableFlexGroupLayout"
                         and int(m_layout.get("flexDirection", 0)) == 0
@@ -1111,6 +1234,7 @@ def _audit_and_rebake_members(
                             "overrides": override_entries,
                             "staticIntervals": static_intervals,
                             "masterFixedVertical": master_fixed_vert,
+                            "masterFitVertical": master_fit_vert,
                             "masterIsHorizontalFlex": master_is_horiz_flex,
                             "masterBaseHeight": float(
                                 m_frame.get("height", inst_frame.get("height", 0.0))
@@ -1183,7 +1307,7 @@ def _audit_and_rebake_members(
             if not ov_details:
                 continue
             if meta.get("masterFixedVertical"):
-                total_delta_text = 0.0
+                expected_h = round(current_h, 2)
             else:
                 # Merge overlapping vertical bands across both overridden text layers and unmodified siblings
                 # so horizontal siblings take max bottom extent while stacked vertical bands sum deltas.
@@ -1215,9 +1339,12 @@ def _audit_and_rebake_members(
                         old_bottom = max(py + p_old for py, p_old, _ in band)
                         new_bottom = max(py + p_new for py, _, p_new in band)
                         total_delta_text += new_bottom - old_bottom
-            expected_h = round(
-                max(1.0, float(meta["masterBaseHeight"]) + total_delta_text), 2
-            )
+                if not meta.get("masterFitVertical") and abs(total_delta_text) <= 0.01:
+                    expected_h = round(current_h, 2)
+                else:
+                    expected_h = round(
+                        max(1.0, float(meta["masterBaseHeight"]) + total_delta_text), 2
+                    )
             spec_id = (
                 ov_details[0]["specID"]
                 if len(ov_details) == 1
@@ -1305,16 +1432,38 @@ def _audit_and_rebake_members(
             rebake_dir_fd, f".{sketch_leaf}.rebake-", ".tmp", mode=0o600
         )
         try:
-            with os.fdopen(fd, "w+b") as tmp_fh:
-                with zipfile.ZipFile(
+            src_copy_fd = os.open(
+                sketch_leaf,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=rebake_dir_fd,
+            )
+            with os.fdopen(src_copy_fd, "rb") as src_copy_fh, os.fdopen(
+                fd, "w+b"
+            ) as tmp_fh:
+                with zipfile.ZipFile(src_copy_fh, "r") as zf_in, zipfile.ZipFile(
                     tmp_fh, "w", compression=zipfile.ZIP_DEFLATED
                 ) as zout:
-                    for name, raw in members.items():
-                        zout.writestr(name, raw)
+                    infolist = _validate_zip_archive_budget(zf_in)
+                    running_total = 0
+                    for info in infolist:
+                        name = info.filename
+                        if name in members:
+                            raw = members[name]
+                            running_total += len(raw)
+                            if running_total > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES:
+                                raise RuntimeError(
+                                    "Archive exceeds total uncompressed size budget during rebake write"
+                                )
+                            zout.writestr(name, raw)
+                        else:
+                            running_total = _stream_copy_zip_member_bounded(
+                                zf_in, info, zout, running_total
+                            )
                 tmp_fh.flush()
                 os.fsync(tmp_fh.fileno())
                 tmp_fh.seek(0)
                 with zipfile.ZipFile(tmp_fh, "r") as zcheck:
+                    _validate_zip_archive_budget(zcheck)
                     if zcheck.testzip() is not None:
                         raise RuntimeError(
                             "Rebaked temporary archive failed ZIP integrity check"
