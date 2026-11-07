@@ -1383,18 +1383,48 @@ def run_export_and_manifest(
                             "expected": prev,
                         }
                     )
-            current_artboard_ids = {ab["artboardID"] for ab in artboards}
+            current_artboards_by_id = {ab["artboardID"]: ab for ab in artboards}
             for prev_ab in existing.get("artboards") or []:
                 if isinstance(prev_ab, dict):
                     prev_ab_id = prev_ab.get("id") or prev_ab.get("artboardID")
-                    if prev_ab_id and str(prev_ab_id) not in current_artboard_ids:
-                        manifest_mismatches.append(
-                            {
-                                "type": "missing_artboard_in_export",
-                                "artboardID": str(prev_ab_id),
-                                "expected": prev_ab,
-                            }
-                        )
+                    if prev_ab_id:
+                        cur_ab = current_artboards_by_id.get(str(prev_ab_id))
+                        if cur_ab is None:
+                            manifest_mismatches.append(
+                                {
+                                    "type": "missing_artboard_in_export",
+                                    "artboardID": str(prev_ab_id),
+                                    "expected": prev_ab,
+                                }
+                            )
+                        elif (
+                            (
+                                prev_ab.get("width") is not None
+                                and prev_ab.get("width") != cur_ab["width"]
+                            )
+                            or (
+                                prev_ab.get("height") is not None
+                                and prev_ab.get("height") != cur_ab["height"]
+                            )
+                            or (
+                                prev_ab.get("name") is not None
+                                and prev_ab.get("name") != cur_ab["artboardName"]
+                            )
+                        ):
+                            manifest_mismatches.append(
+                                {
+                                    "type": "artboard_metadata_mismatch",
+                                    "artboardID": str(prev_ab_id),
+                                    "expected": prev_ab,
+                                    "actual": {
+                                        "id": cur_ab["artboardID"],
+                                        "name": cur_ab["artboardName"],
+                                        "pageID": cur_ab["pageID"],
+                                        "width": cur_ab["width"],
+                                        "height": cur_ab["height"],
+                                    },
+                                }
+                            )
         else:
             _write_text_nofollow(
                 target_json_path,

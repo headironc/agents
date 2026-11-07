@@ -513,6 +513,78 @@ def _find_layer_by_id(
     return None
 
 
+def _merge_nested_instance_overrides(
+    root_master: Dict[str, Any],
+    symbol_masters: Dict[str, Dict[str, Any]],
+    outer_overrides: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Merge nested symbolInstance default overrideValues under root_master with outer_overrides taking precedence."""
+    merged_by_name: Dict[str, Dict[str, Any]] = {}
+    swap_map: Dict[str, str] = {}
+
+    for ov in outer_overrides:
+        if not isinstance(ov, dict):
+            continue
+        ov_name = str(ov.get("overrideName", ""))
+        if not ov_name:
+            continue
+        merged_by_name[ov_name] = ov
+        if (
+            ov_name.endswith("_symbolID")
+            and isinstance(ov.get("value"), str)
+            and ov.get("value")
+        ):
+            swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
+
+    def walk_master(
+        node: Dict[str, Any],
+        prefix: str,
+        visited: set[str],
+    ) -> None:
+        for ch in node.get("layers") or []:
+            if not isinstance(ch, dict) or not _participates_in_flex_flow(ch):
+                continue
+            ch_id = str(ch.get("do_objectID", ""))
+            if not ch_id:
+                continue
+            ch_path = f"{prefix}/{ch_id}" if prefix else ch_id
+            ch_cls = ch.get("_class")
+            if ch_cls == "symbolInstance":
+                eff_sym = swap_map.get(ch_path, str(ch.get("symbolID", "")))
+                if not eff_sym or eff_sym.lower() == "none":
+                    continue
+                for nested_ov in ch.get("overrideValues") or []:
+                    if not isinstance(nested_ov, dict):
+                        continue
+                    raw_name = str(nested_ov.get("overrideName", ""))
+                    if not raw_name:
+                        continue
+                    scoped_name = f"{ch_path}/{raw_name}"
+                    if scoped_name not in merged_by_name:
+                        scoped_entry = dict(nested_ov)
+                        scoped_entry["overrideName"] = scoped_name
+                        merged_by_name[scoped_name] = scoped_entry
+                        if (
+                            scoped_name.endswith("_symbolID")
+                            and isinstance(scoped_entry.get("value"), str)
+                            and scoped_entry.get("value")
+                        ):
+                            swap_map[scoped_name[: -len("_symbolID")]] = str(
+                                scoped_entry["value"]
+                            )
+                nested_m = symbol_masters.get(eff_sym)
+                if nested_m is not None and eff_sym not in visited:
+                    walk_master(nested_m, ch_path, visited | {eff_sym})
+            elif ch.get("layers"):
+                walk_master(ch, prefix, visited)
+
+    root_sym_id = str(
+        root_master.get("symbolID") or root_master.get("do_objectID") or ""
+    )
+    walk_master(root_master, "", {root_sym_id} if root_sym_id else set())
+    return list(merged_by_name.values())
+
+
 def _collect_master_auto_text_paths(
     master: Dict[str, Any],
     symbol_masters: Dict[str, Dict[str, Any]],
@@ -612,13 +684,14 @@ def _collect_master_static_leaf_intervals(
     return intervals
 
 
-def _resolve_nested_override_text_layer(
+def _resolve_nested_override_text_target(
     root_master: Dict[str, Any],
     override_path: str,
     symbol_masters: Dict[str, Dict[str, Any]],
     instance_overrides: List[Dict[str, Any]],
-) -> Optional[Tuple[Dict[str, Any], float]]:
-    """Resolve a potentially nested override path (<inst-id>/.../<text-id>) to (target_text_layer, abs_y_in_root_master)."""
+    seen_height_prefixes: Optional[set[str]] = None,
+) -> Optional[Tuple[Dict[str, Any], float, float, float]]:
+    """Resolve a potentially nested override path (<inst-id>/.../<text-id>) to (target_text_layer, abs_y_in_root_master, width_adjust, height_adjust)."""
     segments = [seg for seg in override_path.split("/") if seg]
     if not segments:
         return None
@@ -632,6 +705,8 @@ def _resolve_nested_override_text_layer(
 
     cur_master = root_master
     accum_y = 0.0
+    width_adjust = 0.0
+    height_adjust = 0.0
     for idx, seg_id in enumerate(segments):
         found_res = _find_layer_by_id(cur_master, seg_id)
         if found_res is None:
@@ -643,13 +718,44 @@ def _resolve_nested_override_text_layer(
                 return None
             prefix = "/".join(segments[: idx + 1])
             next_sym_id = swap_map.get(prefix) or str(found.get("symbolID", ""))
+            if not next_sym_id or next_sym_id.lower() == "none":
+                return None
             next_master = symbol_masters.get(next_sym_id)
             if next_master is None:
                 return None
+            found_frame = found.get("frame") or {}
+            next_m_frame = next_master.get("frame") or {}
+            inst_w = float(found_frame.get("width", next_m_frame.get("width", 0.0)))
+            next_m_w = float(next_m_frame.get("width", inst_w))
+            width_adjust += inst_w - next_m_w
+            if seen_height_prefixes is None or prefix not in seen_height_prefixes:
+                if seen_height_prefixes is not None:
+                    seen_height_prefixes.add(prefix)
+                inst_h = float(
+                    found_frame.get("height", next_m_frame.get("height", 0.0))
+                )
+                next_m_h = float(next_m_frame.get("height", inst_h))
+                height_adjust += inst_h - next_m_h
             cur_master = next_master
         else:
-            return found, accum_y
+            return found, accum_y, width_adjust, height_adjust
     return None
+
+
+def _resolve_nested_override_text_layer(
+    root_master: Dict[str, Any],
+    override_path: str,
+    symbol_masters: Dict[str, Dict[str, Any]],
+    instance_overrides: List[Dict[str, Any]],
+) -> Optional[Tuple[Dict[str, Any], float]]:
+    """Resolve a potentially nested override path (<inst-id>/.../<text-id>) to (target_text_layer, abs_y_in_root_master)."""
+    res = _resolve_nested_override_text_target(
+        root_master, override_path, symbol_masters, instance_overrides
+    )
+    if res is None:
+        return None
+    found, accum_y, _w_adj, _h_adj = res
+    return found, accum_y
 
 
 def _participates_in_flex_flow(child: Dict[str, Any]) -> bool:
@@ -898,7 +1004,10 @@ def _audit_and_rebake_members(
             sym_id = str(node.get("symbolID", ""))
             master = symbol_masters.get(sym_id)
             if master is not None:
-                inst_overrides = node.get("overrideValues") or []
+                raw_inst_overrides = node.get("overrideValues") or []
+                inst_overrides = _merge_nested_instance_overrides(
+                    master, symbol_masters, raw_inst_overrides
+                )
                 inst_frame = node.get("frame") or {}
                 m_frame = master.get("frame") or {}
                 override_entries: List[Dict[str, Any]] = []
@@ -926,13 +1035,20 @@ def _audit_and_rebake_members(
                             "primaryOverrideName": f"{auto_path}_defaultText"
                         }
 
+                seen_height_prefixes: set[str] = set()
                 for override_path, ov_info in path_overrides.items():
-                    resolved_target = _resolve_nested_override_text_layer(
-                        master, override_path, symbol_masters, inst_overrides
+                    resolved_target = _resolve_nested_override_text_target(
+                        master,
+                        override_path,
+                        symbol_masters,
+                        inst_overrides,
+                        seen_height_prefixes=seen_height_prefixes,
                     )
                     if resolved_target is None:
                         continue
-                    master_text, master_text_y = resolved_target
+                    master_text, master_text_y, width_adjust, height_adjust = (
+                        resolved_target
+                    )
                     m_spec = _extract_text_layer_spec(
                         master_text,
                         shared_text_styles,
@@ -940,8 +1056,14 @@ def _audit_and_rebake_members(
                     )
                     if m_spec is None:
                         continue
-                    scale_w = float(inst_frame.get("width", m_spec["width"])) - (
-                        float(m_frame.get("width", m_spec["width"])) - m_spec["width"]
+                    eff_text_w_in_master = max(
+                        1.0, float(m_spec["width"]) + width_adjust
+                    )
+                    scale_w = float(
+                        inst_frame.get("width", eff_text_w_in_master)
+                    ) - (
+                        float(m_frame.get("width", eff_text_w_in_master))
+                        - eff_text_w_in_master
                     )
                     ov_name = str(ov_info["primaryOverrideName"])
                     ov_id = f"{node.get('do_objectID')}::{ov_name}"
@@ -958,7 +1080,9 @@ def _audit_and_rebake_members(
                             "overrideName": ov_name,
                             "spec": ov_spec,
                             "masterTextY": float(master_text_y),
-                            "masterTextBaseHeight": float(m_spec["currentHeight"]),
+                            "masterTextBaseHeight": max(
+                                1.0, float(m_spec["currentHeight"]) + height_adjust
+                            ),
                         }
                     )
                 if override_entries:
@@ -1001,6 +1125,12 @@ def _audit_and_rebake_members(
 
     for page_file, page_obj in sorted(pages_data.items()):
         scan_node(page_file, None, page_obj, [])
+    for fsym in doc_data.get("foreignSymbols") or []:
+        if not isinstance(fsym, dict):
+            continue
+        sm = fsym.get("symbolMaster") or fsym.get("originalMaster")
+        if isinstance(sm, dict):
+            scan_node("document.json", sm, sm, [doc_data, fsym])
 
     batch_report = measure_specs(measure_queue, swift_bin=swift_bin)
     measured_by_id = {item["id"]: item for item in batch_report.get("results", [])}
@@ -1162,9 +1292,15 @@ def _audit_and_rebake_members(
 
     if rebake and dirty_pages and rebake_dir_fd is not None:
         for page_file in dirty_pages:
-            members[page_file] = (
-                json.dumps(pages_data[page_file], ensure_ascii=False, indent=2) + "\n"
-            ).encode("utf-8")
+            if page_file == "document.json":
+                members["document.json"] = (
+                    json.dumps(doc_data, ensure_ascii=False, indent=2) + "\n"
+                ).encode("utf-8")
+            elif page_file in pages_data:
+                members[page_file] = (
+                    json.dumps(pages_data[page_file], ensure_ascii=False, indent=2)
+                    + "\n"
+                ).encode("utf-8")
         fd, tmp_name = _create_temp_in_dir_fd(
             rebake_dir_fd, f".{sketch_leaf}.rebake-", ".tmp", mode=0o600
         )

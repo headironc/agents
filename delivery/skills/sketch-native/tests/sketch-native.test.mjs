@@ -778,6 +778,75 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
     assert.equal(tsReport.driftCount, 1);
     assert.equal(tsReport.drifts[0].bakedHeight, 70);
 
+    // Verify outer symbolInstance inherits nested symbolInstance default _stringValue override, rebakes cleanly, and re-audits with 0 drift
+    const nestedOvSpec = createCleanSketchSpec({
+      textHeight: 44,
+      hotspotY: 76,
+    });
+    const noPage =
+      nestedOvSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const innerMaster = noPage.layers[0];
+    // Give outerMaster a nested instance of innerMaster with a 2-line default _stringValue override
+    const outerMaster = {
+      _class: "symbolMaster",
+      do_objectID: "30000000-0000-4000-8000-000000000050",
+      symbolID: "90000000-0000-4000-8000-000000000050",
+      name: "Card/OuterWrapper",
+      frame: { _class: "rect", x: 0, y: 120, width: 311, height: 48 },
+      groupLayout: {
+        _class: "MSImmutableFlexGroupLayout",
+        flexDirection: 1,
+        verticalSizing: 1,
+        padding: 0,
+      },
+      layers: [
+        {
+          _class: "symbolInstance",
+          do_objectID: "30000000-0000-4000-8000-000000000051",
+          symbolID: "30000000-0000-4000-8000-000000000099",
+          name: "NestedBtn",
+          isVisible: true,
+          frame: { _class: "rect", x: 0, y: 0, width: 311, height: 48 },
+          overrideValues: [
+            {
+              _class: "overrideValue",
+              overrideName:
+                "30000000-0000-4000-8000-000000000002_stringValue",
+              value:
+                "这是一段在嵌套母版实例上默认配置的双行长按钮文案用于验证外层实例自动继承",
+            },
+          ],
+        },
+      ],
+    };
+    innerMaster.layers[0].textBehaviour = 1;
+    noPage.layers.push(outerMaster);
+    // Point page instance to outerMaster with NO overrides of its own
+    const pageInst = noPage.layers[1].layers[1].layers[0];
+    pageInst.symbolID = "90000000-0000-4000-8000-000000000050";
+    pageInst.overrideValues = [];
+    const nestedOvBuilder = path.join(tmpDir, "nested-ov-spec.json");
+    const nestedOvSketch = path.join(tmpDir, "nested-ov.sketch");
+    fs.writeFileSync(nestedOvBuilder, JSON.stringify(nestedOvSpec));
+    buildSyntheticSketch(nestedOvSketch, nestedOvBuilder);
+
+    const nestedOvRebake = runPython(PY_MEASURE, [
+      "--sketch",
+      nestedOvSketch,
+      "--rebake",
+    ]);
+    assert.equal(nestedOvRebake.status, 0, nestedOvRebake.stderr);
+    const nestedOvRebakeReport = JSON.parse(nestedOvRebake.stdout);
+    // Both the nested instance inside outerMaster and the outer instance on the page should be rebaked to 92px
+    assert.equal(nestedOvRebakeReport.rebakedCount, 2);
+    for (const d of nestedOvRebakeReport.drifts) {
+      assert.equal(d.bakedHeight, 92);
+    }
+
+    const nestedOvVerify = runPython(PY_MEASURE, ["--sketch", nestedOvSketch]);
+    assert.equal(nestedOvVerify.status, 0, nestedOvVerify.stdout);
+    assert.equal(JSON.parse(nestedOvVerify.stdout).driftCount, 0);
+
     // Verify --rebake rejects paths under a symlinked ancestor directory
     const symParent = path.join(tmpDir, "sym-parent");
     fs.symlinkSync(tmpDir, symParent);
@@ -2460,6 +2529,142 @@ resolved_grouped = cm._resolve_nested_override_text_layer(master_with_auto, auto
 assert resolved_grouped is not None and resolved_grouped[0]["do_objectID"] == "mt-1", resolved_grouped
 static_ivs = cm._collect_master_static_leaf_intervals(master_with_auto, set(auto_paths), {"sym-1": master_with_auto}, [])
 assert static_ivs == [], static_ivs
+
+# Verify _merge_nested_instance_overrides inherits nested symbolInstance default overrides while allowing outer overrides to win
+inner_sym_master = {
+    "_class": "symbolMaster",
+    "do_objectID": "m-inner",
+    "symbolID": "sym-inner",
+    "frame": {"x": 0, "y": 0, "width": 180, "height": 22},
+    "layers": [
+        {
+            "_class": "text",
+            "do_objectID": "t-inner",
+            "isVisible": True,
+            "textBehaviour": 1,
+            "frame": {"x": 0, "y": 0, "width": 180, "height": 22},
+        }
+    ],
+}
+outer_sym_master = {
+    "_class": "symbolMaster",
+    "do_objectID": "m-outer",
+    "symbolID": "sym-outer",
+    "frame": {"x": 0, "y": 0, "width": 200, "height": 38},
+    "layers": [
+        {
+            "_class": "symbolInstance",
+            "do_objectID": "inst-nested",
+            "symbolID": "sym-inner",
+            "isVisible": True,
+            "frame": {"x": 10, "y": 8, "width": 180, "height": 22},
+            "overrideValues": [
+                {"_class": "overrideValue", "overrideName": "t-inner_stringValue", "value": "Nested default multiline override text"}
+            ],
+        }
+    ],
+}
+sym_map = {"sym-inner": inner_sym_master, "sym-outer": outer_sym_master}
+merged_ovs = cm._merge_nested_instance_overrides(outer_sym_master, sym_map, [])
+assert len(merged_ovs) == 1 and merged_ovs[0]["overrideName"] == "inst-nested/t-inner_stringValue", merged_ovs
+assert merged_ovs[0]["value"] == "Nested default multiline override text", merged_ovs
+
+merged_with_outer = cm._merge_nested_instance_overrides(
+    outer_sym_master,
+    sym_map,
+    [{"_class": "overrideValue", "overrideName": "inst-nested/t-inner_stringValue", "value": "Outer explicit override"}],
+)
+assert len(merged_with_outer) == 1 and merged_with_outer[0]["value"] == "Outer explicit override", merged_with_outer
+
+# Verify _extract_archive_snapshot & diff_sketch_archives_offline detect isVisible changes on non-targeted layers
+import zipfile, json
+vis_before = Path(sys.argv[1]) / "vis-before.sketch"
+vis_after = Path(sys.argv[1]) / "vis-after.sketch"
+for p, vis_flag in ((vis_before, True), (vis_after, False)):
+    with zipfile.ZipFile(p, "w") as zf:
+        zf.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc-1"}))
+        zf.writestr(
+            "pages/p1.json",
+            json.dumps({
+                "_class": "page",
+                "do_objectID": "page-1",
+                "name": "Page 1",
+                "layers": [
+                    {
+                        "_class": "rectangle",
+                        "do_objectID": "layer-vis-1",
+                        "name": "Badge",
+                        "isVisible": vis_flag,
+                        "frame": {"x": 0, "y": 0, "width": 40, "height": 20},
+                    }
+                ],
+            }),
+        )
+vis_diff = rt.diff_sketch_archives_offline(vis_before, vis_after, set())
+assert vis_diff["unexpectedDriftCount"] == 1, vis_diff
+assert vis_diff["unexpectedDrifts"][0]["layerID"] == "layer-vis-1", vis_diff
+
+# Verify SketchMCPClient bypasses HTTP_PROXY / http_proxy / ALL_PROXY when NO_PROXY is unset
+import http.server, threading
+proxy_hits = []
+origin_hits = []
+
+class _ProxyHandler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        proxy_hits.append(self.path)
+        self.send_response(502)
+        self.end_headers()
+    def log_message(self, *args):
+        pass
+
+class _OriginHandler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        _ = self.rfile.read(length)
+        origin_hits.append(self.path)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"jsonrpc":"2.0","id":1,"result":{"ok":true}}')
+    def log_message(self, *args):
+        pass
+
+proxy_srv = http.server.HTTPServer(("127.0.0.1", 0), _ProxyHandler)
+origin_srv = http.server.HTTPServer(("127.0.0.1", 0), _OriginHandler)
+threading.Thread(target=proxy_srv.serve_forever, daemon=True).start()
+threading.Thread(target=origin_srv.serve_forever, daemon=True).start()
+old_http_proxy = os.environ.get("HTTP_PROXY")
+old_http_proxy_lower = os.environ.get("http_proxy")
+old_no_proxy = os.environ.get("NO_PROXY")
+try:
+    proxy_url = f"http://127.0.0.1:{proxy_srv.server_address[1]}"
+    os.environ["HTTP_PROXY"] = proxy_url
+    os.environ["http_proxy"] = proxy_url
+    os.environ.pop("NO_PROXY", None)
+    os.environ.pop("no_proxy", None)
+    client = rt.SketchMCPClient(
+        endpoint=f"http://localhost:{origin_srv.server_address[1]}/mcp",
+        require_signed_sketch=False,
+    )
+    rpc_res = client._post_rpc("ping", {"probe": "direct"})
+    assert rpc_res.get("result", {}).get("ok") is True, rpc_res
+    assert len(proxy_hits) == 0, f"Proxy should not be hit: {proxy_hits}"
+    assert len(origin_hits) == 1, f"Origin should be hit directly: {origin_hits}"
+finally:
+    if old_http_proxy is None:
+        os.environ.pop("HTTP_PROXY", None)
+    else:
+        os.environ["HTTP_PROXY"] = old_http_proxy
+    if old_http_proxy_lower is None:
+        os.environ.pop("http_proxy", None)
+    else:
+        os.environ["http_proxy"] = old_http_proxy_lower
+    if old_no_proxy is not None:
+        os.environ["NO_PROXY"] = old_no_proxy
+    proxy_srv.shutdown()
+    origin_srv.shutdown()
+    proxy_srv.server_close()
+    origin_srv.server_close()
 `,
         tmpDir,
       ],

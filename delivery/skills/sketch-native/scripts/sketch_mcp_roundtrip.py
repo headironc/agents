@@ -385,6 +385,23 @@ def _verify_mcp_listener_peer(
         )
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> Any:
+        raise urllib.error.HTTPError(
+            req.full_url,
+            code,
+            f"Refusing HTTP redirect on loopback MCP endpoint: {msg}",
+            headers,
+            fp,
+        )
+
+
+_DIRECT_LOOPBACK_OPENER = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}),
+    _NoRedirectHandler(),
+)
+
+
 class SketchMCPClient:
     """Minimal JSON-RPC 2.0 HTTP/SSE client for Sketch 2026.3 MCP server."""
 
@@ -432,7 +449,7 @@ class SketchMCPClient:
         req = urllib.request.Request(
             self.endpoint, data=raw_body, headers=headers, method="POST"
         )
-        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+        with _DIRECT_LOOPBACK_OPENER.open(req, timeout=self.timeout) as resp:
             sid = resp.headers.get("Mcp-Session-Id") or resp.headers.get("mcp-session-id")
             if sid:
                 self.session_id = sid
@@ -757,6 +774,18 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                             "borders": ((lst.get("value") or {}).get("borders")),
                             "fills": ((lst.get("value") or {}).get("fills")),
                         }
+                for flst in data.get("foreignLayerStyles") or []:
+                    if not isinstance(flst, dict):
+                        continue
+                    local_lst = flst.get("localSharedStyle") or {}
+                    sid = str(local_lst.get("do_objectID", ""))
+                    if sid:
+                        snapshot[f"foreignLayerStyle:{sid}"] = {
+                            "_class": local_lst.get("_class", "sharedStyle"),
+                            "name": local_lst.get("name"),
+                            "borders": ((local_lst.get("value") or {}).get("borders")),
+                            "fills": ((local_lst.get("value") or {}).get("fills")),
+                        }
                 for sw in (data.get("sharedSwatches") or {}).get("objects") or []:
                     if not isinstance(sw, dict):
                         continue
@@ -766,6 +795,17 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                             "_class": sw.get("_class", "swatch"),
                             "name": sw.get("name"),
                             "value": sw.get("value"),
+                        }
+                for fsw in data.get("foreignSwatches") or []:
+                    if not isinstance(fsw, dict):
+                        continue
+                    local_sw = fsw.get("localSwatch") or {}
+                    sw_id = str(local_sw.get("do_objectID", ""))
+                    if sw_id:
+                        snapshot[f"foreignSwatch:{sw_id}"] = {
+                            "_class": local_sw.get("_class", "swatch"),
+                            "name": local_sw.get("name"),
+                            "value": local_sw.get("value"),
                         }
 
             def walk(node: Dict[str, Any], parent_id: Optional[str] = None) -> None:
@@ -777,6 +817,7 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                 ]
                 if oid:
                     frame = node.get("frame") or {}
+                    style = node.get("style") or {}
                     attr_str = node.get("attributedString") or {}
                     attrs = attr_str.get("attributes") or []
                     first_font = (
@@ -817,6 +858,8 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                     snapshot[oid] = {
                         "_class": node.get("_class"),
                         "name": node.get("name"),
+                        "isVisible": bool(node.get("isVisible", True)),
+                        "isLocked": bool(node.get("isLocked", False)),
                         "parentID": parent_id,
                         "childIDs": [
                             str(c.get("do_objectID", "")) for c in children
@@ -830,6 +873,20 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         if frame
                         else None,
                         "groupLayout": node.get("groupLayout"),
+                        "flexItem": node.get("flexItem"),
+                        "clippingBehavior": node.get("clippingBehavior"),
+                        "shouldBreakMaskChain": bool(
+                            node.get("shouldBreakMaskChain", False)
+                        ),
+                        "hasClippingMask": bool(node.get("hasClippingMask", False)),
+                        "textBehaviour": node.get("textBehaviour"),
+                        "resizingConstraint": node.get("resizingConstraint"),
+                        "rotation": round(float(node.get("rotation", 0.0) or 0.0), 4),
+                        "isFlippedHorizontal": bool(
+                            node.get("isFlippedHorizontal", False)
+                        ),
+                        "isFlippedVertical": bool(node.get("isFlippedVertical", False)),
+                        "booleanOperation": node.get("booleanOperation"),
                         "flow": node.get("flow"),
                         "text": attr_str.get("string") if attr_str else None,
                         "fontDescriptor": first_font,
@@ -837,8 +894,12 @@ def _extract_archive_snapshot(sketch_path: Path) -> Dict[str, Dict[str, Any]]:
                         "symbolID": node.get("symbolID"),
                         "sharedStyleID": node.get("sharedStyleID"),
                         "overrideValues": node.get("overrideValues"),
-                        "borders": (node.get("style") or {}).get("borders"),
-                        "fills": (node.get("style") or {}).get("fills"),
+                        "borders": style.get("borders"),
+                        "fills": style.get("fills"),
+                        "shadows": style.get("shadows"),
+                        "innerShadows": style.get("innerShadows"),
+                        "blur": style.get("blur"),
+                        "contextSettings": style.get("contextSettings"),
                     }
                 for child in children:
                     walk(child, oid or parent_id)
