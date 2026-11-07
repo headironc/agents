@@ -552,7 +552,7 @@ def _collect_master_auto_text_paths(
                 if nested_m is not None and eff_sym not in visited:
                     walk_master(nested_m, ch_path, visited | {eff_sym})
             elif ch.get("layers"):
-                walk_master(ch, ch_path, visited)
+                walk_master(ch, prefix, visited)
 
     root_sym_id = str(master.get("symbolID") or master.get("do_objectID") or "")
     walk_master(master, "", {root_sym_id} if root_sym_id else set())
@@ -603,7 +603,7 @@ def _collect_master_static_leaf_intervals(
                 elif ch_h > 0.0:
                     intervals.append((ch_y, ch_h, ch_h))
             elif ch.get("layers"):
-                walk_master(ch, ch_path, ch_y, visited)
+                walk_master(ch, prefix, ch_y, visited)
             elif ch_h > 0.0:
                 intervals.append((ch_y, ch_h, ch_h))
 

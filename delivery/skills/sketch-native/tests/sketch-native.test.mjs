@@ -2436,18 +2436,30 @@ cm._reflow_vertical_flex_group(stretch_row)
 assert stretch_row["frame"]["height"] == 40, stretch_row
 assert stretch_row["layers"][0]["frame"]["height"] == 40, stretch_row["layers"][0]
 
-# Verify SymbolInstance without overrides is collected when its master contains a textBehaviour == 1 text layer
+# Verify SymbolInstance without overrides is collected when its master contains a textBehaviour == 1 text layer inside a Group
 master_with_auto = {
     "_class": "symbolMaster",
     "do_objectID": "m-1",
     "symbolID": "sym-1",
     "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
     "layers": [
-        {"_class": "text", "do_objectID": "mt-1", "isVisible": True, "textBehaviour": 1, "frame": {"x": 0, "y": 0, "width": 200, "height": 20}}
+        {
+            "_class": "group",
+            "do_objectID": "grp-1",
+            "isVisible": True,
+            "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+            "layers": [
+                {"_class": "text", "do_objectID": "mt-1", "isVisible": True, "textBehaviour": 1, "frame": {"x": 0, "y": 0, "width": 200, "height": 20}}
+            ],
+        }
     ],
 }
 auto_paths = cm._collect_master_auto_text_paths(master_with_auto, {"sym-1": master_with_auto}, [])
 assert auto_paths == ["mt-1"], auto_paths
+resolved_grouped = cm._resolve_nested_override_text_layer(master_with_auto, auto_paths[0], {"sym-1": master_with_auto}, [])
+assert resolved_grouped is not None and resolved_grouped[0]["do_objectID"] == "mt-1", resolved_grouped
+static_ivs = cm._collect_master_static_leaf_intervals(master_with_auto, set(auto_paths), {"sym-1": master_with_auto}, [])
+assert static_ivs == [], static_ivs
 `,
         tmpDir,
       ],
