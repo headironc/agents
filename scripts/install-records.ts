@@ -1,8 +1,19 @@
 import path from "node:path";
 import { z } from "zod";
-import { memberCategories, products, publicMembers } from "./delivery.ts";
-import type { Product } from "./delivery.ts";
+import { memberCategories, publicMembers } from "./delivery.ts";
+import {
+  adoptKeyPattern,
+  isLegacyPrivateRun,
+  legacyFileMembers,
+  privateRunDirectory,
+  recordedProducts,
+  validLegacyProductRoots,
+} from "./install-legacy.ts";
+import type { RecordedProduct } from "./install-legacy.ts";
 import { canonicalDigest, SourceEntrySchema } from "./source.ts";
+
+export { adoptKeyPattern, recordedProducts } from "./install-legacy.ts";
+export type { RecordedProduct } from "./install-legacy.ts";
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const decimal = z.string().regex(/^[0-9]+$/);
@@ -23,19 +34,9 @@ const absolutePath = z
   .string()
   .refine(isNormalizedAbsolute, "Expected a normalized absolute path");
 
-// Old plans can name the retired codex-sessions fragment. New selections are checked against the
-// current delivery manifest separately; keeping the record syntax does not publish the fragment.
-export const adoptKeyPattern =
-  /^(?:codex|claude|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|codex-sessions\.toml|rust-lints\.toml))$/;
+export const activeAdoptKeyPattern =
+  /^(?:codex|dsh|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|codex-sessions\.toml|dsh-headless\.patch\.yml|rust-lints\.toml))$/;
 const adoptKey = z.string().regex(adoptKeyPattern);
-
-// These V7 member identities are needed to read old records before dispatching to their runtime.
-// Only the active delivery manifest is used to select targets when creating a plan.
-const retiredV7CodexMembers = [
-  ["policy", "policy/codex-sessions.md"],
-  ["tool", "tools/codex-sessions.mjs"],
-  ["capability", "capability/codex-sessions.toml"],
-] as const;
 
 /** Build outputs and host tool files copied into each persistent runtime. */
 export const installerBuildFiles = [
@@ -76,6 +77,7 @@ const RootSchema = z.strictObject({
       "HOME",
       "CODEX_HOME",
       "CLAUDE_CONFIG_DIR",
+      "DSH_HOME",
       "XDG_STATE_HOME",
       "AGENTS_BACKUP_ROOT",
     ])
@@ -88,6 +90,7 @@ export const InstallRootsSchema = z.strictObject({
   home: RootSchema,
   codex: RootSchema.optional(),
   claude: RootSchema.optional(),
+  dsh: RootSchema.optional(),
   antigravity: RootSchema.optional(),
   state: RootSchema,
   deploy: RootSchema,
@@ -96,8 +99,8 @@ export const InstallRootsSchema = z.strictObject({
 export type InstallRoots = z.infer<typeof InstallRootsSchema>;
 
 /** The recorded roots own the product selection, including legacy dual/triple-product plans. */
-export function installationProducts(roots: InstallRoots): Product[] {
-  return products.filter((product) => roots[product] !== undefined);
+export function installationProducts(roots: InstallRoots): RecordedProduct[] {
+  return recordedProducts.filter((product) => roots[product] !== undefined);
 }
 
 export const TargetStateSchema = z.discriminatedUnion("type", [
@@ -118,7 +121,7 @@ export const InstallTargetSchema = z.strictObject({
   order: z.number().int().nonnegative(),
   kind: z.enum(["file", "directory"]),
   category: z.enum(memberCategories),
-  product: z.enum(products),
+  product: z.enum(recordedProducts),
   key: adoptKey,
   path: absolutePath,
   source: absolutePath,
@@ -204,11 +207,7 @@ export const InstallPlanSchema = z
     if (plan.version === 7) {
       if (!installationProducts(plan.roots).length)
         issue("V7 plans require at least one product root");
-    } else if (
-      !plan.roots.codex ||
-      !plan.roots.claude ||
-      (plan.version === 6) !== (plan.roots.antigravity !== undefined)
-    )
+    } else if (!validLegacyProductRoots(plan.version, plan.roots))
       issue("Legacy product roots must match the plan version");
     if (canonicalDigest(body) !== sha256) issue("Plan digest mismatch");
     if (plan.selectedTargets) {
@@ -233,10 +232,7 @@ export const InstallPlanSchema = z
     )
       issue("Candidate entries must be sorted, unique and bound");
     const run = plan.run;
-    const privateRun =
-      plan.version === 7
-        ? path.join(plan.roots.state.path, "agents/install", run.id)
-        : path.join(plan.roots.codex?.path ?? "", ".agents-install", run.id);
+    const privateRun = privateRunDirectory(plan.version, plan.roots, run.id);
     if (
       run.directory !== path.join(plan.roots.deploy.path, run.id) ||
       run.plan !== path.join(run.directory, "deployment-plan.json") ||
@@ -264,16 +260,12 @@ export const InstallPlanSchema = z
       )
     )
       issue("Adopted keys must be sorted and unique");
-    const fileMembers = publicMembers([]);
-    if (plan.version === 7) {
-      for (const [category, relative] of retiredV7CodexMembers)
-        fileMembers.push({
-          product: "codex",
-          category,
-          relative,
-          source: `delivery/${relative}`,
-        });
-    }
+    const fileMembers: {
+      product: RecordedProduct;
+      category: (typeof memberCategories)[number];
+      relative: string;
+      source: string;
+    }[] = [...publicMembers([]), ...legacyFileMembers(plan.version)];
     plan.targets.forEach((target, index) => {
       const inside = (root: string, file: string) => {
         const relative = path.relative(root, file);
@@ -370,7 +362,7 @@ export function installPathCollisions(
       !path.isAbsolute(relative)
     );
   };
-  const roots = products.flatMap((product) =>
+  const roots = recordedProducts.flatMap((product) =>
     plan.roots[product] ? [plan.roots[product]!.path] : [],
   );
   const protectedPaths = [
@@ -380,10 +372,7 @@ export function installPathCollisions(
     plan.review,
   ];
   const privateRun = path.dirname(plan.run.source);
-  const legacyPrivateRun =
-    plan.roots.codex !== undefined &&
-    path.dirname(privateRun) ===
-      path.join(plan.roots.codex.path, ".agents-install");
+  const legacyPrivateRun = isLegacyPrivateRun(plan.roots, privateRun);
   const collisions: string[] = [];
   for (let index = 0; index < protectedPaths.length; index++)
     for (const other of protectedPaths.slice(index + 1))

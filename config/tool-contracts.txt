@@ -31,5 +31,5 @@ contract	python	runtime	conditional	scripts/skill-validator.py	comment-subject	p
 contract	skill-validation	cli	conditional	scripts/check-skills.ts	comment-subject	skill-validation
 contract	codex-cli-loader	platform-interface	conditional	scripts/check-codex-loader.ts	comment-subject	codex-cli-loader
 contract	codex-cli	cli	conditional	scripts/check-codex-loader.ts	comment-subject	codex-cli
-contract	claude-code	cli	conditional	delivery/policy/claude-code.md	contract-subject	claude-code
+contract	dsh	cli	conditional	delivery/policy/deepseek-harness.md	contract-subject	dsh
 contract	pinned-tool-bootstrap	platform-interface	conditional	scripts/tool-bootstrap.sh	comment-subject	pinned-tool-bootstrap

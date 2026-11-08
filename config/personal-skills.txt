@@ -1,13 +1,13 @@
 # Delivered tool capabilities; generic development tasks need no workflow skill.
-# path<TAB>product list; shared retains its original Codex/Claude scope.
+# path<TAB>product list; shared maps to Codex and DeepSeek Harness (dsh).
 # Nested paths are validation members, not install targets.
 figma-design-workflow	codex
-sketch-native	codex,claude,antigravity
-gh	codex,claude,antigravity
-project-guide	codex,claude,antigravity
-gh-identity	codex,claude,antigravity
-alibabacloud-find-skills	codex,claude,antigravity
-alibabacloud-sms-send-short-message	codex,claude,antigravity
+sketch-native	codex,dsh,antigravity
+gh	codex,dsh,antigravity
+project-guide	codex,dsh,antigravity
+gh-identity	codex,dsh,antigravity
+alibabacloud-find-skills	codex,dsh,antigravity
+alibabacloud-sms-send-short-message	codex,dsh,antigravity
 wechatide	shared
 wechatide/skills/automator	shared
 wechatide/skills/cloudbase-operator	shared

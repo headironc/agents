@@ -67,16 +67,16 @@ function refusal(action: () => unknown) {
   return assert.fail("Expected installation to be refused");
 }
 
-for (const product of ["codex", "claude", "antigravity"] as const) {
+for (const product of ["codex", "dsh", "antigravity"] as const) {
   test(`${product}-only installation and standalone recovery preserve every unselected product`, (t) => {
     const f = installFixture(t, { realRuntime: true, products: [product] });
     const roots = {
       codex: path.join(f.home, ".codex"),
-      claude: path.join(f.home, ".claude"),
+      dsh: path.join(f.home, ".dsh"),
       antigravity: path.join(f.home, ".gemini/antigravity-cli"),
     };
     const selected = roots[product];
-    const unselected = (["codex", "claude", "antigravity"] as const).filter(
+    const unselected = (["codex", "dsh", "antigravity"] as const).filter(
       (name) => name !== product,
     );
     const before = new Map<string, ReturnType<typeof readTargetState>>();
@@ -99,7 +99,7 @@ for (const product of ["codex", "claude", "antigravity"] as const) {
       const original = readTargetState(path.join(selected, "skills/gh"));
       const environment =
         product === "codex"
-          ? { CLAUDE_CONFIG_DIR: "invalid-unselected-claude" }
+          ? { DSH_HOME: "invalid-unselected-dsh" }
           : { CODEX_HOME: "invalid-unselected-codex" };
       const unchanged = () => {
         for (const name of unselected)
@@ -191,7 +191,7 @@ for (const product of ["codex", "claude", "antigravity"] as const) {
     }
     for (const target of plan.targets)
       assert.equal(existsSync(target.path), false, target.path);
-    for (const name of ["codex", "claude", "antigravity"] as const)
+    for (const name of ["codex", "dsh", "antigravity"] as const)
       if (name !== product)
         assert.equal(
           existsSync(
@@ -213,11 +213,8 @@ for (const product of ["codex", "claude", "antigravity"] as const) {
 for (const version of [5, 6] as const)
   test(`V${version} plans retain their original roots, records and recovery layout`, (t) => {
     const f = installFixture(t, {
-      realRuntime: true,
       products:
-        version === 5
-          ? ["codex", "claude"]
-          : ["codex", "claude", "antigravity"],
+        version === 5 ? ["codex", "dsh"] : ["codex", "dsh", "antigravity"],
     });
     const { plan, review } = legacyPlan(f.planned(), version);
     const original = readFileSync(plan.run.plan);
@@ -257,8 +254,9 @@ for (const version of [5, 6] as const)
   });
 
 test("retired Codex targets remain recoverable from a V7 record", (t) => {
-  const f = installFixture(t, { realRuntime: true, products: ["codex"] });
+  const f = installFixture(t, { products: ["codex"] });
   const members = [
+    ["policy", "policy/claude-code.md"],
     ["policy", "policy/codex-sessions.md"],
     ["tool", "tools/codex-sessions.mjs"],
     ["capability", "capability/codex-sessions.toml"],
@@ -343,13 +341,12 @@ test("retired Codex targets remain recoverable from a V7 record", (t) => {
 
 test("five selected files install and roll back from a Codex worktree without changing unselected targets", (t) => {
   const f = installFixture(t, {
-    realRuntime: true,
     worktree: ".codex/worktrees/fixture/agents",
   });
   const names = [
     "README.md",
     "policy/models.md",
-    "policy/claude-code.md",
+    "policy/deepseek-harness.md",
     "policy/antigravity.md",
     "AGENTS.md",
   ];
@@ -363,7 +360,7 @@ test("five selected files install and roll back from a Codex worktree without ch
   }
   const unselected = [
     path.join(codex, "skills/wechatide"),
-    path.join(f.home, ".claude/skills/wechatide"),
+    path.join(f.home, ".dsh/skills/wechatide"),
   ];
   for (const directory of unselected) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -415,16 +412,16 @@ test("five selected files install and roll back from a Codex worktree without ch
 });
 
 test("selected review files and complete skills preserve other targets through refusal, apply and rollback", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const keys = [
     "codex:gh",
     "codex:policy/review.md",
-    "claude:gh",
-    "claude:policy/review.md",
+    "dsh:gh",
+    "dsh:policy/review.md",
   ];
   const originals = new Map<string, ReturnType<typeof readTargetState>>();
   const untouched: string[] = [];
-  for (const product of ["codex", "claude"]) {
+  for (const product of ["codex", "dsh"]) {
     const root = path.join(f.home, `.${product}`);
     const gh = path.join(root, "skills/gh");
     cpSync(path.join(f.checkout, "delivery/skills/gh"), gh, {
@@ -458,7 +455,7 @@ test("selected review files and complete skills preserve other targets through r
     plan.targets.filter((target) => target.kind === "directory").length,
     2,
   );
-  const drift = path.join(f.home, ".claude/skills/gh/new-owner.txt");
+  const drift = path.join(f.home, ".dsh/skills/gh/new-owner.txt");
   writeFileSync(drift, "third party\n");
   assert.equal(f.cli(["apply", "--plan", review]).status, 1);
   assert.equal(existsSync(plan.run.receipt), false);
@@ -490,7 +487,7 @@ test("selected review files and complete skills preserve other targets through r
 });
 
 test("explicit products apply, read back and restore Antigravity without touching App settings or unlisted skills", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const root = path.join(f.home, ".gemini/antigravity-cli");
   const existing = path.join(root, "skills/gh");
   mkdirSync(existing, { recursive: true });
@@ -503,7 +500,7 @@ test("explicit products apply, read back and restore Antigravity without touchin
     "--product",
     "codex",
     "--product",
-    "claude",
+    "dsh",
     "--product",
     "antigravity",
     "--adopt",
@@ -549,7 +546,7 @@ test("a late Antigravity failure restores all three products", (t) => {
     "--product",
     "codex",
     "--product",
-    "claude",
+    "dsh",
     "--product",
     "antigravity",
   ]);
@@ -574,12 +571,12 @@ test("a late Antigravity failure restores all three products", (t) => {
 });
 
 test("rollback retains third-party Antigravity changes and restores other selected products", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const { plan, review } = f.planned([
     "--product",
     "codex",
     "--product",
-    "claude",
+    "dsh",
     "--product",
     "antigravity",
   ]);
@@ -598,7 +595,7 @@ test("rollback retains third-party Antigravity changes and restores other select
     assert.equal(existsSync(member.path), false);
 });
 
-for (const product of ["codex", "claude", "antigravity"] as const)
+for (const product of ["codex", "dsh", "antigravity"] as const)
   test(`status preserves a recorded ${product} root identity failure even when installed bytes match`, (t) => {
     const f = installFixture(t);
     const root = path.join(
@@ -610,7 +607,7 @@ for (const product of ["codex", "claude", "antigravity"] as const)
       "--product",
       "codex",
       "--product",
-      "claude",
+      "dsh",
       "--product",
       "antigravity",
     ]);
@@ -674,7 +671,7 @@ test("a real runtime installs files and directories directly, then rolls back", 
 });
 
 test("skill directories retain source modes under a restrictive umask", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const relative = "delivery/skills/alibabacloud-find-skills";
   chmodSync(path.join(f.checkout, relative), 0o755);
   chmodSync(path.join(f.checkout, relative, "references"), 0o755);
@@ -693,7 +690,7 @@ test("skill directories retain source modes under a restrictive umask", (t) => {
 });
 
 test("adopted personal instructions are backed up and restored", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const target = path.join(f.home, ".codex/AGENTS.md");
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, "personal rules\n");
@@ -708,7 +705,7 @@ test("adopted personal instructions are backed up and restored", (t) => {
 });
 
 test("a target changed after planning stops apply without overwriting it", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const { review } = f.planned();
   const target = path.join(f.home, ".codex/AGENTS.md");
   mkdirSync(path.dirname(target), { recursive: true });
@@ -734,9 +731,9 @@ test("an added member in a frozen skill blocks apply before any target changes",
   assert.equal(existsSync(path.join(f.home, ".codex/AGENTS.md")), false);
 });
 
-test("a late Claude failure restores both products and only its own empty directories", (t) => {
+test("a late DeepSeek Harness failure restores both products and only its own empty directories", (t) => {
   const f = installFixture(t);
-  const skills = path.join(f.home, ".claude/skills");
+  const skills = path.join(f.home, ".dsh/skills");
   mkdirSync(skills, { recursive: true });
   writeFileSync(path.join(skills, "unrelated"), "keep\n");
   const { review, plan } = f.planned();
@@ -772,7 +769,7 @@ test("V4 plans are rejected by the current installer", (t) => {
 });
 
 test("verification reports a changed installed target", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const { review, plan } = f.planned();
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
   const target = path.join(f.home, ".codex/AGENTS.md");
@@ -860,11 +857,11 @@ test("rollback refuses receipt bindings changed after installation", (t) => {
   assert.equal(readFileSync(adopted, "utf8"), "personal policy\n");
 });
 
-test("rollback preserves Claude drift while restoring Codex and can later finish", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+test("rollback preserves DeepSeek Harness drift while restoring Codex and can later finish", (t) => {
+  const f = installFixture(t);
   const { review, plan } = f.planned();
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
-  const target = path.join(f.home, ".claude/policy/review.md");
+  const target = path.join(f.home, ".dsh/policy/review.md");
   const installed = readFileSync(target);
   const installedMode = lstatSync(target).mode & 0o7777;
   unlinkSync(target);
@@ -1022,7 +1019,7 @@ test("an interrupted receipt missing a step cannot claim complete recovery", (t)
 });
 
 test("status reports the exact verified installation of both products", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const { review, plan } = f.planned();
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
   const status = outcome(f.cli(["status"]));
@@ -1034,7 +1031,7 @@ test("status reports the exact verified installation of both products", (t) => {
 });
 
 test("status identifies an installed uncommitted candidate by its digest", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   f.put("delivery/AGENTS.md", "uncommitted rules\n", 0o600);
   f.writeReport();
   const { review, plan } = f.planned();
@@ -1088,7 +1085,7 @@ test("the frozen runtime applies and recovers after its source checkout is remov
   rmSync(f.checkout, { recursive: true, force: true });
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
   rmSync(plan.run.source, { recursive: true, force: true });
-  for (const product of ["codex", "claude"]) {
+  for (const product of ["codex", "dsh"]) {
     for (const relative of [
       "skills/gh/SKILL.md",
       "skills/wechatide/skills/project-config/SKILL.md",
@@ -1116,7 +1113,7 @@ test("the frozen runtime applies and recovers after its source checkout is remov
 });
 
 test("an old snapshot link requires adoption and becomes independent of its source", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const previous = path.join(f.deploy, "20260927T000000000Z-aaaaaaaaaaaa");
   const previousSource = path.join(previous, "source");
   mkdirSync(previous, { recursive: true });
@@ -1198,7 +1195,7 @@ test("an old snapshot link requires adoption and becomes independent of its sour
 });
 
 test("an adopted skill directory restores its full tree and keeps unlisted siblings", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const skillsRoot = path.join(f.home, ".codex/skills");
   const target = path.join(skillsRoot, "gh");
   mkdirSync(path.join(target, "references"), { recursive: true });
@@ -1236,7 +1233,7 @@ test("an adopted skill directory restores its full tree and keeps unlisted sibli
 });
 
 test("status reports unsupported receipt versions as indeterminate", (t) => {
-  const f = installFixture(t, { realRuntime: true });
+  const f = installFixture(t);
   const { review, plan } = f.planned();
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
   const bytes = JSON.parse(readFileSync(plan.run.receipt, "utf8"));
@@ -1257,64 +1254,120 @@ test("status reports unsupported receipt versions as indeterminate", (t) => {
   assert.deepEqual(status.unreadable, [plan.run.receipt]);
 });
 
-test("Claude receives only skills and their dependencies and preserves product configuration", (t) => {
-  const f = installFixture(t);
+test("DeepSeek Harness receives its supported rules, capabilities, tools and skills while preserving user files and repeat upgrades", (t) => {
+  const f = installFixture(t, { products: ["dsh"] });
   const personal = [
-    "CLAUDE.md",
-    "AGENTS.md",
-    "settings.json",
-    "policy/models.md",
-    "policy/rust.md",
-    "policy/sql.md",
-    "policy/claude-code.md",
-    "capability/codex.toml",
+    ".credentials.yaml",
+    ".anonymous-user-id",
+    "profiles/headless/cordis.patch.yml",
+    "sessions/session-1.json",
+    "storages/state.db",
+    "attachments/file.txt",
     "skills/unlisted/SKILL.md",
   ];
   for (const relative of personal) {
-    const target = path.join(f.home, ".claude", relative);
+    const target = path.join(f.home, ".dsh", relative);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, `personal: ${relative}\n`);
   }
   const { review, plan } = f.planned();
   assert.equal(applyInstallPlan(review, { HOME: f.home }).status, "installed");
   assert.ok(
+    plan.targets.some(
+      (target) =>
+        target.product === "dsh" &&
+        target.category === "instructions" &&
+        target.path === path.join(f.home, ".dsh/AGENTS.md"),
+    ),
+  );
+  assert.ok(
+    plan.targets.some(
+      (target) =>
+        target.product === "dsh" &&
+        target.category === "capability" &&
+        target.path ===
+          path.join(f.home, ".dsh/capability/dsh-headless.patch.yml"),
+    ),
+  );
+  assert.ok(
     !plan.targets.some(
       (target) =>
-        target.product === "claude" &&
-        ["instructions", "capability", "guide"].includes(target.category),
+        target.product === "dsh" &&
+        (target.category === "guide" ||
+          target.path.endsWith("/policy/antigravity.md") ||
+          target.path.endsWith("/capability/codex.toml") ||
+          target.path.endsWith("/skills/figma-design-workflow")),
     ),
   );
   for (const relative of personal)
     assert.equal(
-      readFileSync(path.join(f.home, ".claude", relative), "utf8"),
+      readFileSync(path.join(f.home, ".dsh", relative), "utf8"),
       `personal: ${relative}\n`,
     );
+
+  // Repeat install of the same candidate produces all-unchanged targets without adoption.
+  const repeat = f.planned();
+  assert.ok(
+    repeat.plan.targets.every((target) => target.action === "unchanged"),
+  );
+  assert.equal(
+    applyInstallPlan(repeat.review, { HOME: f.home }).status,
+    "installed",
+  );
+
+  // Upgrading after a rule change requires explicit adoption and preserves personal files.
+  f.put("delivery/AGENTS.md", "# Upgraded DeepSeek Harness rules\n", 0o600);
+  f.writeReport();
+  assert.ok(
+    f
+      .gaps(f.plan())
+      .some(
+        (gap) => gap.code === "adopt-required" && gap.key === "dsh:AGENTS.md",
+      ),
+  );
+  const upgraded = f.planned(["--adopt", "dsh:AGENTS.md"]);
+  assert.equal(
+    applyInstallPlan(upgraded.review, { HOME: f.home }).status,
+    "installed",
+  );
+  assert.equal(
+    readFileSync(path.join(f.home, ".dsh/AGENTS.md"), "utf8"),
+    "# Upgraded DeepSeek Harness rules\n",
+  );
+  for (const relative of personal)
+    assert.equal(
+      readFileSync(path.join(f.home, ".dsh", relative), "utf8"),
+      `personal: ${relative}\n`,
+    );
+  assert.equal(
+    rollbackInstallation(upgraded.plan.run.receipt, { HOME: f.home }).status,
+    "rolled-back",
+  );
   assert.equal(
     rollbackInstallation(plan.run.receipt, { HOME: f.home }).status,
     "rolled-back",
   );
   for (const relative of personal)
     assert.equal(
-      readFileSync(path.join(f.home, ".claude", relative), "utf8"),
+      readFileSync(path.join(f.home, ".dsh", relative), "utf8"),
       `personal: ${relative}\n`,
     );
 });
 
-test("Claude root or target drift refuses apply before changing either product", (t) => {
+test("DeepSeek Harness root or target drift refuses apply before changing either product", (t) => {
   const f = installFixture(t);
   const { review, plan } = f.planned();
   assert.ok(
     refusal(() =>
       applyInstallPlan(review, {
         HOME: f.home,
-        CLAUDE_CONFIG_DIR: path.join(f.home, "elsewhere"),
+        DSH_HOME: path.join(f.home, "elsewhere"),
       }),
     ).some(
-      (problem) =>
-        problem.code === "roots-changed" && problem.root === "claude",
+      (problem) => problem.code === "roots-changed" && problem.root === "dsh",
     ),
   );
-  const target = path.join(f.home, ".claude/skills/gh");
+  const target = path.join(f.home, ".dsh/skills/gh");
   mkdirSync(target, { recursive: true });
   writeFileSync(path.join(target, "new-owner.txt"), "retain\n");
   assert.ok(

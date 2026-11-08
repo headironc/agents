@@ -212,7 +212,7 @@ export async function checkSpecs(
       ],
       ["node", "js-yaml"],
     );
-    for (const product of ["codex", "claude", "antigravity"] as const)
+    for (const product of ["codex", "dsh", "antigravity"] as const)
       if (selectSkillEntries(entries, product).length)
         add(
           skillValidationName(entries, product),

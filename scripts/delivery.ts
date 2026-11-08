@@ -10,11 +10,12 @@ export const memberCategories = [
   "skill",
 ] as const;
 
-export const products = ["codex", "claude", "antigravity"] as const;
+export const products = ["codex", "dsh", "antigravity"] as const;
 export type Product = (typeof products)[number];
 export const darwinOnlySkills = new Set(["sketch-native"]);
 const sharedPolicies = ["writing", "tool-contracts", "review"];
-const codexPolicies = ["rust", "sql", "models", "claude-code", "antigravity"];
+const agentPolicies = ["rust", "sql", "models", "deepseek-harness"];
+const codexOnlyPolicies = ["antigravity"];
 // Deployed executables a consuming project runs directly, published beside the rules they enforce.
 // Kept in name order, so a new entry lands in one place and the plan stays comparable.
 const tools: [string, string][] = [
@@ -28,6 +29,12 @@ const tools: [string, string][] = [
 const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
   ["codex.toml", "delivery/capability/codex.toml"],
+  ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
+  ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+];
+const dshCapability: [string, string][] = [
+  ["README.md", "delivery/capability/README.md"],
+  ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
 ];
 
@@ -74,7 +81,8 @@ export function publicMembers(
   for (const product of products) {
     for (const name of [
       ...sharedPolicies,
-      ...(product === "codex" ? codexPolicies : []),
+      ...(product === "codex" || product === "dsh" ? agentPolicies : []),
+      ...(product === "codex" ? codexOnlyPolicies : []),
     ])
       members.push({
         category: "policy",
@@ -97,12 +105,20 @@ export function publicMembers(
       relative: `capability/${name}`,
       source,
     });
-  members.push({
-    category: "instructions",
-    product: "codex",
-    relative: "AGENTS.md",
-    source: "delivery/AGENTS.md",
-  });
+  for (const [name, source] of dshCapability)
+    members.push({
+      category: "capability",
+      product: "dsh",
+      relative: `capability/${name}`,
+      source,
+    });
+  for (const product of ["codex", "dsh"] as const)
+    members.push({
+      category: "instructions",
+      product,
+      relative: "AGENTS.md",
+      source: "delivery/AGENTS.md",
+    });
   for (const product of products)
     for (const name of skills(product)) {
       members.push({

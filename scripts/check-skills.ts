@@ -125,9 +125,10 @@ export function validateSkills(
         );
       return;
     }
+    const validatorProduct = product === "dsh" ? "claude" : product;
     const result = z
       .strictObject({
-        product: z.literal(product),
+        product: z.literal(validatorProduct),
         validated: z.number().int().positive(),
       })
       .parse(
@@ -139,7 +140,7 @@ export function validateSkills(
               "-B",
               path.join(toolsRoot, "scripts/skill-validator.py"),
               "validate",
-              product,
+              validatorProduct,
               ...directories,
             ],
             temporary,
@@ -176,7 +177,7 @@ export function skillCheckNames(entries: SkillEntry[]): string[] {
     (product) => selectSkillEntries(entries, product).length,
   );
   return [
-    `Skill membership: ${entries.length === 0 ? "NOT_DELIVERED" : "DELIVERED"}; Codex ${counts[0]}, Claude ${counts[1]}, Antigravity ${counts[2]}`,
+    `Skill membership: ${entries.length === 0 ? "NOT_DELIVERED" : "DELIVERED"}; Codex ${counts[0]}, DeepSeek Harness ${counts[1]}, Antigravity ${counts[2]}`,
     ...products.flatMap((product, index) =>
       counts[index] ? [skillValidationName(entries, product)] : [],
     ),
@@ -187,7 +188,7 @@ export function skillValidationName(
   entries: SkillEntry[],
   product: Product,
 ): string {
-  return `${{ codex: "Codex", claude: "Claude", antigravity: "Antigravity" }[product]} skill validation: ${selectSkillEntries(entries, product).length} entries`;
+  return `${{ codex: "Codex", dsh: "DeepSeek Harness", antigravity: "Antigravity" }[product]} skill validation: ${selectSkillEntries(entries, product).length} entries`;
 }
 
 if (
@@ -205,7 +206,7 @@ if (
     ) {
       process.exitCode = 2;
       throw new Error(
-        "Usage: node scripts/check-skills.ts membership DIGEST | codex | claude | antigravity",
+        "Usage: node scripts/check-skills.ts membership DIGEST | codex | dsh | antigravity",
       );
     }
     if (mode === "membership") {

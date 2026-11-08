@@ -73,9 +73,12 @@ export const requiredRepositoryPaths = [
   "delivery/tools/check-prose.mjs",
   "delivery/tools/check-ids.mjs",
   "delivery/tools/task-temp.mjs",
-  ...["README.md", "codex.toml", "rust-lints.toml"].map(
-    (name) => `delivery/capability/${name}`,
-  ),
+  ...[
+    "README.md",
+    "codex.toml",
+    "dsh-headless.patch.yml",
+    "rust-lints.toml",
+  ].map((name) => `delivery/capability/${name}`),
   ...[
     "personal-skills",
     "tool-inventory",
@@ -86,7 +89,7 @@ export const requiredRepositoryPaths = [
   "delivery/policy/writing.md",
   "delivery/policy/models.md",
   "delivery/policy/review.md",
-  "delivery/policy/claude-code.md",
+  "delivery/policy/deepseek-harness.md",
   "delivery/policy/antigravity.md",
   "delivery/skills/figma-design-workflow/SKILL.md",
   "delivery/skills/sketch-native/SKILL.md",
@@ -111,6 +114,7 @@ export const requiredRepositoryPaths = [
   ...[
     "install.sh",
     "install.ts",
+    "install-legacy.ts",
     "install-records.ts",
     "install-state.ts",
     "install-apply.ts",

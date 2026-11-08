@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -22,11 +22,13 @@ import path from "node:path";
 import type { TestContext } from "node:test";
 import type { Product } from "../../scripts/delivery.ts";
 import { CheckReportSchema } from "../../scripts/check-report.ts";
+import { runInstallCli } from "../../scripts/install.ts";
 import { InstallPlanSchema } from "../../scripts/install-records.ts";
 import type { InstallPlan } from "../../scripts/install-records.ts";
 import {
   canonicalDigest,
   listSourcePaths,
+  readSourceEntries,
   readSourceIdentity,
 } from "../../scripts/source.ts";
 import { fixtureEnvironment, repositoryRoot } from "../validation/fixtures.ts";
@@ -43,7 +45,7 @@ export const skills = {
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "wechatide",
   ],
-  claude: [
+  dsh: [
     "alibabacloud-find-skills",
     "alibabacloud-sms-send-short-message",
     "gh",
@@ -68,15 +70,30 @@ export const policies = [
   "rust",
   "sql",
   "models",
-  "claude-code",
+  "deepseek-harness",
   "antigravity",
 ];
-export const claudePolicies = ["writing", "tool-contracts", "review"];
+export const dshPolicies = [
+  "writing",
+  "tool-contracts",
+  "review",
+  "rust",
+  "sql",
+  "models",
+  "deepseek-harness",
+];
+export const antigravityPolicies = ["writing", "tool-contracts", "review"];
 export const tools = ["check-ids.mjs", "check-prose.mjs", "task-temp.mjs"];
 // The capability category, written out here the way the installation target table names it.
 export const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
   ["codex.toml", "delivery/capability/codex.toml"],
+  ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
+  ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+];
+export const dshCapability: [string, string][] = [
+  ["README.md", "delivery/capability/README.md"],
+  ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
 ];
 export const runtimeInputs = [
@@ -92,8 +109,8 @@ export function expectedTargets(
   home: string,
   snapshot: string,
   codex = `${home}/.codex`,
-  claude = `${home}/.claude`,
-  selected: Product[] = ["codex", "claude"],
+  dsh = `${home}/.dsh`,
+  selected: Product[] = ["codex", "dsh"],
 ): [string, string][] {
   const pair = (target: string, link: string): [string, string] => [
     target,
@@ -118,19 +135,23 @@ export function expectedTargets(
     ...skills.codex.map((name) =>
       pair(`${codex}/skills/${name}`, `${snapshot}/delivery/skills/${name}`),
     ),
-    ...claudePolicies.map((name) =>
+    ...dshPolicies.map((name) =>
       pair(
-        `${claude}/policy/${name}.md`,
+        `${dsh}/policy/${name}.md`,
         `${snapshot}/delivery/policy/${name}.md`,
       ),
     ),
     ...tools.map((name) =>
-      pair(`${claude}/tools/${name}`, `${snapshot}/delivery/tools/${name}`),
+      pair(`${dsh}/tools/${name}`, `${snapshot}/delivery/tools/${name}`),
     ),
-    ...skills.claude.map((name) =>
-      pair(`${claude}/skills/${name}`, `${snapshot}/delivery/skills/${name}`),
+    ...dshCapability.map(([name, source]) =>
+      pair(`${dsh}/capability/${name}`, `${snapshot}/${source}`),
     ),
-    ...claudePolicies.map((name) =>
+    pair(`${dsh}/AGENTS.md`, `${snapshot}/delivery/AGENTS.md`),
+    ...skills.dsh.map((name) =>
+      pair(`${dsh}/skills/${name}`, `${snapshot}/delivery/skills/${name}`),
+    ),
+    ...antigravityPolicies.map((name) =>
       pair(
         `${antigravity}/policy/${name}.md`,
         `${snapshot}/delivery/policy/${name}.md`,
@@ -149,7 +170,7 @@ export function expectedTargets(
       ),
     ),
   ];
-  const roots = { codex, claude, antigravity };
+  const roots = { codex, dsh, antigravity };
   return all.filter(([target]) =>
     selected.some((product) => target.startsWith(`${roots[product]}/`)),
   );
@@ -164,68 +185,102 @@ export function link(target: string, file: string): void {
   symlinkSync(target, file);
 }
 
-/** A committed checkout, passing report and temporary HOME; the fake runtime only answers the plan probes. */
-export function installFixture(
-  t: TestContext,
-  options: {
-    realRuntime?: boolean;
-    home?: string;
-    worktree?: string;
-    products?: Product[];
-  } = {},
-) {
+const gitArguments = [
+  "-c",
+  "user.name=Fixture",
+  "-c",
+  "user.email=fixture@example.invalid",
+  "-c",
+  "commit.gpgsign=false",
+  "-c",
+  "core.hooksPath=/dev/null",
+];
+
+function createReport(
+  checkout: string,
+  overrides: Record<string, unknown> = {},
+  inputs = runtimeInputs,
+): string {
+  const closure = {
+    name: "Installer build closure",
+    exitCode: 0,
+    signal: null,
+    durationMs: 1,
+    diagnostic: "",
+    passed: true,
+  };
+  const report = {
+    version: 1,
+    source: readSourceIdentity(checkout, [
+      ...listSourcePaths(checkout),
+      ...inputs,
+    ]),
+    checker: "0".repeat(64),
+    groups: ["repository", "ci", "docs"],
+    planned: [closure.name],
+    results: [closure],
+    tools: {},
+    platform: {
+      os: process.platform,
+      arch: process.arch,
+      node: process.versions.node,
+    },
+    errors: [],
+    passed: true,
+    ...overrides,
+  };
+  return JSON.stringify(CheckReportSchema.parse(report));
+}
+
+const fixtureTemplates = new Map<
+  boolean,
+  { checkout: string; report: string }
+>();
+
+function fixtureTemplate(realRuntime: boolean): {
+  checkout: string;
+  report: string;
+} {
+  const cached = fixtureTemplates.get(realRuntime);
+  if (cached) return cached;
   const base = realpathSync(
-    mkdtempSync(path.join(os.tmpdir(), "agents-install-")),
+    mkdtempSync(path.join(os.tmpdir(), "agents-install-template-")),
   );
-  t.after(() => rmSync(base, { recursive: true, force: true }));
-  let checkout = path.join(base, "checkout");
-  const home = path.join(base, options.home ?? "home");
-  const outputs = path.join(base, "outputs");
-  for (const item of [checkout, home, outputs]) directory(item);
+  process.once("exit", () => rmSync(base, { recursive: true, force: true }));
+  const stage = path.join(base, "stage");
+  const checkout = path.join(base, "checkout");
+  directory(stage);
   const environment = fixtureEnvironment();
   const git = (...args: string[]) =>
-    execFileSync(
-      "git",
-      [
-        "-c",
-        "user.name=Fixture",
-        "-c",
-        "user.email=fixture@example.invalid",
-        "-c",
-        "commit.gpgsign=false",
-        "-c",
-        "core.hooksPath=/dev/null",
-        ...args,
-      ],
-      {
-        cwd: checkout,
-        env: environment,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
+    execFileSync("git", [...gitArguments, ...args], {
+      cwd: stage,
+      env: environment,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   git("init", "--quiet");
   // Keep background maintenance from recreating pack directories during fixture cleanup.
   git("config", "gc.auto", "0");
   git("config", "maintenance.auto", "false");
   for (const file of [".gitignore", "config/personal-skills.txt", "delivery"]) {
-    cpSync(path.join(repositoryRoot, file), path.join(checkout, file), {
+    cpSync(path.join(repositoryRoot, file), path.join(stage, file), {
       recursive: true,
+      mode: constants.COPYFILE_FICLONE,
     });
   }
   git("add", "--all");
   git("commit", "--quiet", "-m", "fixture");
   const put = (file: string, bytes: string | Buffer, mode: number) => {
-    directory(path.dirname(path.join(checkout, file)));
-    writeFileSync(path.join(checkout, file), bytes);
-    chmodSync(path.join(checkout, file), mode);
+    directory(path.dirname(path.join(stage, file)));
+    writeFileSync(path.join(stage, file), bytes);
+    chmodSync(path.join(stage, file), mode);
   };
-  if (options.realRuntime) {
-    directory(path.join(checkout, ".cache/agents-tools/bin"));
+  if (realRuntime) {
+    directory(path.join(stage, ".cache/agents-tools/bin"));
     // Copy across read-only container mounts without a symlinked source input.
     copyFileSync(
       process.execPath,
-      path.join(checkout, ".cache/agents-tools/bin/node"),
+      path.join(stage, ".cache/agents-tools/bin/node"),
       constants.COPYFILE_FICLONE,
     );
     for (const file of runtimeInputs.slice(1))
@@ -252,6 +307,52 @@ export function installFixture(
       0o600,
     );
   }
+  cpSync(stage, checkout, {
+    recursive: true,
+    mode: constants.COPYFILE_FICLONE,
+  });
+  rmSync(stage, { recursive: true, force: true });
+  const created = { checkout, report: createReport(checkout) };
+  fixtureTemplates.set(realRuntime, created);
+  return created;
+}
+
+/** A committed checkout, passing report and temporary HOME; the fake runtime only answers the plan probes. */
+export function installFixture(
+  t: TestContext,
+  options: {
+    realRuntime?: boolean;
+    home?: string;
+    worktree?: string;
+    products?: Product[];
+  } = {},
+) {
+  const base = realpathSync(
+    mkdtempSync(path.join(os.tmpdir(), "agents-install-")),
+  );
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  let checkout = path.join(base, "checkout");
+  const home = path.join(base, options.home ?? "home");
+  const outputs = path.join(base, "outputs");
+  for (const item of [home, outputs]) directory(item);
+  const template = fixtureTemplate(Boolean(options.realRuntime));
+  cpSync(template.checkout, checkout, {
+    recursive: true,
+    mode: constants.COPYFILE_FICLONE,
+  });
+  const environment = fixtureEnvironment();
+  const git = (...args: string[]) =>
+    execFileSync("git", [...gitArguments, ...args], {
+      cwd: checkout,
+      env: environment,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  const put = (file: string, bytes: string | Buffer, mode: number) => {
+    directory(path.dirname(path.join(checkout, file)));
+    writeFileSync(path.join(checkout, file), bytes);
+    chmodSync(path.join(checkout, file), mode);
+  };
   if (options.worktree) {
     const linked = path.join(home, options.worktree);
     directory(path.dirname(linked));
@@ -267,47 +368,17 @@ export function installFixture(
     overrides: Record<string, unknown> = {},
     inputs = runtimeInputs,
   ) => {
-    const closure = {
-      name: "Installer build closure",
-      exitCode: 0,
-      signal: null,
-      durationMs: 1,
-      diagnostic: "",
-      passed: true,
-    };
-    const report = {
-      version: 1,
-      source: readSourceIdentity(checkout, [
-        ...listSourcePaths(checkout),
-        ...inputs,
-      ]),
-      checker: "0".repeat(64),
-      groups: ["repository", "ci", "docs"],
-      planned: [closure.name],
-      results: [closure],
-      tools: {},
-      platform: {
-        os: process.platform,
-        arch: process.arch,
-        node: process.versions.node,
-      },
-      errors: [],
-      passed: true,
-      ...overrides,
-    };
-    writeFileSync(reportPath, JSON.stringify(CheckReportSchema.parse(report)));
+    writeFileSync(reportPath, createReport(checkout, overrides, inputs));
   };
-  writeReport();
+  if (options.worktree) writeReport();
+  else writeFileSync(reportPath, template.report);
   let count = 0;
   const cli = (args: string[], env: NodeJS.ProcessEnv = {}) =>
-    spawnSync(
-      process.execPath,
-      [path.join(repositoryRoot, "scripts/install.ts"), ...args],
-      {
-        env: { PATH: process.env.PATH, HOME: home, ...env },
-        encoding: "utf8",
-        timeout: 60_000,
-      },
+    runInstallCli(
+      args,
+      { PATH: process.env.PATH, HOME: home, ...env },
+      true,
+      Boolean(options.realRuntime),
     );
   const plan = (
     extra: string[] = [],
@@ -322,7 +393,7 @@ export function installFixture(
         // Existing two-product cases explicitly request both; CLI tests bypass this helper.
         ...(extra.includes("--product")
           ? []
-          : (options.products ?? ["codex", "claude"]).flatMap((product) => [
+          : (options.products ?? ["codex", "dsh"]).flatMap((product) => [
               "--product",
               product,
             ])),
@@ -400,19 +471,90 @@ export function legacyPlan(
   version: 5 | 6,
 ): { plan: InstallPlan; review: string } {
   const plan = structuredClone(prepared.plan);
-  assert.ok(plan.roots.codex && plan.roots.claude);
+  assert.ok(plan.roots.codex && plan.roots.dsh);
   assert.equal(plan.roots.antigravity !== undefined, version === 6);
+  const codexRoot = plan.roots.codex;
+  const dshPath = plan.roots.dsh.path;
+  const claudePath = dshPath.replace(/\/\.dsh$/, "/.claude");
+  if (exists(dshPath) && !exists(claudePath)) renameSync(dshPath, claudePath);
+  plan.roots = {
+    home: plan.roots.home,
+    codex: codexRoot,
+    claude: {
+      ...plan.roots.dsh,
+      path: claudePath,
+      variable:
+        plan.roots.dsh.variable === "DSH_HOME" ? "CLAUDE_CONFIG_DIR" : null,
+    },
+    ...(plan.roots.antigravity ? { antigravity: plan.roots.antigravity } : {}),
+    state: plan.roots.state,
+    deploy: plan.roots.deploy,
+    backup: plan.roots.backup,
+  };
+  const legacyClaudePolicies = new Set([
+    "policy/writing.md",
+    "policy/tool-contracts.md",
+    "policy/review.md",
+  ]);
+  plan.targets = plan.targets
+    .flatMap((target) => {
+      if (target.product === "codex") {
+        if (target.key === "codex:capability/dsh-headless.patch.yml") return [];
+        if (target.key === "codex:policy/deepseek-harness.md") {
+          return [
+            {
+              ...target,
+              key: "codex:policy/claude-code.md",
+              path: path.join(codexRoot.path, "policy/claude-code.md"),
+              source: path.join(
+                plan.run.source,
+                "delivery/policy/claude-code.md",
+              ),
+            },
+          ];
+        }
+        return [target];
+      }
+      if (target.product !== "dsh") return [target];
+      const relative = target.path.slice(dshPath.length + 1);
+      if (
+        target.category !== "skill" &&
+        target.category !== "tool" &&
+        !legacyClaudePolicies.has(relative)
+      )
+        return [];
+      return [
+        {
+          ...target,
+          product: "claude" as const,
+          key: target.key.replace(/^dsh:/, "claude:"),
+          path: path.join(claudePath, relative),
+        },
+      ];
+    })
+    .map((target, order) => ({
+      ...target,
+      order,
+      backup:
+        target.backup === null
+          ? null
+          : path.join(plan.roots.backup.path, plan.run.id, String(order)),
+    }));
   const previous = path.dirname(plan.run.source);
-  const privateRun = path.join(
-    plan.roots.codex.path,
-    ".agents-install",
-    plan.run.id,
-  );
+  const privateRun = path.join(codexRoot.path, ".agents-install", plan.run.id);
   directory(path.dirname(privateRun));
   renameSync(previous, privateRun);
   plan.version = version;
   plan.run.source = path.join(privateRun, "source");
   plan.run.runtime = path.join(privateRun, "runtime");
+  renameSync(
+    path.join(plan.run.source, "delivery/policy/deepseek-harness.md"),
+    path.join(plan.run.source, "delivery/policy/claude-code.md"),
+  );
+  rmSync(
+    path.join(plan.run.source, "delivery/capability/dsh-headless.patch.yml"),
+    { force: true },
+  );
   for (const file of plan.runtime.files)
     file.path = path.join(plan.run.runtime, path.basename(file.path));
   for (const target of plan.targets)
@@ -420,7 +562,33 @@ export function legacyPlan(
       privateRun,
       path.relative(previous, target.source),
     );
-  plan.newDirectories = plan.newDirectories.filter((file) => !exists(file));
+  plan.candidate.entries = readSourceEntries(
+    plan.run.source,
+    plan.candidate.entries
+      .map((entry) =>
+        entry.path === "delivery/policy/deepseek-harness.md"
+          ? "delivery/policy/claude-code.md"
+          : entry.path,
+      )
+      .filter(
+        (entryPath) =>
+          entryPath !== "delivery/capability/dsh-headless.patch.yml",
+      ),
+  );
+  plan.candidate.sha256 = canonicalDigest(plan.candidate.entries);
+  plan.newDirectories = [
+    ...new Set(
+      plan.newDirectories
+        .filter((file) => file !== path.join(dshPath, "capability"))
+        .map((file) =>
+          file === dshPath || file.startsWith(`${dshPath}/`)
+            ? path.join(claudePath, file.slice(dshPath.length))
+            : file,
+        ),
+    ),
+  ]
+    .filter((file) => !exists(file))
+    .sort();
   const { sha256: _digest, ...body } = plan;
   plan.sha256 = canonicalDigest(body);
   InstallPlanSchema.parse(plan);

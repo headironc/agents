@@ -7,14 +7,14 @@ import { readSourceEntries } from "./source.ts";
 // Require delivered tool capabilities and their intended products.
 const requiredSkills = [
   { path: "figma-design-workflow", target: "codex" },
-  { path: "sketch-native", target: "codex,claude,antigravity" },
-  { path: "gh", target: "codex,claude,antigravity" },
-  { path: "project-guide", target: "codex,claude,antigravity" },
-  { path: "gh-identity", target: "codex,claude,antigravity" },
-  { path: "alibabacloud-find-skills", target: "codex,claude,antigravity" },
+  { path: "sketch-native", target: "codex,dsh,antigravity" },
+  { path: "gh", target: "codex,dsh,antigravity" },
+  { path: "project-guide", target: "codex,dsh,antigravity" },
+  { path: "gh-identity", target: "codex,dsh,antigravity" },
+  { path: "alibabacloud-find-skills", target: "codex,dsh,antigravity" },
   {
     path: "alibabacloud-sms-send-short-message",
-    target: "codex,claude,antigravity",
+    target: "codex,dsh,antigravity",
   },
   { path: "wechatide", target: "shared" },
   { path: "wechatide/skills/automator", target: "shared" },
@@ -37,7 +37,7 @@ const EntrySchema = z
     z.string().refine((value) => {
       if (value === "shared") return true;
       const selected = value.split(",");
-      const allowed = ["codex", "claude", "antigravity"];
+      const allowed = ["codex", "dsh", "antigravity"];
       return (
         selected.length > 0 &&
         new Set(selected).size === selected.length &&
@@ -61,15 +61,13 @@ const FrontmatterSchema = z.looseObject({
 /** Select a product's delivered entries after common membership validation. */
 export function selectSkillEntries(
   entries: SkillEntry[],
-  product: "codex" | "claude" | "antigravity",
+  product: "codex" | "dsh" | "antigravity",
 ): SkillEntry[] {
   return entries.filter((entry) => skillProducts(entry).includes(product));
 }
 
 export function skillProducts(entry: Pick<SkillEntry, "target">): string[] {
-  return entry.target === "shared"
-    ? ["codex", "claude"]
-    : entry.target.split(",");
+  return entry.target === "shared" ? ["codex", "dsh"] : entry.target.split(",");
 }
 
 /** Enumerate all candidate skill assets, including ignored files; reject links and special files. */

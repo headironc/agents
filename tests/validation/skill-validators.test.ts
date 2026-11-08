@@ -43,7 +43,7 @@ test("official Antigravity validator checks skills without installation or sourc
   assert.throws(() => validateSkills("antigravity", []), /Empty/);
 });
 
-for (const product of ["codex", "claude"] as const)
+for (const product of ["codex", "dsh"] as const)
   test(`pinned ${product} validator accepts a valid skill and rejects an unsupported field`, (t) => {
     const f = fixtureRepository(t);
     const directory = path.join(f.directory, "delivery/skills/probe");
@@ -79,7 +79,7 @@ test("real product validation covers parent and nested child without changing so
     readFileSync(path.join(f.directory, file)),
   );
   validateSkillProduct(f.directory, "codex");
-  validateSkillProduct(f.directory, "claude");
+  validateSkillProduct(f.directory, "dsh");
   for (const [index, file] of paths.entries())
     assert.deepEqual(readFileSync(path.join(f.directory, file)), before[index]);
 });
@@ -178,7 +178,7 @@ with patch('os.getuid', return_value=65534), patch.object(Path, 'stat', supervis
 
 test("shared failures block each product while exclusive failures stay in their product", (t) => {
   const f = fixtureRepository(t);
-  f.putSkillManifest("probe\tshared\nexclusive\tcodex\nclaude-only\tclaude\n");
+  f.putSkillManifest("probe\tshared\nexclusive\tcodex\ndsh-only\tdsh\n");
   const valid = skill("probe");
   const invalid = valid.replace(
     "name: probe",
@@ -186,20 +186,20 @@ test("shared failures block each product while exclusive failures stay in their 
   );
   f.put("delivery/skills/probe/SKILL.md", invalid);
   f.put("delivery/skills/exclusive/SKILL.md", skill("exclusive"));
-  // Anthropic accepts compatibility; the pinned Codex validator rejects it.
-  const claudeOnly = skill("claude-only").replace(
-    "name: claude-only",
-    "name: claude-only\ncompatibility: Claude Code",
+  // The pinned Agent Skills validator accepts compatibility; the pinned Codex validator rejects it.
+  const dshOnly = skill("dsh-only").replace(
+    "name: dsh-only",
+    "name: dsh-only\ncompatibility: DeepSeek Harness",
   );
-  f.put("delivery/skills/claude-only/SKILL.md", claudeOnly);
-  for (const product of ["codex", "claude"] as const)
+  f.put("delivery/skills/dsh-only/SKILL.md", dshOnly);
+  for (const product of ["codex", "dsh"] as const)
     assert.throws(
       () => validateSkillProduct(f.directory, product),
       /probe:.*unsupported-field/,
     );
   f.put("delivery/skills/probe/SKILL.md", valid);
   validateSkillProduct(f.directory, "codex");
-  validateSkillProduct(f.directory, "claude");
+  validateSkillProduct(f.directory, "dsh");
   f.put(
     "delivery/skills/exclusive/SKILL.md",
     skill("exclusive").replace(
@@ -207,19 +207,19 @@ test("shared failures block each product while exclusive failures stay in their 
       "name: exclusive\nunsupported-field: true",
     ),
   );
-  validateSkillProduct(f.directory, "claude");
+  validateSkillProduct(f.directory, "dsh");
   assert.throws(
     () => validateSkillProduct(f.directory, "codex"),
     /exclusive:.*unsupported-field/,
   );
   f.put("delivery/skills/exclusive/SKILL.md", skill("exclusive"));
   f.put(
-    "delivery/skills/claude-only/SKILL.md",
-    claudeOnly.replace("Claude Code", "x".repeat(501)),
+    "delivery/skills/dsh-only/SKILL.md",
+    dshOnly.replace("DeepSeek Harness", "x".repeat(501)),
   );
   validateSkillProduct(f.directory, "codex");
   assert.throws(
-    () => validateSkillProduct(f.directory, "claude"),
+    () => validateSkillProduct(f.directory, "dsh"),
     /Compatibility is too long/,
   );
 });
@@ -235,7 +235,7 @@ test("invalid nested shared skill blocks both validators", (t) => {
       "name: child\nunsupported-field: true",
     ),
   );
-  for (const product of ["codex", "claude"] as const)
+  for (const product of ["codex", "dsh"] as const)
     assert.throws(
       () => validateSkillProduct(f.directory, product),
       /child:.*unsupported-field/,
