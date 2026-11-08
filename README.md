@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Codex 规则与专业偏好 | [Codex 规则](delivery/AGENTS.md)、[写作规范](delivery/policy/writing.md)、[Rust](delivery/policy/rust.md)、[SQL](delivery/policy/sql.md) | 专业偏好由项目明确采用 |
 | 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 采用快慢三级路由（`Architect/Debugger`、`Coder/Reviewer` 日常 `low` 档位、`Runner/Explorer` 极速 `low` 档位）与 150K Token 上下文护栏；开发设备由 Human 明确选择，普通单会话任务直接完成，多切片任务通过 `progress.md` / `spec.md` 锚点推进；能力与限制见[使用说明](docs/usage.md#mac-与-dev-的结果回传)及[验证边界](docs/usage.md#验证能说明什么) |
-| 总协调启动提示词 | [通用模板与 Nucleus 使用约定](docs/prompts/coordinator.md) | 明确启用后，总协调保持极简上下文（目标 `<50K Token`）负责拆分、派发、跟进和精简证据接纳，执行会话默认按 `Sol low` 高速完成编码验证与 PR，实现多切片全自动连续推进；普通文档，不安装 |
+| 总协调启动提示词 | [通用启动模板](docs/prompts/coordinator.md) | 明确启用后，总协调保持极简上下文（目标 `<50K Token`）负责拆分、派发、跟进和精简证据接纳，执行会话默认按 `Sol low` 高速完成编码验证与 PR，实现多切片全自动连续推进；普通文档，不安装 |
 | 本机协作提醒 | [使用与恢复](docs/usage.md#本机协作提醒) | 本机可选配置，独立于源码交付；启用状态与授权按实际环境核对 |
 | DeepSeek Harness (`dsh`) 委派与调用 | [分工与授权](delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](delivery/policy/deepseek-harness.md) | 按任务与能力适配选用（连接本合同定义的 OpenCode Go 或 DeepSeek 官方路由，日常默认 `deepseek-v4.1-flash` 显式 `low` 档位）；提供无密钥 `headless` 凭据与路由片段 [`dsh-headless.patch.yml`](delivery/capability/dsh-headless.patch.yml)；负责人判断与验收；未接入 CI 或审查关卡 |
 | 设计稿与看图验收 | [figma-design-workflow](delivery/skills/figma-design-workflow/SKILL.md)、[sketch-native](delivery/skills/sketch-native/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Figma 工作流为 Codex 专用，Sketch 原生技能限 macOS 安装与运行；保留可编辑结果与真实像素验收；历史实测范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
@@ -53,7 +53,7 @@
 | 检查执行与报告 | [check.ts](scripts/check.ts)、[check-report.ts](scripts/check-report.ts)、`check-*.ts` | 本地 `check.sh` 与安装计划 |
 | 安装命令与计划 | [install.ts](scripts/install.ts) | `install.sh` 与独立安装器产物 |
 | 安装执行与恢复 | [install-apply.ts](scripts/install-apply.ts)、[install-current.ts](scripts/install-current.ts) | 安装命令与状态查询 |
-| 安装记录与目标状态 | [install-records.ts](scripts/install-records.ts)、[install-state.ts](scripts/install-state.ts) | 安装计划、执行、验证与恢复 |
+| 安装记录与目标状态 | [install-records.ts](scripts/install-records.ts)、[install-legacy.ts](scripts/install-legacy.ts)、[install-state.ts](scripts/install-state.ts) | 安装计划、执行、验证、恢复及历史 V5/V6 回执兼容 |
 | 源码快照与身份 | [source.ts](scripts/source.ts) | 检查报告、成员校验与安装计划 |
 | 产物构建与工具准备 | [bundle-tools.ts](scripts/bundle-tools.ts)、[build-install.ts](scripts/build-install.ts)、[install-tools.sh](scripts/install-tools.sh) | 交付检查器、独立安装器与本地门禁 |
 
@@ -67,7 +67,6 @@
 | --- | --- |
 | [使用指南](docs/usage.md) | 交付目录、技能闭包、安装目标与恢复合同 |
 | [工具说明](docs/tooling.md) | 工具准备、完整门禁及源码身份 |
-| [目标、授权与任务协作架构](docs/task-architecture.md) | 架构提案、内容归属、迁移与可逆试用；规则实施另选切片 |
 | [静态场景](tests/scenarios/rules.md) | 从规则推导的行为预期，区别于真实模型测试 |
 | [技能来源](docs/skill-sources.md) | 上游身份、许可、采用范围及历史设计入口 |
 | [安装快照过渡](docs/usage.md#既有安装快照过渡) | 既有安装来源和新版切换限制 |
@@ -78,9 +77,7 @@
 
 ## 已知验证边界
 
-WechatIDE 的入口与本地回归已交付。此前真实 DevTools 仅验证客户端授权与只读状态。编译、诊断、预览、上传尚无实测证据。项目列表、自动化及云端操作也未实测。安装诊断脚本已有本机只读运行记录，具体来源见[登记](docs/skill-sources.md#wechatide-installer-inputs)。
-
-文档检查器已包含在源码中。英文正文中的中文引用仍可能因括号或引号漏检，当前由人工复核。写作规范已要求保留必要引文。项目语言配置仍未交付。供检查器识别引用的显式协议也未交付。现行调用方式仍以工具契约为准。
+各技能与检查工具的实测范围及剩余限制统一由[使用指南验证边界](docs/usage.md#验证能说明什么)、[工具说明](docs/tooling.md)和[来源登记](docs/skill-sources.md)维护（例如 WechatIDE 实测仅覆盖客户端授权、只读状态与本机安装诊断；文档检查器对英文正文内带括号或引号的中文引文仍需人工复核）。
 
 ## 执行记录
 

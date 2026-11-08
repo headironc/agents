@@ -90,36 +90,12 @@
 
 ## 微信项目配置、DevTools 初始化、编译、诊断、预览、项目列表、自动化、云开发与安装诊断
 
-[wechatide](../delivery/skills/wechatide/SKILL.md) 从[实际交付索引](../delivery/skills/wechatide/references/capabilities.md)选择子入口，并核验其返回。
+[wechatide](../delivery/skills/wechatide/SKILL.md) 从[实际交付索引](../delivery/skills/wechatide/references/capabilities.md)路由九个子入口并核验返回：
 
-[project-config](../delivery/skills/wechatide/skills/project-config/SKILL.md) 读取并合并修改本地配置。它不启动 DevTools，也不登录或调用 CLI。项目 hooks 也不运行。字段与 private/common 规则由[配置参考](../delivery/skills/wechatide/skills/project-config/references/fields.md)持有。风险仍按修改语义判断。
+- **本地配置与安装诊断（无需启动 DevTools）**：[project-config](../delivery/skills/wechatide/skills/project-config/SKILL.md) 按[字段规则](../delivery/skills/wechatide/skills/project-config/references/fields.md)读取与合并本地 JSON 配置，不触发项目 hooks；[installer](../delivery/skills/wechatide/skills/installer/SKILL.md) 仅在执行器报 `cli-unavailable` / `cli-unbound` 或用户明确询问安装状态时调用只读 `check-install.mjs`，诊断十二类安装与 `PATH` 状态，不自动下载、安装或修改 `PATH`。
+- **DevTools CLI 执行与业务子入口（仅限 macOS）**：[initializer](../delivery/skills/wechatide/skills/initializer/SKILL.md)、[compiler](../delivery/skills/wechatide/skills/compiler/SKILL.md)、[debugger](../delivery/skills/wechatide/skills/debugger/SKILL.md)、[previewer](../delivery/skills/wechatide/skills/previewer/SKILL.md)、[project-manager](../delivery/skills/wechatide/skills/project-manager/SKILL.md)、[automator](../delivery/skills/wechatide/skills/automator/SKILL.md) 与 [cloudbase-operator](../delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md) 统一经[调用执行器](../delivery/skills/wechatide/scripts/call.sh)与 [CLI 合同](../delivery/skills/wechatide/references/cli.md)（适配 DevTools `2.02.2610302` / 技能 `0.3.15` skill-call 路线，固定客户端名 `ClaudeCode`、`Codex`，不读取钥匙串或注入 Token；登录与客户端授权按[异步任务](../delivery/skills/wechatide/references/tasks.md)有界轮询）。对外发布（`upload`、`share_minicode`）、运行态改动（`automation_wx_api`、`debug_clear_cache`、`automation_evaluate`）及六项云开发写操作均须用户针对具体目标单独确认；未知写结果先读回核实，不盲目重发。
 
-[initializer](../delivery/skills/wechatide/skills/initializer/SKILL.md) 只在 macOS 上工作。它查询状态、扫码登录、开关项目窗口。它还列出 AppID，读取运行时信息。明确要求时它才退出 DevTools。所有操作经[调用执行器](../delivery/skills/wechatide/scripts/call.sh)，按 [CLI 合同](../delivery/skills/wechatide/references/cli.md)完成首次状态检查。执行器只接受已交付操作和固定客户端名 `ClaudeCode`、`Codex`。当前合同适配 DevTools 2.02.2610302 的 skill-call 路线，技能版本为 0.3.15。执行器不读取钥匙串，也不传入 Token。既有钥匙串项保持原样。客户端授权仍由 DevTools 检查。
-
-DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现 `MCP_TOKEN_AUTH_ERROR` 则报告路线或兼容异常并停止。不索取、保存或注入 Token，也不回退认证、切换入口或自动升级应用。版本检查返回 `skip_check` 或 `agent_behind` 时也停止。版本相等不代表行为验收通过。登录与客户端授权按[异步任务](../delivery/skills/wechatide/references/tasks.md)有界轮询。二维码出现不等于登录成功。
-
-[compiler](../delivery/skills/wechatide/skills/compiler/SKILL.md) 打开指定页面、刷新模拟器、构建 npm。它也只读获取单个 WXML/WXSS 的编译摘要。开窗由 initializer 负责。触发成功不等于编译通过。单文件摘要只覆盖局部，且仅适用小程序页面。`build_npm` 会写本地产物，只在任务要求或失败指向缺少构建时执行。刷新后仍有异常，交给 debugger 取证。证据包括 console、network 和截图。
-
-[debugger](../delivery/skills/wechatide/skills/debugger/SKILL.md) 在已开窗的项目上取证。console 与 network 按 grep 表达式过滤。截图统一用 `simulator_screenshot`。它还可读取运行时信息。`automation_wx_api` 的调用与 mock、`debug_clear_cache` 的清理都会改变运行中的项目。这些属于改动而非诊断，必须有本人要求或确认。mock 未恢复时如实报告。空的过滤结果只说明没有匹配行。刷新与重新编译属 compiler，带着现象交回调用方。
-
-[previewer](../delivery/skills/wechatide/skills/previewer/SKILL.md) 把预览直接推送到开发者微信，用 `auto_preview`。它也能生成预览二维码，用 `create_preview_qrcode`，默认新窗口展示。两者无需先开项目窗口，但需要已登录账号。`upload` 上传代码包、发布体验版，是对外发布的写操作。它只在本人明确要求「上传代码」或「发布体验版」时执行。版本号取自要求而非猜测。预览确认与上传返回的 pendingTask 不主动轮询。只提示在 DevTools 内确认。重发前先查原 taskId。超时或结果未知时如实报告，不重发。
-
-[project-manager](../delivery/skills/wechatide/skills/project-manager/SKILL.md) 管理项目列表与代码片段。两类操作均不开 DevTools 窗口。`project_list` 只读列出已导入项目，默认 `miniprogram`，可用 `--scope other` 或 `all`。`project_import` 把本地目录加入列表，并像开窗一样校验路径、配置与 AppID。`project_remove` 只删列表项、不动磁盘，并会关闭该项目已开的窗口。`share_minicode` 把项目代码上传到微信，返回任何持有者都能导入的链接。它属于对外发布，只在本人明确要求分享该项目时执行。`import_minicode` 把链接指向的代码下载到 DevTools 选定的目录并登记。导入的代码视为未审查。先检查配置，包括 `scripts` hooks。还要检查依赖脚本、可执行代码、网络与文件操作。再由本人决定是否开窗或编译。从零创建项目不是已交付流程。目录与最小文件属普通源码工作。配置交 project-config。本入口只负责最后的导入。
-
-[automator](../delivery/skills/wechatide/skills/automator/SKILL.md) 在已开窗的项目上做页面自动化。它先按项目类型分流。小程序用 `automation_navigate`、`automation_element_action`、`automation_page_action` 与 `automation_viewport_action --action pageScrollTo`。元素操作的 selector 与视口坐标二选一。页面操作里 getData 与 querySelector 为读。setData 与 callMethod 为改。小游戏只用 `automation_game_action` 与 `automation_evaluate`。画布用画布坐标，或用 `--coordinate-space image` 配截图返回的宽高。交互成功只说明已派发。每条断言必须有证据。可用元素读取、page data 或运行时返回值。截图路径也可作证据。`automation_evaluate` 会执行代码。函数必须由本人提供或认可。取证用的只读表达式也可运行，且必须报告源码。换测试号、刷新 ticket 与真机调试只在明确要求时执行。被拒即停。`automation_generate_script` 生成的脚本审查后交给本人。安装 `miniprogram-automator` 与运行属普通源码工作。截图统一用 `simulator_screenshot`，关窗交 initializer。
-
-[cloudbase-operator](../delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md) 管理云开发资源。它无需开窗，支持读取和写入。AppID 只来自用户或上游已确认事实。对 `cloud_env_list`、`cloud_fn_list`、`cloud_fn_info` 也可用 `--project` 从该项目配置解析，并报告确认。`--env` 只来自用户、已确认事实或 `cloud_env_list` 的返回。多环境时让用户选，禁止自动挑。目标不明确时先读后写。云函数走 `cloud_fn_list` → `cloud_fn_info`。数据库走 `cloud_db_read_struct` → `cloud_db_read_doc`。存储走 `cloud_query_storage` 的 `list`/`info`。消息推送走 `cloud_query_msg_push --action list`。六个写操作每次必须针对该 AppID、环境与目标单独确认：
-
-- 云函数的完整部署与增量部署
-- 库结构修改与文档修改
-- 存储的 upload 与 delete
-- 消息推送管理
-
-一次确认不覆盖下一次。拒绝或确认超时即停。删除存储目录先列出前缀内容，再确认精确 `--cloud-path`。文档 update/delete 不发空 `--query`。部署有依赖时带 `--remote-npm-install`。同一 (MsgType, Event) 只绑一个云函数。subscribe 会替换原函数。事件名取自 `listSupportedEvents`。云托管的 `ensureContainerMode` 与 `setContainerCallback` 不交付。遇到这类请求，报告未交付。再指向 DevTools 云开发控制台。临时下载链接会过期，只在当前任务内使用。不要把它写进源码、文档、提交或记忆。部分成功原样保留返回结构。结果未知先用读操作核实，不重发。
-
-[installer](../delivery/skills/wechatide/skills/installer/SKILL.md) 只诊断本机安装。它不登记任何 DevTools 操作。因此它不走执行器，也不需要客户端授权与就绪检查。执行器报 `cli-unavailable` 或 `cli-unbound` 时才进。本人问是否装了开发者工具时也进。日常业务前不跑。`node SKILL_ROOT/skills/installer/scripts/check-install.mjs` 输出一个 JSON。`reason` 区分十二种结论。未安装、NW.js 版、缺运行时标记各一种。版本不可读、版本不可比、版本过低各一种。缺 CLI、CLI 自身 help 失败各一种。PATH 无命令、PATH 指向应用包外各一种。还有一种是被查目录兼容，但 PATH 指向另一个应用包。`executorCode` 说明它解释的是哪一条执行器拒绝，且只由 PATH 决定。PATH 上有应用包内的 CLI 时，即使结论失败也不带该字段。这时用 `pathInstallRoot` 指出真正会跑的安装。`remedy` 写本人要做什么，脚本自己从不做。版本门槛优先从已安装目录读取。读不到才用仓库记录值，并以 `minimumVersionSource: recorded` 声明可能落后上游。默认路径查不到时，先用 `--install-root` 复查再下结论。下载、安装、更新与补 PATH 软链都不在交付内。`cli_not_on_path` 报告可用绝对路径，并说明补 PATH 属本人的工作。不自建软链，也不因此重装。`cli_unbound` 先报告 PATH 上那个文件是什么，再由本人决定。要装要更新只给官方下载页。不拼链接，不替本人选渠道架构版本。
-
-九个子入口保持原有能力范围。上游 0.3.15 新增的 simulator 入口及四个操作尚未交付。未登记名称仍被执行器拒绝。包括 CLI 别名和两个废弃的 project_setting。它们的 pendingTask 保留身份，不查询也不重发。十个入口均为验证成员，安装成员只有顶层 wechatide。来源和边界见[来源记录](skill-sources.md#wechatide)。静态预期见九个场景小节：
+十个入口均为验证成员，安装成员只有顶层 `wechatide`（上游 `0.3.15` 新增的 `simulator` 入口及未登记别名仍拒绝）。来源与实测边界见[来源记录](skill-sources.md#wechatide)（本机已实测客户端授权、只读状态、云开发 `-h` 与 `check-install.mjs`，其余开窗、编译、自动化、预览上传与云端读写由离线假 CLI 回归与下列静态场景覆盖）：
 
 - [本地配置](../tests/scenarios/rules.md#wechatide-顶层与本地配置)
 - [初始化](../tests/scenarios/rules.md#wechatide-devtools-初始化)
@@ -130,8 +106,6 @@ DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现
 - [自动化](../tests/scenarios/rules.md#wechatide-页面自动化)
 - [云开发](../tests/scenarios/rules.md#wechatide-云开发)
 - [安装诊断](../tests/scenarios/rules.md#wechatide-安装诊断)
-
-执行器测试使用假 CLI 和假钥匙串。安装诊断测试使用合成安装目录。2026-09-18 在 Mac 上使用真实 DevTools。实测覆盖客户端授权和只读状态检查。升级至 Nightly 2.02.2609182 后复测。`versionRelation` 仍为 `equal`。2026-09-19 又在同一台 Mac 上复测。云开发操作的 `-h` 逐个核对。`versionRelation` 仍为 `equal`。尚未实测开窗、登录、AppID、运行时信息和退出。编译、诊断、预览、上传也未实测。项目列表、自动化和任何云端读写同样未实测。安装诊断脚本在本机真实跑过，返回 `compatible: true`，门槛取自已安装目录。它不安装也不改动任何东西。源码验证不表示个人配置已安装。
 
 ## 阿里云技能发现
 
@@ -331,11 +305,7 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 
 首次两次会话受嵌套沙箱启动错误阻挡，未执行命令。重测从正常宿主启动 CLI，仍保留 workspace 沙箱。worktree 移除和部分本地 Git 更新被沙箱拒绝。模型保留受阻资源并报告原因，完整删除路径尚未验证。服务端模型身份也未独立核实。原始失败、重测轨迹及资源回读保留在任务验收记录。本轮 fixture 最后由测试负责人清除，该结果不作为模型自动清理成功的证据。
 
-2026-10-23 在 dev 上通过当前网关运行 Claude Code 2.1.309，完成调用合同、使用说明和对应场景的有界编辑及原有文档检查。请求模型和响应标识均为 `deepseek-v4.1-flash`，请求 effort 为 low，CLI、子进程环境与临时 settings 对齐。实际使用 Read 和 Bash，通过 apply_patch 修改三个限定文件。进程退出码为 0，结果 `is_error` 为 false；负责人读取原始运行与差异后接纳。进程枚举曾被 dontAsk 拒绝，该限制保留在原始报告中。此记录只覆盖该次执行，不证明实际上游身份、服务端有效 effort、完整场景行为或现有客户端已加载新合同。
-
-[设计工作流](../delivery/skills/figma-design-workflow/SKILL.md)从已授权设计实践提炼。当前模型与 effort 由[模型政策](../delivery/policy/models.md#current-defaults)维护。技能绑定材料、目标、可编辑结果与真实像素验收。Figma 按需使用。显式选用 DeepSeek Harness (`dsh`) 或 Design 插件时，再适用对应合同。负责人亲自核对实际预览。请求模型、客户端设置与实际运行身份分别报告。
-
-来源实践使用 Claude Code 请求 DeepSeek；历史成功调用请求 effort 为 low，响应标识为 `deepseek-flash`。日志包含实际 `design:design-critique` 调用与 PNG 读取，评审也曾误读颜色、图片类型和文字布局。主代理核实后筛选修正。这些历史观察不证明独立审查或服务端有效档位。来源范围见[技能来源](skill-sources.md#figma-design-workflow)。
+[设计工作流](../delivery/skills/figma-design-workflow/SKILL.md)从已授权设计实践提炼（早期来源见[技能来源](skill-sources.md#figma-design-workflow)）。当前模型与 effort 由[模型政策](../delivery/policy/models.md#current-defaults)维护。技能绑定材料、目标、可编辑结果与真实像素验收。Figma 按需使用。显式选用 DeepSeek Harness (`dsh`) 或 Design 插件时，再适用对应合同。负责人亲自核对实际预览。请求模型、客户端设置与实际运行身份分别报告。
 
 2026-10-28 的一次合成协调页演练通过官方 OpenCode Go 请求 DeepSeek 和 `max`。实际调用了 Figma 与 Design 技能，生成原生可编辑稿。长标题经真实替换、检查后还原。Terra 与主责读取同版完整画面。辅助发现由主责核实、回交修复，再核对最终节点与持久预览。Design critique 记录为制作模型的自查。
 
@@ -343,7 +313,7 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 
 [工具门禁](tooling.md#选择检查)会将非忽略的新 Markdown 文件纳入显式检查集合。它检查机器路径、格式、本地链接和锚点。`all` 还运行源码检查、契约绑定、技能成员、工具打包新鲜度、发布形态引用、固定产品验证器、隔离安装回归及无模型 Codex 加载检查。加载检查确认隔离候选的指令和技能目录进入 CLI 输入。它也核对模型政策入口及隔离文件的字节一致性。这不证明模型读取了按需正文、实际切换模型或遵循规则，也不证明个人安装已加载。语义遗漏仍须依据场景和适用审查核对。
 
-技能候选只从仓库清单与源码读取。清单是 [personal-skills.txt](../config/personal-skills.txt)，不从个人 HOME 读取已安装技能。各产品入口数量由当前清单实时推导。每个顶层成员只安装一次，wechatide 的九个嵌套入口随顶层包交付并参与验证。删除清单行、必需引用、执行器或随技能测试均不能绕过完整门禁。共享与专用技能按[技能格式校验合同](tooling.md#技能格式校验)执行对应官方验证器。当前入口数量见[安装目标](#安装目标与接管)。格式校验不代表 Claude CLI 加载或模型使用已验证。
+技能候选只从仓库清单与源码读取。清单是 [personal-skills.txt](../config/personal-skills.txt)，不从个人 HOME 读取已安装技能。各产品入口数量由当前清单实时推导。每个顶层成员只安装一次，wechatide 的九个嵌套入口随顶层包交付并参与验证。删除清单行、必需引用、执行器或随技能测试均不能绕过完整门禁。共享与专用技能按[技能格式校验合同](tooling.md#技能格式校验)执行对应官方验证器。当前入口数量见[安装目标](#安装目标与接管)。格式校验不代表各客户端加载或模型使用已验证。
 
 本地审查路线没有本仓库交付的执行器，门禁也不启动任何模型。场景只静态核对规则文本。门禁证据不覆盖实际审查者行为。CLI 服务兼容性与评审者资格也不在其中。
 

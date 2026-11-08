@@ -11,7 +11,7 @@ metadata:
 
 `sketch-native` generates, mutates, exports, and verifies `.sketch` documents for Sketch 2026.3+. It combines offline archives, CoreText measurement, and serialized native MCP checks. Execution is macOS-only: other platforms skip installation, and measurement fails closed without CoreText. The workflow incorporates Sketch's official `sketch-hq/agents` skills and built-in `MCPGuides`.
 
-The same skill directory is delivered to Codex, Claude Code, and Antigravity CLI on macOS. Resolve script and reference paths from this installed directory. Antigravity CLI discovers it under `~/.gemini/antigravity-cli/skills/sketch-native/`; installation does not register MCP servers or configure Sketch. Native MCP operations require the local Sketch endpoint to be available.
+The same skill directory is delivered to Codex, DeepSeek Harness, and Antigravity CLI on macOS. Resolve script and reference paths from this installed directory. Antigravity CLI discovers it under `~/.gemini/antigravity-cli/skills/sketch-native/`; installation does not register MCP servers or configure Sketch. Native MCP operations require the local Sketch endpoint to be available.
 
 For detailed `.sketch` archive JSON structures (`MSImmutableFlexGroupLayout`, `textBehaviour`, `CTFontRegularUsage`, `overrideValues`, `flow`, and `swatchID` bindings), read [`references/sketch-json-schema.md`](references/sketch-json-schema.md).
 
