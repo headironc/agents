@@ -84,7 +84,7 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
 - **Permitted in JS `run_code`**:
   1. Read top-level document and page counts only: `doc.id`, `doc.pages.length`, per-page top-level `page.layers.length`, `doc.swatches.length`, `doc.sharedTextStyles.length`, and `doc.sharedLayerStyles.length`.
   2. Locate `1–3` target layers by known UUID on a known page (or via `sketch.find('#<uuid>', targetPage)`), apply targeted property/override/focus-border mutations, and call `doc.processPendingChanges()`. Submit one save for the bound working-copy path and wait for its matching completion receipt.
-  3. After confirmed successful saving, rebind the live document through the exact copy path, capture targeted screenshots via `get_screenshot` (`artboard_id` or `layer_id`), and close that document once. Verify closure before offline diffing or reopening.
+  3. After confirmed successful saving, rebind the live document through the exact copy path, capture targeted screenshots via `get_screenshot` with `targetDocumentID` and `layerID`, and close that document once. Verify closure before offline diffing or reopening.
 - **Offline Full-Document Diffing**: Compare `frame` coordinates, `MSImmutableFlexGroupLayout` stacks, `HotSpot` layers, prototype `flow` links, and font descriptors in Python via `zipfile` after saving and closure are confirmed. A successful save callback alone does not prove persisted mutation, screenshot equality, or absence of unexpected drift; verify those on the saved archive and after reopening.
 
 ### Rule 3: CoreText Line-Height Parity (`0 px` `NATIVE-LAYOUT-HOTSPOT-DESYNC`)
@@ -122,6 +122,7 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
   - `Accept: application/json, text/event-stream`
   - Pass back `Mcp-Session-Id` when returned by the server on `initialize`.
 - **Response Framing**: The endpoint may respond with `application/json` or `text/event-stream` (`data: {...}` SSE lines). Always parse both content types.
+- **Complete tool results**: The roundtrip client accepts one JSON object log, including Sketch's single-quoted console representation, or a structured object result. It rejects mixed, duplicate, or conflicting result blocks rather than extracting a success fragment. Screenshots may be inline PNG data or the documented temporary-file message; the client validates the complete response and reads only bounded, regular, current-user-owned PNG files under the system temporary directory without following links. PNG framing checks do not replace visual inspection of the captured image.
 
 ### Built-In Sketch 2026.3 MCP Tools
 
@@ -131,7 +132,7 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
 | `get_layer_tree_summary` | `page_id` or `artboard_id`, `depth` (`1..10`, default `3`) | Inspect bounded layer hierarchy natively without creating JSC wrapper storms. |
 | `get_design_assets` | `asset_types` (`colorVariables`, `textStyles`, `layerStyles`, `symbols`) | Inspect local and library tokens/styles before creating duplicates. |
 | `get_symbol_overrides` | `layer_id` | Inspect override slots and `commonOverrideIDPrefix` on a `SymbolInstance`. |
-| `get_screenshot` | `artboard_id` or `layer_id`, `scale` | Render live canvas PNG for a specific artboard or layer. |
+| `get_screenshot` | `targetDocumentID`, `layerID` | Render live canvas PNG for the explicitly bound document and layer. |
 | `run_code` | `{"title": "...", "script": "..."}` | Execute JS in Sketch context. Parameter key is **`script`** (never `code`). Return JSON via `console.log(JSON.stringify(...))`. |
 
 ### `run_code` Parser and Execution Rules (from Sketch 2026.3 `MCPGuides` & `sketch-hq/agents`)

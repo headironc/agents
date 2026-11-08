@@ -25,6 +25,7 @@ Executes the verification protocol against `http://localhost:31126/mcp`:
 from __future__ import annotations
 
 import argparse
+import ast
 import base64
 import hashlib
 import http.client
@@ -714,8 +715,8 @@ def _build_direct_loopback_opener(
 class MCPToolError(RuntimeError):
     """Retain the original tool response for recovery after an uncertain write."""
 
-    def __init__(self, tool: str, payload: Dict[str, Any]) -> None:
-        super().__init__(f"MCP tool '{tool}' failed: {payload}")
+    def __init__(self, tool: str, payload: Dict[str, Any], reason: str = "returned an error") -> None:
+        super().__init__(f"MCP tool '{tool}' {reason}")
         self.tool = tool
         self.payload = payload
 
@@ -830,43 +831,69 @@ class SketchMCPClient:
 
     def run_code(self, title: str, script: str) -> Dict[str, Any]:
         res = self.call_tool("run_code", {"title": title, "script": script})
-        for block in res.get("content") or []:
-            if isinstance(block, dict) and block.get("type") == "text":
-                txt = str(block.get("text", "")).strip()
-                if txt:
-                    for line in reversed(txt.splitlines()):
-                        candidate = line.strip()
-                        if candidate.startswith("{") and candidate.endswith("}"):
-                            return json.loads(candidate)
-                    return {"rawText": txt}
-        if isinstance(res.get("structuredContent"), dict):
-            return res["structuredContent"]
-        return res
+        content = res.get("content") or []
+        structured = res.get("structuredContent")
+        if not content and isinstance(structured, dict):
+            return structured
+        try:
+            if len(content) != 1 or content[0].get("type") != "text":
+                raise ValueError("expected one complete JSON log")
+            text = content[0]["text"].strip()
+            # Sketch's console inspector escapes strings as single-quoted literals.
+            if text.startswith("'"):
+                text = ast.literal_eval(text)
+            result = json.loads(text)
+            if not isinstance(result, dict):
+                raise ValueError("expected a JSON object")
+            if structured is not None and structured != result:
+                raise ValueError("conflicting structured and text results")
+            return result
+        except (ValueError, SyntaxError, TypeError, KeyError, AttributeError) as exc:
+            raise MCPToolError("run_code", res, f"returned an invalid result: {exc}") from exc
 
     def get_screenshot(
         self,
         *,
-        artboard_id: Optional[str] = None,
-        layer_id: Optional[str] = None,
-        scale: int = 1,
+        document_id: str,
+        layer_id: str,
     ) -> bytes:
-        args: Dict[str, Any] = {"scale": scale}
-        if artboard_id:
-            args["artboard_id"] = artboard_id
-        if layer_id:
-            args["layer_id"] = layer_id
-        res = self.call_tool("get_screenshot", args)
-        for block in res.get("content") or []:
-            if isinstance(block, dict):
-                if block.get("type") == "image" and block.get("data"):
-                    return base64.b64decode(block["data"])
-                if block.get("type") == "text":
-                    txt = str(block.get("text", "")).strip()
-                    if txt.startswith("{"):
-                        parsed = json.loads(txt)
-                        if parsed.get("imageBase64"):
-                            return base64.b64decode(parsed["imageBase64"])
-        raise RuntimeError(f"get_screenshot returned no image bytes: {res}")
+        if not document_id or not layer_id:
+            raise ValueError("Screenshot requires an explicit document and layer ID")
+        res = self.call_tool("get_screenshot", {
+            "targetDocumentID": document_id, "layerID": layer_id,
+        })
+        try:
+            content = res.get("content") or []
+            if len(content) != 1 or res.get("structuredContent") is not None:
+                raise ValueError("expected one screenshot result")
+            block = content[0]
+            if block.get("type") == "image" and block.get("mimeType") == "image/png":
+                png = base64.b64decode(block["data"], validate=True)
+            elif block.get("type") == "text":
+                text = block["text"].strip()
+                prefix = "The screenshot has been generated at "
+                if text.startswith(prefix):
+                    path = Path(text[len(prefix):])
+                    temporary_root = Path(tempfile.gettempdir()).resolve()
+                    if (not path.is_absolute() or path.suffix.lower() != ".png"
+                            or not path.resolve().is_relative_to(temporary_root)):
+                        raise ValueError("screenshot path must be a PNG in the system temporary directory")
+                    png = _read_regular_owned_bytes_nofollow(path, max_bytes=MAX_MCP_RESPONSE_BYTES)
+                else:
+                    payload = json.loads(text)
+                    if not isinstance(payload, dict) or set(payload) != {"imageBase64"}:
+                        raise ValueError("unexpected screenshot text")
+                    png = base64.b64decode(payload["imageBase64"], validate=True)
+            else:
+                raise ValueError("unexpected screenshot content type")
+            if (len(png) < 45 or len(png) > MAX_MCP_RESPONSE_BYTES
+                    or png[:8] != b"\x89PNG\r\n\x1a\n" or png[8:16] != b"\x00\x00\x00\rIHDR"
+                    or not int.from_bytes(png[16:20], "big") or not int.from_bytes(png[20:24], "big")
+                    or png[-12:] != b"\x00\x00\x00\x00IEND\xaeB`\x82"):
+                raise ValueError("invalid or incomplete PNG framing")
+            return png
+        except (ValueError, TypeError, KeyError, AttributeError, OSError, RuntimeError) as exc:
+            raise MCPToolError("get_screenshot", res, f"returned an invalid result: {exc}") from exc
 
 
 def _build_slot_check_js(anchor_id: str) -> str:
@@ -1550,7 +1577,7 @@ def run_mcp_roundtrip(
         opened_doc_id = doc_id
         checkpoint("opened", docID=doc_id)
 
-        before_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+        before_png_bytes = client.get_screenshot(document_id=doc_id, layer_id=target_artboard_id)
         before_png_path = screenshots_dir / "before.png"
         _write_bytes_nofollow(before_png_path, before_png_bytes)
         before_sha256 = hashlib.sha256(before_png_bytes).hexdigest()
@@ -1590,7 +1617,7 @@ def run_mcp_roundtrip(
         doc_id = str(saved_doc["docId"])
         checkpoint("saved", docID=doc_id)
 
-        after_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+        after_png_bytes = client.get_screenshot(document_id=doc_id, layer_id=target_artboard_id)
         after_png_path = screenshots_dir / "after.png"
         _write_bytes_nofollow(after_png_path, after_png_bytes)
         after_sha256 = hashlib.sha256(after_png_bytes).hexdigest()
@@ -1638,7 +1665,7 @@ def run_mcp_roundtrip(
         )
         if readback_res.get("ok") is not True:
             raise RuntimeError("Reopened document readback was not confirmed")
-        reopen_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+        reopen_png_bytes = client.get_screenshot(document_id=reopen_doc_id, layer_id=target_artboard_id)
         reopen_png_path = screenshots_dir / "reopen.png"
         _write_bytes_nofollow(reopen_png_path, reopen_png_bytes)
         reopen_sha256 = hashlib.sha256(reopen_png_bytes).hexdigest()

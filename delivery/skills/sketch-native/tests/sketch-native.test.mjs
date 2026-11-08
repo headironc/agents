@@ -736,6 +736,96 @@ print(json.dumps({"save": rt._build_save_js("before-save", ${JSON.stringify(expe
   }
 });
 
+test("MCP responses accept native quoted JSON and temporary PNGs without masking errors", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      String.raw`
+import base64, json, os, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import sketch_mcp_roundtrip as rt
+
+client = rt.SketchMCPClient.__new__(rt.SketchMCPClient)
+client._initialized = True
+def response(value):
+    client._post_rpc = lambda *args, **kwargs: {"result": value}
+def rejected(value, call):
+    response(value)
+    try:
+        call()
+    except rt.MCPToolError as exc:
+        assert exc.payload == value
+    else:
+        raise AssertionError("Expected complete response rejection")
+def read():
+    return client.run_code("probe", "unused")
+
+expected = {"ok": True, "path": "/tmp/owner's copy #100%.sketch", "text": "line\n中文\\value"}
+plain = json.dumps(expected, ensure_ascii=False)
+quoted = "'" + plain.replace("\\", "\\\\").replace("'", "\\'") + "'"
+for text in [plain, quoted]:
+    response({"content": [{"type": "text", "text": text}]})
+    assert read() == expected
+response({"structuredContent": expected})
+assert read() == expected
+for invalid in [
+    {"content": [{"type": "text", "text": plain + "\nError: cleanup failed"}]},
+    {"content": [{"type": "text", "text": "Error: cleanup failed\n" + plain}]},
+    {"content": [{"type": "text", "text": plain}, {"type": "text", "text": "error"}]},
+    {"content": [{"type": "text", "text": plain}, {"type": "text", "text": plain}]},
+    {"content": [{"type": "text", "text": plain}], "isError": True},
+    {"content": [{"type": "text", "text": plain}], "structuredContent": {"ok": False}},
+    {"content": [{"type": "text", "text": "[]"}]},
+    {"content": [{"type": "text", "text": "'{}' + '{}': invalid"}]},
+]:
+    rejected(invalid, read)
+
+png64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
+png = base64.b64decode(png64)
+image = {"type": "image", "mimeType": "image/png", "data": png64}
+error = {"type": "text", "text": "Error: screenshot failed"}
+capture = lambda: client.get_screenshot(document_id="document", layer_id="target")
+with tempfile.TemporaryDirectory(prefix="sketch-response-contract-") as td:
+    root = Path(td)
+    path = root / "native screenshot.png"
+    path.write_bytes(png)
+    path_block = {"type": "text", "text": "The screenshot has been generated at " + str(path)}
+    for block in [image, path_block, {"type": "text", "text": json.dumps({"imageBase64": png64})}]:
+        response({"content": [block]})
+        assert capture() == png
+    for invalid in [
+        {"content": [image, error]}, {"content": [error, image]},
+        {"content": [path_block, error]}, {"content": [path_block], "isError": True},
+        {"content": [path_block], "structuredContent": {"error": "failed"}},
+        {"content": [{"type": "text", "text": json.dumps({"imageBase64": png64, "error": "failed"})}]},
+        {"content": [dict(image, data="invalid base64")]},
+        {"content": [dict(image, mimeType="image/jpeg")]},
+        {"content": [{"type": "text", "text": "The screenshot has been generated at /etc/private.png"}]},
+    ]:
+        rejected(invalid, capture)
+    for bad in [b"not a PNG", png[:-1]]:
+        path.write_bytes(bad)
+        rejected({"content": [path_block]}, capture)
+    path.unlink()
+    rejected({"content": [path_block]}, capture)
+    target = root / "target.png"
+    target.write_bytes(png)
+    path.symlink_to(target)
+    rejected({"content": [path_block]}, capture)
+    path.unlink()
+    os.link(target, path)
+    rejected({"content": [path_block]}, capture)
+`,
+      SCRIPTS_DIR,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
 test("unknown save and close outcomes retain the original copy without retry or cleanup", () => {
   const res = spawnSync(
     "python3",
@@ -2177,7 +2267,7 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
   const pngBase64Pre =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==";
   const pngBase64Post =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPgPAAEDAQAIicLsAAAASUVORK5CYII=";
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==";
 
   const server = http.createServer((req, res) => {
     let body = "";
@@ -2211,6 +2301,10 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
       const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
 
       if (toolName === "get_screenshot") {
+        assert.deepEqual(toolArgs, {
+          targetDocumentID: workDocId,
+          layerID: "40000000-0000-4000-8000-000000000001",
+        });
         if (state.failScreenshotOnce) {
           state.failScreenshotOnce = false;
           fs.writeFileSync(stateFile, JSON.stringify(state));
@@ -2228,6 +2322,8 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
           return;
         }
         const imgData = state.mutatedText1 ? pngBase64Post : pngBase64Pre;
+        const imagePath = path.join(tmpDir, "native-screenshot.png");
+        fs.writeFileSync(imagePath, Buffer.from(imgData, "base64"));
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
@@ -2235,7 +2331,10 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
             id: rpc.id,
             result: {
               content: [
-                { type: "image", data: imgData, mimeType: "image/png" },
+                {
+                  type: "text",
+                  text: "The screenshot has been generated at " + imagePath,
+                },
               ],
             },
           }),
@@ -2386,7 +2485,17 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
             jsonrpc: "2.0",
             id: rpc.id,
             result: {
-              content: [{ type: "text", text: JSON.stringify(replyObj) }],
+              content: [
+                {
+                  type: "text",
+                  text:
+                    "'" +
+                    JSON.stringify(replyObj)
+                      .replaceAll("\\", "\\\\")
+                      .replaceAll("'", "\\'") +
+                    "'",
+                },
+              ],
             },
           }),
         );
