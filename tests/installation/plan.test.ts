@@ -231,7 +231,7 @@ function installDistinctProducts(
     assert.equal(lstatSync(target, { throwIfNoEntry: false }), undefined);
 }
 
-test("explicit Antigravity selection contains only its five compatible skills and dependencies", (t) => {
+test("explicit Antigravity selection contains its platform-compatible skills and dependencies", (t) => {
   const f = installFixture(t);
   const initial = f.planned().plan;
   assert.equal(initial.version, 7);
@@ -277,6 +277,7 @@ test("explicit Antigravity selection contains only its five compatible skills an
       "antigravity:policy/tool-contracts.md",
       "antigravity:policy/writing.md",
       "antigravity:project-guide",
+      ...(process.platform === "darwin" ? ["antigravity:sketch-native"] : []),
       "antigravity:tools/check-ids.mjs",
       "antigravity:tools/check-prose.mjs",
       "antigravity:tools/task-temp.mjs",

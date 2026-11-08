@@ -19,7 +19,7 @@ import { fixtureRepository, repositoryRoot } from "./fixtures.ts";
 const skill = (name: string) =>
   `---\nname: ${name}\ndescription: Read a synthetic fixture.\n---\n\n# Fixture\n\nRead the supplied value.\n`;
 
-test("design orchestration stays Codex-only while shared skills reach both validators", () => {
+test("design orchestration stays Codex-only while Sketch reaches all products on macOS", () => {
   const entries = readSkillEntries(repositoryRoot);
   assert.equal(entries.length, 17);
   assert.equal(
@@ -40,6 +40,7 @@ test("design orchestration stays Codex-only while shared skills reach both valid
       "gh",
       "gh-identity",
       "project-guide",
+      "sketch-native",
     ],
   );
   assert.deepEqual(
@@ -58,7 +59,7 @@ test("design orchestration stays Codex-only while shared skills reach both valid
     publicMembers(entries, undefined, "darwin")
       .filter((member) => member.source === "delivery/skills/sketch-native")
       .map((member) => member.product),
-    ["codex", "claude"],
+    ["codex", "claude", "antigravity"],
   );
   assert.deepEqual(
     publicMembers(entries, undefined, "linux").filter(
@@ -67,10 +68,10 @@ test("design orchestration stays Codex-only while shared skills reach both valid
     [],
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 17, Claude 16, Antigravity 5",
+    "Skill membership: DELIVERED; Codex 17, Claude 16, Antigravity 6",
     "Codex skill validation: 17 entries",
     "Claude skill validation: 16 entries",
-    "Antigravity skill validation: 5 entries",
+    "Antigravity skill validation: 6 entries",
   ]);
 });
 
@@ -131,10 +132,10 @@ test("nested members belong to their top-level skill and do not add install targ
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 20, Claude 18, Antigravity 5",
+    "Skill membership: DELIVERED; Codex 20, Claude 18, Antigravity 6",
     "Codex skill validation: 20 entries",
     "Claude skill validation: 18 entries",
-    "Antigravity skill validation: 5 entries",
+    "Antigravity skill validation: 6 entries",
   ]);
 });
 

@@ -13,6 +13,8 @@ metadata:
 
 It combines offline `.sketch` archive engineering (`zipfile` + macOS `CoreText` + `sketchtool`) with disciplined single-slot native Sketch MCP verification (`http://localhost:31126/mcp`), incorporating best practices from Sketch's official `sketch-hq/agents` skills and built-in Sketch 2026.3 `MCPGuides`.
 
+The same skill directory is delivered to Codex, Claude Code, and Antigravity CLI on macOS. Resolve script and reference paths from this installed directory. Antigravity CLI discovers it under `~/.gemini/antigravity-cli/skills/sketch-native/`; installation does not register MCP servers or configure Sketch. Native MCP operations require the local Sketch endpoint to be available.
+
 For detailed `.sketch` archive JSON structures (`MSImmutableFlexGroupLayout`, `textBehaviour`, `CTFontRegularUsage`, `overrideValues`, `flow`, and `swatchID` bindings), read [`references/sketch-json-schema.md`](references/sketch-json-schema.md).
 
 ## Trigger Scenarios

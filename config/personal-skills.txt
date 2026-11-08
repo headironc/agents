@@ -2,7 +2,7 @@
 # path<TAB>product list; shared retains its original Codex/Claude scope.
 # Nested paths are validation members, not install targets.
 figma-design-workflow	codex
-sketch-native	shared
+sketch-native	codex,claude,antigravity
 gh	codex,claude,antigravity
 project-guide	codex,claude,antigravity
 gh-identity	codex,claude,antigravity

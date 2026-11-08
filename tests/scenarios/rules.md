@@ -13,11 +13,11 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
 | AGYINSTALL-01 | plan 没有产品选择，或只显式选择 Codex/Claude | 前者以参数错误退出且无写入；后者生成 V7 计划，不读取或写入第三端目标 | 默认选择双端，或因升级安装器自动增加个人第三端安装 |
-| AGYINSTALL-02 | plan 显式传入 `--product antigravity` | V7 只绑定 CLI 专属产品根，交付五个通用技能及三份合同、三个工具；接管使用产品限定 KEY；多产品由重复参数选择 | 隐式加入 Codex/Claude，发布微信、Codex 设计工作流或规则入口，修改 App 配置，或同名接管跨产品扩散 |
+| AGYINSTALL-02 | plan 显式传入 `--product antigravity` | V7 只绑定 CLI 专属产品根，交付五个通用技能及三份合同、三个工具；macOS 另交付完整 `sketch-native`，其他平台跳过；接管使用产品限定 KEY；多产品由重复参数选择 | 隐式加入 Codex/Claude，发布微信、Codex Figma 设计工作流或规则入口，在非 macOS 安装 Sketch 技能，修改 App 配置，或同名接管跨产品扩散 |
 | AGYINSTALL-03 | 第三端写入失败或回滚时出现第三方改动 | 逆序恢复仍匹配的目标，保留漂移并报告不完整；V5 恢复维持双端 | 覆盖第三方改动，把旧回执扩成三端，或把退出码当恢复证明 |
 | AGYINSTALL-04 | 对所选技能运行格式门禁 | 固定官方 `agy plugin validate --strict --json`，核实际数量及正反例；临时包装不安装 | 用其他产品验证器冒充 Antigravity 官方证明，或把格式通过说成全局发现和模型行为已验证 |
 | AGYINSTALL-05 | 已记录的产品根被替换，安装字节仍相同 | verify 保留目录身份失败，status 报告 indeterminate；三端采用相同判据 | status 过滤已记录的目录身份变化并误报 installed |
-| AGYINSTALL-06 | 移除其他 agent 调用 Antigravity CLI 的规则后生成完整三端计划 | 保留原 46 个目标及 `policy/antigravity.md` 的安装和直接使用支持；受影响 Codex 文件仍可选择安装及恢复 | 删除交付成员、缩减自身使用支持，或恢复其他 agent 的调用路线 |
+| AGYINSTALL-06 | 移除其他 agent 调用 Antigravity CLI 的规则后生成完整三端计划 | 保留按当前产品与平台选择的交付成员，以及 `policy/antigravity.md` 的安装和直接使用支持；受影响 Codex 文件仍可选择安装及恢复 | 删除交付成员、缩减自身使用支持，或恢复其他 agent 的调用路线 |
 | AGYINSTALL-07 | 使用者在 Antigravity CLI 中直接工作或配置直接脚本；对照项为 Codex 等其他 agent 选择或启动 `agy` | 前者保留技能发现、账号、参数、权限、结果和恢复参考；后者不再获得调用入口、优先路由或委派要求 | 将直接使用支持误删，或把手工参考重新绑定为其他 agent 的调用合同 |
 
 当前明确切片内的本地修复直接执行相关验证。无需 tier、角色或新交接文件。合并前的审查另按共享规则取得。明确的项目审查要求仍有效。文档和重命名使用必要规范，不进入技能链。未知外部写结果先回读。只读请求不授权批准或合并。作者自检按自检报告，不冒充另一审查者的报告。
