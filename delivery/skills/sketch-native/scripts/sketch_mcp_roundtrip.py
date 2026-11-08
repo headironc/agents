@@ -1414,9 +1414,22 @@ def diff_sketch_archives_offline(
     before_sketch: Path,
     after_sketch: Path,
     allowed_layer_ids: Set[str],
+    saved_document_ids: Optional[Tuple[str, str]] = None,
 ) -> Dict[str, Any]:
     before_snap = _extract_archive_snapshot(before_sketch)
     after_snap = _extract_archive_snapshot(after_sketch)
+    document_identity = None
+    if saved_document_ids is not None:
+        before_id, after_id = saved_document_ids
+        if (not before_id or not after_id
+                or before_snap.get(before_id, {}).get("_class") != "document"
+                or after_snap.get(after_id, {}).get("_class") != "document"
+                or (before_id != after_id and before_id in after_snap)):
+            raise RuntimeError("Saved archive document IDs do not match the bound operation")
+        # Align only the root identity verified by the save receipt and exact-path probe.
+        # Keep the original attributes in reports and compare every other document fact.
+        after_snap[before_id] = after_snap.pop(after_id)
+        document_identity = {"before": before_id, "after": after_id}
 
     expected_changes: List[Dict[str, Any]] = []
     unexpected_drifts: List[Dict[str, Any]] = []
@@ -1425,7 +1438,13 @@ def diff_sketch_archives_offline(
     for oid in all_ids:
         b_item = before_snap.get(oid)
         a_item = after_snap.get(oid)
-        if b_item == a_item:
+        compared_after = a_item
+        if document_identity and oid == document_identity["before"]:
+            compared_after = {
+                **a_item,
+                "rawAttributes": {**a_item["rawAttributes"], "do_objectID": oid},
+            }
+        if b_item == compared_after:
             continue
         diff_entry = {
             "layerID": oid,
@@ -1445,6 +1464,7 @@ def diff_sketch_archives_offline(
         "unexpectedDriftCount": len(unexpected_drifts),
         "expectedChanges": expected_changes,
         "unexpectedDrifts": unexpected_drifts,
+        "documentIdentity": document_identity,
     }
 
 
@@ -1600,6 +1620,8 @@ def run_mcp_roundtrip(
             or save_res.get("stage") != "save-completed"
             or save_res.get("path") != expected_sketch_path
             or not isinstance(save_res.get("ok"), bool)
+            or not isinstance(save_res.get("docId"), str)
+            or not save_res["docId"]
             or (save_res.get("ok") is True and save_res.get("error") is not None)
         ):
             raise RuntimeError("Save completion receipt is missing or mismatched; do not repeat the save")
@@ -1612,7 +1634,8 @@ def run_mcp_roundtrip(
             "roundtrip-step3-wait-open-saved",
             _build_wait_open_js(anchor_id, expected_sketch_path),
         )
-        if saved_doc.get("ready") is not True or not saved_doc.get("docId"):
+        if (saved_doc.get("ready") is not True
+                or saved_doc.get("docId") != save_res["docId"]):
             raise RuntimeError("Saved document could not be rebound to the working copy")
         doc_id = str(saved_doc["docId"])
         checkpoint("saved", docID=doc_id)
@@ -1637,7 +1660,8 @@ def run_mcp_roundtrip(
 
         # Step 5: Offline Python zipfile diff between pre-save and post-save .sketch
         offline_diff = diff_sketch_archives_offline(
-            baseline_copy, working_copy, allowed_ids
+            baseline_copy, working_copy, allowed_ids,
+            saved_document_ids=(expected_archive_doc_id, doc_id),
         )
 
         # Step 6: Reopen copy via `open -g -a /Applications/Sketch.app`, readback, screenshot SHA-256, close, assert matching: []

@@ -847,7 +847,7 @@ with tempfile.TemporaryDirectory(prefix="sketch-save-outcomes-") as td:
     allocate = rt.tempfile.mkdtemp
     rt.tempfile.mkdtemp = lambda **kwargs: allocate(dir=root, **kwargs)
     rt._launch_sketch_background = lambda *args: ["open", "-g"]
-    for outcome in ["timeout", "missing", "wrong-operation", "wrong-path", "failure", "contradictory", "callback-then-error", "close-timeout", "close-unconfirmed"]:
+    for outcome in ["timeout", "missing", "wrong-operation", "wrong-path", "missing-doc", "wrong-doc", "failure", "contradictory", "callback-then-error", "close-timeout", "close-unconfirmed"]:
         calls = []
         class Client:
             def __init__(self, **kwargs): pass
@@ -865,9 +865,11 @@ with tempfile.TemporaryDirectory(prefix="sketch-save-outcomes-") as td:
                     assert op["stage"] == "save-requested"
                     if outcome == "timeout": raise TimeoutError("original save still has unknown outcome")
                     if outcome == "missing": return {"rawText": "request accepted"}
-                    receipt = {"operationID": op["operationID"], "stage": "save-completed", "path": op["workingCopy"], "ok": True}
+                    receipt = {"operationID": op["operationID"], "stage": "save-completed", "path": op["workingCopy"], "ok": True, "docId": "saved-doc"}
                     if outcome == "wrong-operation": receipt["operationID"] = "another-operation"
                     if outcome == "wrong-path": receipt["path"] = str(source)
+                    if outcome == "missing-doc": receipt.pop("docId")
+                    if outcome == "wrong-doc": receipt["docId"] = "another-doc"
                     if outcome == "failure": receipt.update(ok=False, error="disk full")
                     if outcome == "contradictory": receipt["error"] = "disk full"
                     if outcome == "callback-then-error":
@@ -897,6 +899,60 @@ with tempfile.TemporaryDirectory(prefix="sketch-save-outcomes-") as td:
             assert receipt["operationID"] == recovery["operationID"] and receipt["ok"] is True
         # The fixture owns every retained operation and removes it after assertions.
         rt.shutil.rmtree(recovery["directory"])
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("archive comparison binds saved document identity without hiding other drift", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import copy, json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as rt
+
+with tempfile.TemporaryDirectory(prefix="sketch-save-identity-") as td:
+    root = Path(td)
+    doc = {"_class": "document", "do_objectID": "before", "colorSpace": 1, "pages": [{"_ref": "pages/page"}]}
+    page = {"_class": "page", "do_objectID": "page", "layers": [{"_class": "group", "do_objectID": "frame", "groupBehavior": 1, "layerListExpandedType": 2, "layers": []}]}
+    def archive(name, document, page_data=page):
+        target = root / (name + ".sketch")
+        with zipfile.ZipFile(target, "w") as z:
+            z.writestr("document.json", json.dumps(document))
+            z.writestr("pages/page.json", json.dumps(page_data))
+        return target
+    before = archive("before", doc)
+    saved = {**doc, "do_objectID": "after"}
+    after = archive("after", saved)
+    assert rt.diff_sketch_archives_offline(before, after, set())["unexpectedDriftCount"] == 2
+    bound = rt.diff_sketch_archives_offline(before, after, set(), ("before", "after"))
+    assert bound["unexpectedDriftCount"] == 0 and bound["expectedChangedCount"] == 0, bound
+    assert bound["documentIdentity"] == {"before": "before", "after": "after"}
+    assert rt.diff_sketch_archives_offline(before, before, set(), ("before", "before"))["unexpectedDriftCount"] == 0
+    for ids in [("wrong", "after"), ("before", "wrong"), ("frame", "after"), ("before", "frame"), ("", "after")]:
+        try: rt.diff_sketch_archives_offline(before, after, set(), ids)
+        except RuntimeError: pass
+        else: raise AssertionError(ids)
+    color = archive("color", {**saved, "colorSpace": 0})
+    drift = rt.diff_sketch_archives_offline(before, color, set(), ("before", "after"))
+    assert drift["unexpectedDriftCount"] == 1, drift
+    assert drift["unexpectedDrifts"][0]["after"]["rawAttributes"]["do_objectID"] == "after"
+    changed_page = copy.deepcopy(page)
+    changed_page["layers"][0]["layerListExpandedType"] = 0
+    changed = archive("layer", saved, changed_page)
+    assert rt.diff_sketch_archives_offline(before, changed, set(), ("before", "after"))["unexpectedDriftCount"] == 1
+    changed_page["layers"][0]["do_objectID"] = "before"
+    collision = archive("collision", saved, changed_page)
+    try: rt.diff_sketch_archives_offline(before, collision, set(), ("before", "after"))
+    except RuntimeError: pass
+    else: raise AssertionError("Root identity cannot conceal a layer identity collision")
 `,
     ],
     { encoding: "utf8", env: PY_ENV, timeout: 60000 },

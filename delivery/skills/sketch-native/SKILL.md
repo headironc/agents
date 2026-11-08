@@ -86,6 +86,7 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
   2. Locate `1–3` target layers by known UUID on a known page (or via `sketch.find('#<uuid>', targetPage)`), apply targeted property/override/focus-border mutations, and call `doc.processPendingChanges()`. Submit one save for the bound working-copy path and wait for its matching completion receipt.
   3. After confirmed successful saving, rebind the live document through the exact copy path, capture targeted screenshots via `get_screenshot` with `targetDocumentID` and `layerID`, and close that document once. Verify closure before offline diffing or reopening.
 - **Offline Full-Document Diffing**: Compare `frame` coordinates, `MSImmutableFlexGroupLayout` stacks, `HotSpot` layers, prototype `flow` links, and font descriptors in Python via `zipfile` after saving and closure are confirmed. A successful save callback alone does not prove persisted mutation, screenshot equality, or absence of unexpected drift; verify those on the saved archive and after reopening.
+  The native save can assign a new document ID. The roundtrip binds that ID through the successful receipt, the exact-path live probe, and the saved archive before aligning only the document root identity for comparison. The report retains both IDs. Other document facts, including color space and layer attributes, remain strict drift checks; standalone archive comparisons do not assume a save identity transition.
 
 ### Rule 3: CoreText Line-Height Parity (`0 px` `NATIVE-LAYOUT-HOTSPOT-DESYNC`)
 
