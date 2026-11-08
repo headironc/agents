@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""5-second non-activating native Sketch MCP roundtrip verifier.
+"""Non-activating native Sketch MCP roundtrip verifier with save receipts.
 
-Executes the 6-step crash-free verification protocol against `http://localhost:31126/mcp`:
+Executes the verification protocol against `http://localhost:31126/mcp`:
 1. Pre-check open documents on `:31126/mcp`: confirm persistent `--anchor-id` is open
    and no stray working documents remain (`matching: []`).
 2. Background non-activating open: `open -g -a /Applications/Sketch.app <copy.sketch>`,
@@ -9,7 +9,8 @@ Executes the 6-step crash-free verification protocol against `http://localhost:3
 3. Capture pre-edit `get_screenshot`, then run lightweight multiline JS `run_code`
    (`{"title": "...", "script": "..."}`, reading only top-level counts + locating 1-3
    target layers by ID on a target page to apply override/focus-border edits +
-   `doc.processPendingChanges()` + zero-arg `doc.save()`).
+   `doc.processPendingChanges()`). Save once to the bound copy path and require
+   the matching asynchronous completion receipt before proceeding.
 4. Capture post-edit `get_screenshot` and call `doc.close()` on the disposable copy
    (never closing `--anchor-id`).
 5. Offline Python `zipfile` diff between pre-save and post-save `.sketch` archives,
@@ -36,6 +37,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -709,6 +711,15 @@ def _build_direct_loopback_opener(
     )
 
 
+class MCPToolError(RuntimeError):
+    """Retain the original tool response for recovery after an uncertain write."""
+
+    def __init__(self, tool: str, payload: Dict[str, Any]) -> None:
+        super().__init__(f"MCP tool '{tool}' failed: {payload}")
+        self.tool = tool
+        self.payload = payload
+
+
 class SketchMCPClient:
     """Minimal JSON-RPC 2.0 HTTP/SSE client for Sketch 2026.3 MCP server."""
 
@@ -811,10 +822,10 @@ class SketchMCPClient:
             "tools/call", {"name": name, "arguments": arguments}
         )
         if "error" in rpc_resp:
-            raise RuntimeError(f"MCP tool '{name}' RPC error: {rpc_resp['error']}")
+            raise MCPToolError(name, rpc_resp)
         result = rpc_resp.get("result") or {}
         if result.get("isError"):
-            raise RuntimeError(f"MCP tool '{name}' execution error: {result}")
+            raise MCPToolError(name, result)
         return result
 
     def run_code(self, title: str, script: str) -> Dict[str, Any]:
@@ -882,8 +893,8 @@ def _build_wait_open_js(anchor_id: str, expected_path: str) -> str:
             f"const anchorId = {anchor_json}",
             f"const expectedPath = {path_json}",
             "const docs = sketch.getDocuments()",
-            "const candidates = docs.filter(d => String(d.id) !== anchorId && Boolean(d.path) && String(d.path) === expectedPath)",
-            "const doc = candidates.length > 0 ? candidates[0] : null",
+            "const candidates = docs.filter(d => String(d.id) !== anchorId && Boolean(d.path) && decodeURIComponent(String(d.path)) === expectedPath)",
+            "const doc = candidates.length === 1 ? candidates[0] : null",
             "if (!doc) {",
             "  console.log(JSON.stringify({ ready: false }))",
             "} else {",
@@ -938,8 +949,27 @@ def _build_lightweight_mutate_js(doc_id: str, edits: List[Dict[str, Any]], page_
             "if (typeof doc.processPendingChanges === 'function') {",
             "  doc.processPendingChanges()",
             "}",
-            "doc.save()",
             "console.log(JSON.stringify({ ok: true, topCounts, applied }))",
+        ]
+    )
+
+
+def _build_save_js(doc_id: str, expected_path: str, operation_id: str) -> str:
+    return "\n".join(
+        [
+            "const sketch = require('sketch')",
+            f"const targetDocId = {json.dumps(doc_id)}",
+            f"const expectedPath = {json.dumps(expected_path)}",
+            f"const operationID = {json.dumps(operation_id)}",
+            "const matches = sketch.getDocuments().filter(d => String(d.id) === targetDocId && Boolean(d.path) && decodeURIComponent(String(d.path)) === expectedPath)",
+            "if (matches.length !== 1) { throw new Error('Working document identity changed before save') }",
+            "const doc = matches[0]",
+            "let completed = false",
+            "doc.save(expectedPath, { saveMode: sketch.Document.SaveMode.Save }, function(error) {",
+            "  if (completed) return",
+            "  completed = true",
+            "  console.log(JSON.stringify({ operationID, stage: 'save-completed', ok: !error, error: error ? String(error) : null, path: doc.path ? decodeURIComponent(String(doc.path)) : null, docId: String(doc.id) }))",
+            "})",
         ]
     )
 
@@ -980,7 +1010,7 @@ def _build_lightweight_readback_js(doc_id: str, edits: List[Dict[str, Any]], pag
     )
 
 
-def _build_close_doc_js(doc_id: str, anchor_id: str) -> str:
+def _build_close_doc_js(doc_id: str, anchor_id: str, expected_path: str) -> str:
     doc_id_json = json.dumps(doc_id)
     anchor_json = json.dumps(anchor_id)
     return "\n".join(
@@ -988,39 +1018,18 @@ def _build_close_doc_js(doc_id: str, anchor_id: str) -> str:
             "const sketch = require('sketch')",
             f"const targetDocId = {doc_id_json}",
             f"const anchorId = {anchor_json}",
+            f"const expectedPath = {json.dumps(expected_path)}",
             "if (targetDocId === anchorId) { throw new Error('Refusing to close anchor document') }",
             "const docs = sketch.getDocuments()",
-            "const doc = docs.find(d => String(d.id) === targetDocId)",
-            "if (doc) { doc.close() }",
-            "const remaining = sketch.getDocuments().filter(d => String(d.id) !== anchorId).map(d => String(d.id))",
-            "console.log(JSON.stringify({ closed: true, remainingNonAnchor: remaining }))",
-        ]
-    )
-
-
-def _build_close_copy_by_path_js(
-    anchor_id: str, expected_path: str, expected_doc_id: str = ""
-) -> str:
-    anchor_json = json.dumps(anchor_id)
-    path_json = json.dumps(expected_path)
-    doc_id_json = json.dumps(expected_doc_id)
-    return "\n".join(
-        [
-            "const sketch = require('sketch')",
-            f"const anchorId = {anchor_json}",
-            f"const expectedPath = {path_json}",
-            f"const expectedDocId = {doc_id_json}",
-            "const docs = sketch.getDocuments()",
-            "for (const d of docs) {",
-            "  const idStr = String(d.id)",
-            "  if (idStr === anchorId) continue",
-            "  const pathStr = d.path ? String(d.path) : ''",
-            "  const pathMatch = Boolean(expectedPath) && Boolean(pathStr) && pathStr === expectedPath",
-            "  const idMatch = !pathStr && Boolean(expectedDocId) && idStr === expectedDocId",
-            "  if (pathMatch || idMatch) { d.close() }",
-            "}",
-            "const remaining = sketch.getDocuments().filter(d => String(d.id) !== anchorId).map(d => String(d.id))",
-            "console.log(JSON.stringify({ closed: true, remainingNonAnchor: remaining }))",
+            "const matches = docs.filter(d => String(d.id) === targetDocId && Boolean(d.path) && decodeURIComponent(String(d.path)) === expectedPath)",
+            "if (matches.length !== 1) { throw new Error('Working document identity changed before close') }",
+            "matches[0].close()",
+            "const after = sketch.getDocuments()",
+            "const anchorPresent = after.some(d => String(d.id) === anchorId)",
+            "const remainingDocs = after.filter(d => String(d.id) !== anchorId)",
+            "const remaining = remainingDocs.map(d => String(d.id))",
+            "const closed = !remainingDocs.some(d => String(d.id) === targetDocId || (d.path && decodeURIComponent(String(d.path)) === expectedPath))",
+            "console.log(JSON.stringify({ closed, anchorPresent, remainingNonAnchor: remaining }))",
         ]
     )
 
@@ -1447,10 +1456,32 @@ def run_mcp_roundtrip(
     for extra_id in edit_spec.get("allowedChangedIDs") or []:
         allowed_ids.add(str(extra_id))
 
-    with tempfile.TemporaryDirectory(prefix="sketch-roundtrip-baseline-") as tmpdir:
+    tmpdir = str(Path(tempfile.mkdtemp(prefix="sketch-roundtrip-")).resolve())
+    operation_path = Path(tmpdir) / "operation.json"
+    operation: Dict[str, Any] = {
+        "operationID": str(uuid.uuid4()),
+        "source": str(sketch_path),
+        "anchorID": anchor_id,
+        "stage": "preparing",
+    }
+    open_attempted = False
+    mutation_requested = False
+    close_requested = False
+    doc_id: Optional[str] = None
+    slot_released = False
+
+    def checkpoint(stage: str, **facts: Any) -> None:
+        operation.update(facts)
+        operation["stage"] = stage
+        _write_bytes_nofollow(
+            operation_path, json.dumps(operation, ensure_ascii=False, indent=2).encode("utf-8")
+        )
+
+    try:
         os.chmod(tmpdir, 0o700)
         baseline_copy = Path(tmpdir) / "baseline-before-save.sketch"
         working_copy = Path(tmpdir) / "working-disposable-copy.sketch"
+        checkpoint("preparing", workingCopy=str(working_copy), baselineCopy=str(baseline_copy))
         expected_archive_doc_id = ""
         src_fd = _open_regular_owned_fd_nofollow(
             sketch_path, max_bytes=MAX_SKETCH_ARCHIVE_BYTES
@@ -1480,6 +1511,8 @@ def run_mcp_roundtrip(
         finally:
             os.close(src_fd)
         expected_sketch_path = str(working_copy.resolve())
+        checkpoint("prepared", workingCopy=expected_sketch_path,
+                   baselineCopy=str(baseline_copy), archiveDocID=expected_archive_doc_id)
 
         client = SketchMCPClient(
             endpoint=mcp_url,
@@ -1493,85 +1526,87 @@ def run_mcp_roundtrip(
         precheck = client.run_code(
             "roundtrip-step1-precheck", _build_slot_check_js(anchor_id)
         )
-        if not precheck.get("anchorPresent"):
-            return {
-                "tool": "sketch_mcp_roundtrip.py",
-                "passed": False,
-                "failedStep": "step1_precheck",
-                "reason": f"Anchor document {anchor_id} is not open in Sketch",
-                "precheck": precheck,
-            }
-        if precheck.get("matching"):
-            return {
-                "tool": "sketch_mcp_roundtrip.py",
-                "passed": False,
-                "failedStep": "step1_precheck",
-                "reason": "Stray non-anchor document(s) open before acquiring slot (matching != [])",
-                "precheck": precheck,
-            }
+        if precheck.get("anchorPresent") is not True:
+            raise RuntimeError(f"Anchor document {anchor_id} is not open in Sketch")
+        if precheck.get("matching") != []:
+            raise RuntimeError("Stray non-anchor document(s) open before acquiring slot (matching != [])")
 
         # Step 2: Open disposable copy with `open -g -a /Applications/Sketch.app`
+        checkpoint("open-requested")
+        open_attempted = True
         open_cmd_1 = _launch_sketch_background(working_copy, sketch_app, open_bin)
-        doc_id: Optional[str] = None
-        close_res_1: Optional[Dict[str, Any]] = None
-        try:
-            deadline = time.perf_counter() + poll_timeout
-            while time.perf_counter() < deadline:
-                probe = client.run_code(
-                    "roundtrip-step2-wait-open",
-                    _build_wait_open_js(anchor_id, expected_sketch_path),
-                )
-                if probe.get("ready") and probe.get("docId"):
-                    doc_id = str(probe["docId"])
-                    break
-                time.sleep(0.15)
-            if not doc_id:
-                return {
-                    "tool": "sketch_mcp_roundtrip.py",
-                    "passed": False,
-                    "failedStep": "step2_open_copy",
-                    "reason": f"Timed out waiting for {working_copy.name} to open in background",
-                }
-
-            # Step 3 & Step 4: Pre-edit screenshot -> lightweight JS edit + processPendingChanges + save -> post-edit screenshot -> doc.close()
-            before_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
-            before_png_path = screenshots_dir / "before.png"
-            _write_bytes_nofollow(before_png_path, before_png_bytes)
-            before_sha256 = hashlib.sha256(before_png_bytes).hexdigest()
-
-            mutate_res = client.run_code(
-                "roundtrip-step3-mutate-and-save",
-                _build_lightweight_mutate_js(doc_id, edits, target_page_id),
+        deadline = time.perf_counter() + poll_timeout
+        while time.perf_counter() < deadline:
+            probe = client.run_code(
+                "roundtrip-step2-wait-open",
+                _build_wait_open_js(anchor_id, expected_sketch_path),
             )
+            if probe.get("ready") is True and probe.get("docId"):
+                doc_id = str(probe["docId"])
+                break
+            time.sleep(0.15)
+        if not doc_id:
+            raise RuntimeError(f"Timed out waiting for {working_copy.name} to open in background")
+        opened_doc_id = doc_id
+        checkpoint("opened", docID=doc_id)
 
-            after_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
-            after_png_path = screenshots_dir / "after.png"
-            _write_bytes_nofollow(after_png_path, after_png_bytes)
-            after_sha256 = hashlib.sha256(after_png_bytes).hexdigest()
+        before_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+        before_png_path = screenshots_dir / "before.png"
+        _write_bytes_nofollow(before_png_path, before_png_bytes)
+        before_sha256 = hashlib.sha256(before_png_bytes).hexdigest()
 
-            close_res_1 = client.run_code(
-                "roundtrip-step4-close-copy",
-                _build_close_doc_js(doc_id, anchor_id),
-            )
-        finally:
-            if close_res_1 is None:
-                try:
-                    if doc_id:
-                        client.run_code(
-                            "roundtrip-step4-emergency-close",
-                            _build_close_doc_js(doc_id, anchor_id),
-                        )
-                    else:
-                        client.run_code(
-                            "roundtrip-step4-emergency-close-copy",
-                            _build_close_copy_by_path_js(
-                                anchor_id,
-                                expected_sketch_path,
-                                expected_archive_doc_id,
-                            ),
-                        )
-                except Exception:
-                    pass
+        checkpoint("mutation-requested")
+        mutation_requested = True
+        mutate_res = client.run_code(
+            "roundtrip-step3-mutate",
+            _build_lightweight_mutate_js(doc_id, edits, target_page_id),
+        )
+        if mutate_res.get("ok") is not True:
+            raise RuntimeError("Mutation completion was not confirmed; do not repeat the edit")
+        checkpoint("save-requested", mutation=mutate_res)
+        save_res = client.run_code(
+            "roundtrip-step3-save",
+            _build_save_js(doc_id, expected_sketch_path, operation["operationID"]),
+        )
+        if (
+            save_res.get("operationID") != operation["operationID"]
+            or save_res.get("stage") != "save-completed"
+            or save_res.get("path") != expected_sketch_path
+            or not isinstance(save_res.get("ok"), bool)
+            or (save_res.get("ok") is True and save_res.get("error") is not None)
+        ):
+            raise RuntimeError("Save completion receipt is missing or mismatched; do not repeat the save")
+        checkpoint("save-completed", saveReceipt=save_res)
+        if save_res["ok"] is not True:
+            raise RuntimeError(f"Sketch reported a save failure: {save_res.get('error')}")
+
+        # Saving can change the live document ID. Rebind through the exact copy path.
+        saved_doc = client.run_code(
+            "roundtrip-step3-wait-open-saved",
+            _build_wait_open_js(anchor_id, expected_sketch_path),
+        )
+        if saved_doc.get("ready") is not True or not saved_doc.get("docId"):
+            raise RuntimeError("Saved document could not be rebound to the working copy")
+        doc_id = str(saved_doc["docId"])
+        checkpoint("saved", docID=doc_id)
+
+        after_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+        after_png_path = screenshots_dir / "after.png"
+        _write_bytes_nofollow(after_png_path, after_png_bytes)
+        after_sha256 = hashlib.sha256(after_png_bytes).hexdigest()
+
+        checkpoint("close-requested")
+        close_requested = True
+        close_res_1 = client.run_code(
+            "roundtrip-step4-close-copy",
+            _build_close_doc_js(doc_id, anchor_id, expected_sketch_path),
+        )
+        if (close_res_1.get("closed") is not True
+                or close_res_1.get("anchorPresent") is not True
+                or close_res_1.get("remainingNonAnchor") != []):
+            raise RuntimeError("Working copy closure was not confirmed; do not repeat the close")
+        checkpoint("closed")
+        slot_released = True
 
         # Step 5: Offline Python zipfile diff between pre-save and post-save .sketch
         offline_diff = diff_sketch_archives_offline(
@@ -1579,65 +1614,96 @@ def run_mcp_roundtrip(
         )
 
         # Step 6: Reopen copy via `open -g -a /Applications/Sketch.app`, readback, screenshot SHA-256, close, assert matching: []
+        checkpoint("reopen-requested")
+        slot_released = False
         open_cmd_2 = _launch_sketch_background(working_copy, sketch_app, open_bin)
         reopen_doc_id: Optional[str] = None
-        close_res_2: Optional[Dict[str, Any]] = None
-        try:
-            deadline2 = time.perf_counter() + poll_timeout
-            while time.perf_counter() < deadline2:
-                probe2 = client.run_code(
-                    "roundtrip-step6-wait-reopen",
-                    _build_wait_open_js(anchor_id, expected_sketch_path),
-                )
-                if probe2.get("ready") and probe2.get("docId"):
-                    reopen_doc_id = str(probe2["docId"])
-                    break
-                time.sleep(0.15)
-            if not reopen_doc_id:
-                return {
-                    "tool": "sketch_mcp_roundtrip.py",
-                    "passed": False,
-                    "failedStep": "step6_reopen",
-                    "reason": f"Timed out waiting for {working_copy.name} to reopen",
-                }
-
-            readback_res = client.run_code(
-                "roundtrip-step6-readback",
-                _build_lightweight_readback_js(reopen_doc_id, edits, target_page_id),
+        deadline2 = time.perf_counter() + poll_timeout
+        while time.perf_counter() < deadline2:
+            probe2 = client.run_code(
+                "roundtrip-step6-wait-reopen",
+                _build_wait_open_js(anchor_id, expected_sketch_path),
             )
-            reopen_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
-            reopen_png_path = screenshots_dir / "reopen.png"
-            _write_bytes_nofollow(reopen_png_path, reopen_png_bytes)
-            reopen_sha256 = hashlib.sha256(reopen_png_bytes).hexdigest()
+            if probe2.get("ready") is True and probe2.get("docId"):
+                reopen_doc_id = str(probe2["docId"])
+                break
+            time.sleep(0.15)
+        if not reopen_doc_id:
+            raise RuntimeError(f"Timed out waiting for {working_copy.name} to reopen")
+        checkpoint("reopened", docID=reopen_doc_id)
 
-            close_res_2 = client.run_code(
-                "roundtrip-step6-close-reopen",
-                _build_close_doc_js(reopen_doc_id, anchor_id),
-            )
-        finally:
-            if close_res_2 is None:
-                try:
-                    if reopen_doc_id:
-                        client.run_code(
-                            "roundtrip-step6-emergency-close",
-                            _build_close_doc_js(reopen_doc_id, anchor_id),
-                        )
-                    else:
-                        client.run_code(
-                            "roundtrip-step6-emergency-close-copy",
-                            _build_close_copy_by_path_js(
-                                anchor_id,
-                                expected_sketch_path,
-                                doc_id or expected_archive_doc_id,
-                            ),
-                        )
-                except Exception:
-                    pass
+        readback_res = client.run_code(
+            "roundtrip-step6-readback",
+            _build_lightweight_readback_js(reopen_doc_id, edits, target_page_id),
+        )
+        if readback_res.get("ok") is not True:
+            raise RuntimeError("Reopened document readback was not confirmed")
+        reopen_png_bytes = client.get_screenshot(artboard_id=target_artboard_id)
+        reopen_png_path = screenshots_dir / "reopen.png"
+        _write_bytes_nofollow(reopen_png_path, reopen_png_bytes)
+        reopen_sha256 = hashlib.sha256(reopen_png_bytes).hexdigest()
+
+        checkpoint("reopen-close-requested")
+        close_res_2 = client.run_code(
+            "roundtrip-step6-close-reopen",
+            _build_close_doc_js(reopen_doc_id, anchor_id, expected_sketch_path),
+        )
+        if (close_res_2.get("closed") is not True
+                or close_res_2.get("anchorPresent") is not True
+                or close_res_2.get("remainingNonAnchor") != []):
+            raise RuntimeError("Reopened copy closure was not confirmed; do not repeat the close")
+        slot_released = True
+        checkpoint("reopen-closed")
 
         final_slot_check = client.run_code(
             "roundtrip-step6-final-slot-check",
             _build_slot_check_js(anchor_id),
         )
+
+    except Exception as exc:
+        if isinstance(exc, MCPToolError):
+            operation["failureResponse"] = {"tool": exc.tool, "payload": exc.payload}
+        # A pre-edit failure can close its known copy once. After dispatching an
+        # edit/save or close, an error is not permission to repeat or discard it.
+        if open_attempted and not mutation_requested and not close_requested and doc_id:
+            close_requested = True
+            try:
+                checkpoint("failure-close-requested")
+                close_result = client.run_code(
+                    "roundtrip-failure-close-unmodified-copy",
+                    _build_close_doc_js(doc_id, anchor_id, expected_sketch_path),
+                )
+                slot_released = (
+                    close_result.get("closed") is True
+                    and close_result.get("anchorPresent") is True
+                    and close_result.get("remainingNonAnchor") == []
+                )
+            except Exception as close_error:
+                operation["closeError"] = str(close_error)
+        operation["error"] = str(exc)
+        operation["slotReleased"] = slot_released
+        recovery = {"directory": tmpdir, "operationFile": str(operation_path), **operation}
+        if not open_attempted or (slot_released and not mutation_requested):
+            try:
+                shutil.rmtree(tmpdir)
+                recovery = None
+            except OSError as cleanup_error:
+                recovery["cleanupError"] = str(cleanup_error)
+        else:
+            try:
+                checkpoint(operation["stage"])
+            except OSError as journal_error:
+                operation["journalError"] = str(journal_error)
+            recovery = {"directory": tmpdir, "operationFile": str(operation_path), **operation}
+        return {
+            "tool": "sketch_mcp_roundtrip.py",
+            "sketch": str(sketch_path),
+            "anchorID": anchor_id,
+            "passed": False,
+            "failedStep": operation["stage"],
+            "error": str(exc),
+            "recovery": recovery,
+        }
 
     persistence_verified = True
     raw_readbacks = [
@@ -1738,7 +1804,7 @@ def run_mcp_roundtrip(
     screenshot_sha_match = after_sha256 == reopen_sha256
     zero_unexpected_drift = offline_diff["unexpectedDriftCount"] == 0
     final_slot_clean = (
-        bool(final_slot_check.get("anchorPresent"))
+        final_slot_check.get("anchorPresent") is True
         and final_slot_check.get("matching") == []
     )
     passed = (
@@ -1749,16 +1815,33 @@ def run_mcp_roundtrip(
         and final_slot_clean
     )
 
+    try:
+        checkpoint("verified", verificationPassed=passed, slotReleased=final_slot_clean)
+    except OSError as journal_error:
+        operation["journalError"] = str(journal_error)
+        passed = False
+    recovery = None
+    if passed:
+        try:
+            shutil.rmtree(tmpdir)
+        except OSError as cleanup_error:
+            operation["cleanupError"] = str(cleanup_error)
+            passed = False
+    if not passed:
+        recovery = {"directory": tmpdir, "operationFile": str(operation_path), **operation}
     return {
         "tool": "sketch_mcp_roundtrip.py",
         "sketch": str(sketch_path),
         "anchorID": anchor_id,
         "passed": passed,
+        "operationID": operation["operationID"],
+        "saveReceipt": save_res,
+        "recovery": recovery,
         "elapsedMs": round((time.perf_counter() - start_ts) * 1000.0, 2),
         "launchCommands": [open_cmd_1, open_cmd_2],
         "steps": {
             "step1Precheck": precheck,
-            "step2OpenDocID": doc_id,
+            "step2OpenDocID": opened_doc_id,
             "step3MutateAndSave": mutate_res,
             "step4ScreenshotsAndClose": {
                 "beforeScreenshot": str(before_png_path),
@@ -1787,10 +1870,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sketch_mcp_roundtrip.py",
         description=(
-            "5-second non-activating native Sketch MCP roundtrip verifier. "
+            "Non-activating native Sketch MCP roundtrip verifier with save receipts. "
             "Opens a disposable .sketch copy via `open -g -a /Applications/Sketch.app`, "
             "executes lightweight ID-targeted JS edits + `doc.processPendingChanges()` + "
-            "zero-arg `doc.save()`, diffs archives offline via Python zipfile, and "
+            "an asynchronous save receipt, diffs archives offline via Python zipfile, and "
             "verifies persistence + screenshot SHA-256 on reopen while protecting the anchor doc."
         ),
     )
