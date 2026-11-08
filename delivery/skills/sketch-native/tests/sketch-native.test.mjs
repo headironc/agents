@@ -5,6 +5,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -568,6 +569,476 @@ with tempfile.TemporaryDirectory(prefix="sketch-frame-rebake-") as td:
         assert result["layers"][0]["layers"][1]["frame"]["y"] == 30, result
         assert result["layers"][1]["frame"] == {"x": 10, "y": 50, "width": 100, "height": 10}, result
         assert cm.audit_and_rebake_sketch(p)["driftCount"] == 0
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("generated save script emits one receipt only after the matching asynchronous callback", () => {
+  const expectedPath = "/tmp/copy with spaces #100%.sketch";
+  const generated = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import json, sys
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as rt
+print(json.dumps({"save": rt._build_save_js("before-save", ${JSON.stringify(expectedPath)}, "operation-1"),
+                  "mutate": rt._build_lightweight_mutate_js("before-save", [], None),
+                  "wait": rt._build_wait_open_js("anchor", ${JSON.stringify(expectedPath)}),
+                  "close": rt._build_close_doc_js("after-save", "anchor", ${JSON.stringify(expectedPath)})}))
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV },
+  );
+  assert.equal(generated.status, 0, generated.stderr);
+  const scripts = JSON.parse(generated.stdout);
+  const encodedPath = encodeURI(expectedPath).replaceAll("#", "%23");
+  for (const outcome of [
+    "matching",
+    "wrong-path",
+    "pathless",
+    "duplicate",
+    "anchor-only",
+  ]) {
+    const receipts = [];
+    const doc = {
+      id: "before-save",
+      path:
+        outcome === "wrong-path"
+          ? "/elsewhere/copy%20with%20spaces%20%23100%25.sketch"
+          : outcome === "pathless"
+            ? null
+            : encodedPath,
+      pages: [{}],
+    };
+    const anchor = { id: "anchor", path: encodedPath, pages: [] };
+    const docs = outcome === "anchor-only" ? [anchor] : [anchor, doc];
+    if (outcome === "duplicate") docs.push({ ...doc, id: "another-copy" });
+    vm.runInNewContext(scripts.wait, {
+      require: () => ({ getDocuments: () => docs }),
+      console: { log: (value) => receipts.push(JSON.parse(value)) },
+    });
+    assert.deepEqual(
+      receipts,
+      outcome === "matching"
+        ? [{ ready: true, docId: "before-save", pagesCount: 1 }]
+        : [{ ready: false }],
+    );
+  }
+  for (const outcome of ["success", "failure", "throw", "wrong-document"]) {
+    const receipts = [];
+    let saved = 0;
+    let callback;
+    const doc = {
+      id: "before-save",
+      path: outcome === "wrong-document" ? "/tmp/other.sketch" : encodedPath,
+      save(destination, options, done) {
+        saved++;
+        assert.equal(destination, expectedPath);
+        assert.equal(options.saveMode, 0);
+        if (outcome === "throw") throw new Error("save dispatch failed");
+        callback = done;
+      },
+    };
+    const context = {
+      require(name) {
+        assert.equal(name, "sketch");
+        return {
+          getDocuments: () => [doc],
+          Document: { SaveMode: { Save: 0 } },
+        };
+      },
+      console: { log: (value) => receipts.push(JSON.parse(value)) },
+    };
+    if (outcome === "throw" || outcome === "wrong-document") {
+      assert.throws(() => vm.runInNewContext(scripts.save, context));
+      assert.equal(saved, outcome === "throw" ? 1 : 0);
+      assert.equal(receipts.length, 0);
+      continue;
+    }
+    vm.runInNewContext(scripts.save, context);
+    assert.equal(saved, 1);
+    assert.equal(receipts.length, 0, "returning from save is not completion");
+    doc.id = "after-save";
+    callback(outcome === "failure" ? new Error("disk full") : null);
+    callback(null);
+    assert.equal(
+      receipts.length,
+      1,
+      "duplicate callbacks cannot replace the original outcome",
+    );
+    assert.deepEqual(receipts[0], {
+      operationID: "operation-1",
+      stage: "save-completed",
+      ok: outcome === "success",
+      error: outcome === "failure" ? "Error: disk full" : null,
+      path: expectedPath,
+      docId: "after-save",
+    });
+  }
+  let propagated = false;
+  const doc = {
+    id: "before-save",
+    pages: [],
+    processPendingChanges() {
+      propagated = true;
+    },
+    save() {
+      assert.fail("mutation must not dispatch a save");
+    },
+  };
+  vm.runInNewContext(scripts.mutate, {
+    require: () => ({ getDocuments: () => [doc] }),
+    console: { log() {} },
+  });
+  assert.equal(propagated, true);
+  for (const outcome of ["closed", "pending", "wrong-path"]) {
+    let closed = 0;
+    const receipts = [];
+    const anchor = {
+      id: "anchor",
+      close() {
+        assert.fail("anchor must stay open");
+      },
+    };
+    const doc = {
+      id: "after-save",
+      path: outcome === "wrong-path" ? "/tmp/other.sketch" : encodedPath,
+      close() {
+        closed++;
+        if (outcome === "closed") docs = [anchor];
+      },
+    };
+    let docs = [anchor, doc];
+    const context = {
+      require: () => ({ getDocuments: () => docs }),
+      console: { log: (value) => receipts.push(JSON.parse(value)) },
+    };
+    if (outcome === "wrong-path") {
+      assert.throws(() => vm.runInNewContext(scripts.close, context));
+      assert.equal(closed, 0);
+    } else {
+      vm.runInNewContext(scripts.close, context);
+      assert.equal(closed, 1);
+      assert.deepEqual(receipts, [
+        {
+          closed: outcome === "closed",
+          anchorPresent: true,
+          remainingNonAnchor: outcome === "closed" ? [] : ["after-save"],
+        },
+      ]);
+    }
+  }
+});
+
+test("MCP responses accept native quoted JSON and temporary PNGs without masking errors", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      String.raw`
+import base64, json, os, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import sketch_mcp_roundtrip as rt
+
+client = rt.SketchMCPClient.__new__(rt.SketchMCPClient)
+client._initialized = True
+def response(value):
+    client._post_rpc = lambda *args, **kwargs: {"result": value}
+def rejected(value, call):
+    response(value)
+    try:
+        call()
+    except rt.MCPToolError as exc:
+        assert exc.payload == value
+    else:
+        raise AssertionError("Expected complete response rejection")
+def read():
+    return client.run_code("probe", "unused")
+
+expected = {"ok": True, "path": "/tmp/owner's copy #100%.sketch", "text": "line\n中文\\value"}
+plain = json.dumps(expected, ensure_ascii=False)
+quoted = "'" + plain.replace("\\", "\\\\").replace("'", "\\'") + "'"
+for text in [plain, quoted]:
+    response({"content": [{"type": "text", "text": text}]})
+    assert read() == expected
+response({"structuredContent": expected})
+assert read() == expected
+for invalid in [
+    {"content": [{"type": "text", "text": plain + "\nError: cleanup failed"}]},
+    {"content": [{"type": "text", "text": "Error: cleanup failed\n" + plain}]},
+    {"content": [{"type": "text", "text": plain}, {"type": "text", "text": "error"}]},
+    {"content": [{"type": "text", "text": plain}, {"type": "text", "text": plain}]},
+    {"content": [{"type": "text", "text": plain}], "isError": True},
+    {"content": [{"type": "text", "text": plain}], "structuredContent": {"ok": False}},
+    {"content": [{"type": "text", "text": "[]"}]},
+    {"content": [{"type": "text", "text": "'{}' + '{}': invalid"}]},
+]:
+    rejected(invalid, read)
+
+png64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
+png = base64.b64decode(png64)
+image = {"type": "image", "mimeType": "image/png", "data": png64}
+error = {"type": "text", "text": "Error: screenshot failed"}
+capture = lambda: client.get_screenshot(document_id="document", layer_id="target")
+with tempfile.TemporaryDirectory(prefix="sketch-response-contract-") as td:
+    root = Path(td)
+    path = root / "native screenshot.png"
+    path.write_bytes(png)
+    path_block = {"type": "text", "text": "The screenshot has been generated at " + str(path)}
+    for block in [image, path_block, {"type": "text", "text": json.dumps({"imageBase64": png64})}]:
+        response({"content": [block]})
+        assert capture() == png
+    for invalid in [
+        {"content": [image, error]}, {"content": [error, image]},
+        {"content": [path_block, error]}, {"content": [path_block], "isError": True},
+        {"content": [path_block], "structuredContent": {"error": "failed"}},
+        {"content": [{"type": "text", "text": json.dumps({"imageBase64": png64, "error": "failed"})}]},
+        {"content": [dict(image, data="invalid base64")]},
+        {"content": [dict(image, mimeType="image/jpeg")]},
+        {"content": [{"type": "text", "text": "The screenshot has been generated at /etc/private.png"}]},
+    ]:
+        rejected(invalid, capture)
+    for bad in [b"not a PNG", png[:-1]]:
+        path.write_bytes(bad)
+        rejected({"content": [path_block]}, capture)
+    path.unlink()
+    rejected({"content": [path_block]}, capture)
+    target = root / "target.png"
+    target.write_bytes(png)
+    path.symlink_to(target)
+    rejected({"content": [path_block]}, capture)
+    path.unlink()
+    os.link(target, path)
+    rejected({"content": [path_block]}, capture)
+    path.unlink()
+    path.write_bytes(png)
+    caller_temp = root / "caller-only"
+    caller_temp.mkdir()
+    original_platform, original_run = rt.sys.platform, rt.subprocess.run
+    original_tmpdir, original_cache = os.environ.get("TMPDIR"), tempfile.tempdir
+    try:
+        rt.sys.platform = "darwin"
+        os.environ["TMPDIR"] = str(caller_temp)
+        tempfile.tempdir = None
+        assert Path(tempfile.gettempdir()) == caller_temp
+        def platform_temp(args, **kwargs):
+            assert args == ["/usr/bin/getconf", "DARWIN_USER_TEMP_DIR"]
+            assert kwargs["check"] and kwargs["timeout"] == 5
+            return type("Result", (), {"stdout": str(root) + "\n"})()
+        rt.subprocess.run = platform_temp
+        response({"content": [path_block]})
+        assert capture() == png, "Sketch's PNG can be outside the caller's TMPDIR"
+        for invalid_root in ["", "relative/path"]:
+            rt.subprocess.run = lambda *a, **kw: type("Result", (), {"stdout": invalid_root})()
+            rejected({"content": [path_block]}, capture)
+        def unavailable(*args, **kwargs):
+            raise rt.subprocess.CalledProcessError(1, args[0])
+        rt.subprocess.run = unavailable
+        rejected({"content": [path_block]}, capture)
+    finally:
+        rt.sys.platform, rt.subprocess.run = original_platform, original_run
+        tempfile.tempdir = original_cache
+        if original_tmpdir is None: os.environ.pop("TMPDIR", None)
+        else: os.environ["TMPDIR"] = original_tmpdir
+`,
+      SCRIPTS_DIR,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("unknown save and close outcomes retain the original copy without retry or cleanup", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as rt
+
+with tempfile.TemporaryDirectory(prefix="sketch-save-outcomes-") as td:
+    root = Path(td)
+    source = root / "source.sketch"
+    with zipfile.ZipFile(source, "w") as z:
+        z.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "archive-doc"}))
+    original = source.read_bytes()
+    allocate = rt.tempfile.mkdtemp
+    rt.tempfile.mkdtemp = lambda **kwargs: allocate(dir=root, **kwargs)
+    rt._launch_sketch_background = lambda *args: ["open", "-g"]
+    for outcome in ["timeout", "missing", "wrong-operation", "wrong-path", "missing-doc", "wrong-doc", "failure", "contradictory", "callback-then-error", "close-timeout", "close-unconfirmed"]:
+        calls = []
+        class Client:
+            def __init__(self, **kwargs): pass
+            def get_screenshot(self, **kwargs):
+                calls.append("screenshot")
+                return b"synthetic image"
+            def run_code(self, title, script):
+                calls.append(title)
+                directory = next(p for p in root.glob("sketch-roundtrip-*") if p.is_dir())
+                op = json.loads((directory / "operation.json").read_text())
+                if "precheck" in title: return {"anchorPresent": True, "matching": []}
+                if "wait-open" in title: return {"ready": True, "docId": "saved-doc" if "saved" in title else "original-doc"}
+                if "mutate" in title: return {"ok": True}
+                if title == "roundtrip-step3-save":
+                    assert op["stage"] == "save-requested"
+                    if outcome == "timeout": raise TimeoutError("original save still has unknown outcome")
+                    if outcome == "missing": return {"rawText": "request accepted"}
+                    receipt = {"operationID": op["operationID"], "stage": "save-completed", "path": op["workingCopy"], "ok": True, "docId": "saved-doc"}
+                    if outcome == "wrong-operation": receipt["operationID"] = "another-operation"
+                    if outcome == "wrong-path": receipt["path"] = str(source)
+                    if outcome == "missing-doc": receipt.pop("docId")
+                    if outcome == "wrong-doc": receipt["docId"] = "another-doc"
+                    if outcome == "failure": receipt.update(ok=False, error="disk full")
+                    if outcome == "contradictory": receipt["error"] = "disk full"
+                    if outcome == "callback-then-error":
+                        raise rt.MCPToolError("run_code", {"isError": True, "content": [{"type": "text", "text": json.dumps(receipt)}]})
+                    return receipt
+                if "close" in title:
+                    assert "saved-doc" in script and "original-doc" not in script
+                    if outcome == "close-timeout": raise TimeoutError("close has unknown outcome")
+                    return {"closed": False, "remainingNonAnchor": ["saved-doc"]}
+                raise AssertionError(title)
+        rt.SketchMCPClient = Client
+        report = rt.run_mcp_roundtrip(source, "anchor", {"edits": []}, root / (outcome + "-shots"))
+        assert not report["passed"], report
+        recovery = report["recovery"]
+        assert recovery and Path(recovery["workingCopy"]).is_file(), report
+        assert Path(recovery["baselineCopy"]).read_bytes() == original
+        assert source.read_bytes() == original
+        assert calls.count("roundtrip-step3-save") == 1, calls
+        close_calls = [c for c in calls if "close" in c]
+        assert len(close_calls) == (1 if outcome.startswith("close-") else 0), calls
+        assert calls.count("screenshot") == (2 if outcome.startswith("close-") else 1), calls
+        assert not any("reopen" in c for c in calls), calls
+        assert recovery["slotReleased"] is False
+        if outcome == "failure": assert recovery["saveReceipt"]["ok"] is False
+        if outcome == "callback-then-error":
+            receipt = json.loads(recovery["failureResponse"]["payload"]["content"][0]["text"])
+            assert receipt["operationID"] == recovery["operationID"] and receipt["ok"] is True
+        # The fixture owns every retained operation and removes it after assertions.
+        rt.shutil.rmtree(recovery["directory"])
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("safe pre-edit cleanup preserves original MCP diagnostics in the report", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as rt
+with tempfile.TemporaryDirectory(prefix="sketch-failure-report-") as td:
+    root = Path(td)
+    source = root / "source.sketch"
+    with zipfile.ZipFile(source, "w") as z:
+        z.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc"}))
+    allocate = rt.tempfile.mkdtemp
+    rt.tempfile.mkdtemp = lambda **kwargs: allocate(dir=root, **kwargs)
+    rt._launch_sketch_background = lambda *args: ["open", "-g"]
+    original = {"isError": True, "content": [{"type": "text", "text": "Original native exception"}]}
+    cleanup = {"isError": True, "content": [{"type": "text", "text": "Close exception"}]}
+    for stage in ["precheck", "screenshot", "close-error"]:
+        calls = []
+        class Client:
+            def __init__(self, **kwargs): pass
+            def get_screenshot(self, **kwargs):
+                raise rt.MCPToolError("get_screenshot", original)
+            def run_code(self, title, script):
+                calls.append(title)
+                if "precheck" in title:
+                    if stage == "precheck": raise rt.MCPToolError("run_code", original)
+                    return {"anchorPresent": True, "matching": []}
+                if "wait-open" in title: return {"ready": True, "docId": "doc"}
+                if "close" in title:
+                    if stage == "close-error": raise rt.MCPToolError("run_code", cleanup)
+                    return {"closed": True, "anchorPresent": True, "remainingNonAnchor": []}
+                raise AssertionError(title)
+        rt.SketchMCPClient = Client
+        report = rt.run_mcp_roundtrip(source, "anchor", {"edits": []}, root / (stage + "-shots"))
+        assert not report["passed"] and report["failureResponse"]["payload"] == original, report
+        assert report["failedStep"] == ("prepared" if stage == "precheck" else "opened"), report
+        assert not any("mutate" in c or "save" in c for c in calls), calls
+        if stage == "close-error":
+            assert report["closeFailureResponse"]["payload"] == cleanup
+            assert report["recovery"]["failureResponse"]["payload"] == original
+            rt.shutil.rmtree(report["recovery"]["directory"])
+        else:
+            assert report["recovery"] is None and report["closeFailureResponse"] is None, report
+        assert not list(root.glob("sketch-roundtrip-*"))
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("archive comparison binds saved document identity without hiding other drift", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import copy, json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as rt
+
+with tempfile.TemporaryDirectory(prefix="sketch-save-identity-") as td:
+    root = Path(td)
+    doc = {"_class": "document", "do_objectID": "before", "colorSpace": 1, "pages": [{"_ref": "pages/page"}]}
+    page = {"_class": "page", "do_objectID": "page", "layers": [{"_class": "group", "do_objectID": "frame", "groupBehavior": 1, "layerListExpandedType": 2, "layers": []}]}
+    def archive(name, document, page_data=page):
+        target = root / (name + ".sketch")
+        with zipfile.ZipFile(target, "w") as z:
+            z.writestr("document.json", json.dumps(document))
+            z.writestr("pages/page.json", json.dumps(page_data))
+        return target
+    before = archive("before", doc)
+    saved = {**doc, "do_objectID": "after"}
+    after = archive("after", saved)
+    assert rt.diff_sketch_archives_offline(before, after, set())["unexpectedDriftCount"] == 2
+    bound = rt.diff_sketch_archives_offline(before, after, set(), ("before", "after"))
+    assert bound["unexpectedDriftCount"] == 0 and bound["expectedChangedCount"] == 0, bound
+    assert bound["documentIdentity"] == {"before": "before", "after": "after"}
+    assert rt.diff_sketch_archives_offline(before, before, set(), ("before", "before"))["unexpectedDriftCount"] == 0
+    for ids in [("wrong", "after"), ("before", "wrong"), ("frame", "after"), ("before", "frame"), ("", "after")]:
+        try: rt.diff_sketch_archives_offline(before, after, set(), ids)
+        except RuntimeError: pass
+        else: raise AssertionError(ids)
+    color = archive("color", {**saved, "colorSpace": 0})
+    drift = rt.diff_sketch_archives_offline(before, color, set(), ("before", "after"))
+    assert drift["unexpectedDriftCount"] == 1, drift
+    assert drift["unexpectedDrifts"][0]["after"]["rawAttributes"]["do_objectID"] == "after"
+    changed_page = copy.deepcopy(page)
+    changed_page["layers"][0]["layerListExpandedType"] = 0
+    changed = archive("layer", saved, changed_page)
+    assert rt.diff_sketch_archives_offline(before, changed, set(), ("before", "after"))["unexpectedDriftCount"] == 1
+    changed_page["layers"][0]["do_objectID"] = "before"
+    collision = archive("collision", saved, changed_page)
+    try: rt.diff_sketch_archives_offline(before, collision, set(), ("before", "after"))
+    except RuntimeError: pass
+    else: raise AssertionError("Root identity cannot conceal a layer identity collision")
 `,
     ],
     { encoding: "utf8", env: PY_ENV, timeout: 60000 },
@@ -1938,7 +2409,7 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
   const pngBase64Pre =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==";
   const pngBase64Post =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPgPAAEDAQAIicLsAAAASUVORK5CYII=";
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==";
 
   const server = http.createServer((req, res) => {
     let body = "";
@@ -1972,6 +2443,10 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
       const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
 
       if (toolName === "get_screenshot") {
+        assert.deepEqual(toolArgs, {
+          targetDocumentID: workDocId,
+          layerID: "40000000-0000-4000-8000-000000000001",
+        });
         if (state.failScreenshotOnce) {
           state.failScreenshotOnce = false;
           fs.writeFileSync(stateFile, JSON.stringify(state));
@@ -1989,6 +2464,8 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
           return;
         }
         const imgData = state.mutatedText1 ? pngBase64Post : pngBase64Pre;
+        const imagePath = path.join(tmpDir, "native-screenshot.png");
+        fs.writeFileSync(imagePath, Buffer.from(imgData, "base64"));
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
@@ -1996,7 +2473,10 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
             id: rpc.id,
             result: {
               content: [
-                { type: "image", data: imgData, mimeType: "image/png" },
+                {
+                  type: "text",
+                  text: "The screenshot has been generated at " + imagePath,
+                },
               ],
             },
           }),
@@ -2025,7 +2505,10 @@ state_path.write_text(json.dumps(state), encoding="utf-8")
             docId: workDocId,
             pagesCount: 1,
           };
-        } else if (title.includes("mutate-and-save")) {
+        } else if (
+          title.includes("step3-mutate") ||
+          title.includes("step3-save")
+        ) {
           state.mutatedText1 = "立即认证（已更新）";
           state.mutatedText2 = "副标题（已更新）";
           fs.writeFileSync(stateFile, JSON.stringify(state));
@@ -2046,7 +2529,7 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     for n, raw in members.items():
         zout.writestr(n, raw)
 `;
-          if (!state.skipDiskMutate) {
+          if (title.includes("step3-save") && !state.skipDiskMutate) {
             spawnSync(
               "python3",
               ["-B", "-c", pyMutate, state.workPath || copySketch],
@@ -2078,10 +2561,36 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
               },
             ],
           };
+          if (title.includes("step3-save")) {
+            const doc = {
+              id: workDocId,
+              path: encodeURI(state.workPath),
+              save(savePath, options, callback) {
+                assert.equal(savePath, state.workPath);
+                assert.equal(options.saveMode, 0);
+                callback(null);
+              },
+            };
+            vm.runInNewContext(toolArgs.script, {
+              require: () => ({
+                getDocuments: () => [doc],
+                Document: { SaveMode: { Save: 0 } },
+              }),
+              console: {
+                log: (value) => {
+                  replyObj = JSON.parse(value);
+                },
+              },
+            });
+          }
         } else if (title.includes("close")) {
           state.workOpen = false;
           fs.writeFileSync(stateFile, JSON.stringify(state));
-          replyObj = { closed: true, remainingNonAnchor: [] };
+          replyObj = {
+            closed: true,
+            anchorPresent: true,
+            remainingNonAnchor: [],
+          };
         } else if (title.includes("readback")) {
           replyObj = {
             ok: true,
@@ -2118,7 +2627,17 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
             jsonrpc: "2.0",
             id: rpc.id,
             result: {
-              content: [{ type: "text", text: JSON.stringify(replyObj) }],
+              content: [
+                {
+                  type: "text",
+                  text:
+                    "'" +
+                    JSON.stringify(replyObj)
+                      .replaceAll("\\", "\\\\")
+                      .replaceAll("'", "\\'") +
+                    "'",
+                },
+              ],
             },
           }),
         );
@@ -2157,22 +2676,26 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     failState.failScreenshotOnce = true;
     fs.writeFileSync(stateFile, JSON.stringify(failState));
 
-    const abortedRes = await runPythonAsync(PY_ROUNDTRIP, [
-      "--sketch",
-      copySketch,
-      "--anchor-id",
-      anchorId,
-      "--edit-spec",
-      JSON.stringify(editSpec),
-      "--output",
-      outReportPath,
-      "--screenshots-dir",
-      shotsDir,
-      "--mcp-url",
-      mcpUrl,
-      "--open-bin",
-      mockOpenBin,
-    ]);
+    const abortedRes = await runPythonAsync(
+      PY_ROUNDTRIP,
+      [
+        "--sketch",
+        copySketch,
+        "--anchor-id",
+        anchorId,
+        "--edit-spec",
+        JSON.stringify(editSpec),
+        "--output",
+        outReportPath,
+        "--screenshots-dir",
+        shotsDir,
+        "--mcp-url",
+        mcpUrl,
+        "--open-bin",
+        mockOpenBin,
+      ],
+      { env: { ...PY_ENV, TMPDIR: tmpDir } },
+    );
     assert.equal(abortedRes.status, 1);
     const stateAfterAbort = JSON.parse(fs.readFileSync(stateFile, "utf8"));
     assert.equal(
@@ -2185,22 +2708,26 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     stateAfterAbort.openCalls = [];
     fs.writeFileSync(stateFile, JSON.stringify(stateAfterAbort));
 
-    const res = await runPythonAsync(PY_ROUNDTRIP, [
-      "--sketch",
-      copySketch,
-      "--anchor-id",
-      anchorId,
-      "--edit-spec",
-      JSON.stringify(editSpec),
-      "--output",
-      outReportPath,
-      "--screenshots-dir",
-      shotsDir,
-      "--mcp-url",
-      mcpUrl,
-      "--open-bin",
-      mockOpenBin,
-    ]);
+    const res = await runPythonAsync(
+      PY_ROUNDTRIP,
+      [
+        "--sketch",
+        copySketch,
+        "--anchor-id",
+        anchorId,
+        "--edit-spec",
+        JSON.stringify(editSpec),
+        "--output",
+        outReportPath,
+        "--screenshots-dir",
+        shotsDir,
+        "--mcp-url",
+        mcpUrl,
+        "--open-bin",
+        mockOpenBin,
+      ],
+      { env: { ...PY_ENV, TMPDIR: tmpDir } },
+    );
     assert.equal(res.status, 0, res.stdout + "\n" + res.stderr);
     const report = JSON.parse(fs.readFileSync(outReportPath, "utf8"));
     assert.equal(report.passed, true);
@@ -2223,22 +2750,26 @@ with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as zout:
     finalState.skipDiskMutate = true;
     finalState.openCalls = [];
     fs.writeFileSync(stateFile, JSON.stringify(finalState));
-    const spoofedRes = await runPythonAsync(PY_ROUNDTRIP, [
-      "--sketch",
-      copySketch,
-      "--anchor-id",
-      anchorId,
-      "--edit-spec",
-      JSON.stringify(editSpec),
-      "--output",
-      outReportPath,
-      "--screenshots-dir",
-      shotsDir,
-      "--mcp-url",
-      mcpUrl,
-      "--open-bin",
-      mockOpenBin,
-    ]);
+    const spoofedRes = await runPythonAsync(
+      PY_ROUNDTRIP,
+      [
+        "--sketch",
+        copySketch,
+        "--anchor-id",
+        anchorId,
+        "--edit-spec",
+        JSON.stringify(editSpec),
+        "--output",
+        outReportPath,
+        "--screenshots-dir",
+        shotsDir,
+        "--mcp-url",
+        mcpUrl,
+        "--open-bin",
+        mockOpenBin,
+      ],
+      { env: { ...PY_ENV, TMPDIR: tmpDir } },
+    );
     assert.equal(spoofedRes.status, 1);
     const spoofedReport = JSON.parse(fs.readFileSync(outReportPath, "utf8"));
     assert.equal(spoofedReport.passed, false);
@@ -3144,8 +3675,7 @@ test("sketch-native: round-7 focus-ring border detection, shared style asset ref
     assert.ok(r9Codes.has("REF-DANGLING-OVERRIDE-STYLE"));
     assert.ok(!r9Codes.has("FLOW-HOME-DEAD-BACK-BUTTON"));
 
-    // 5. Verify _build_wait_open_js and _build_close_copy_by_path_js require full path match,
-    //    diff_sketch_archives_offline catches regular layer style.fills drift, and directory scans do not leak FDs
+    // 5. Verify archive style drift and directory scan resource ownership.
     const closeCheck = spawnSync(
       "python3",
       [
@@ -3156,13 +3686,6 @@ from pathlib import Path
 sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
 import sketch_mcp_roundtrip as rt
 import sketch_export_manifest as em
-
-wait_js = rt._build_wait_open_js("ANCHOR-1", "/tmp/copy.sketch")
-assert "Boolean(d.path) && String(d.path) === expectedPath" in wait_js, wait_js
-
-close_js = rt._build_close_copy_by_path_js("ANCHOR-1", "/tmp/copy.sketch", "COPY-DOC-1")
-assert "pathStr === expectedPath" in close_js, close_js
-assert "!pathStr && Boolean(expectedDocId) && idStr === expectedDocId" in close_js, close_js
 
 # Check FD count stays constant across 30 _validate_pinned_dir_fd scans
 test_dir = Path(sys.argv[1]) / "fd-leak-check"
@@ -3681,16 +4204,16 @@ finally:
     cm.measure_specs = orig_measure_specs
 
 # 7. Verify run_mcp_roundtrip enforces ZIP archive budget before copying or launching Sketch
-try:
-    rt.run_mcp_roundtrip(
-        sketch_path=bomb_sketch,
-        anchor_id="anchor-1",
-        edit_spec={"edits": []},
-        screenshots_dir=Path(sys.argv[1]) / "rt-shots",
-    )
-    raise AssertionError("Expected run_mcp_roundtrip to reject high-ratio archive before opening Sketch")
-except RuntimeError as exc:
-    assert "compression ratio limit" in str(exc), exc
+rejected_roundtrip = rt.run_mcp_roundtrip(
+    sketch_path=bomb_sketch,
+    anchor_id="anchor-1",
+    edit_spec={"edits": []},
+    screenshots_dir=Path(sys.argv[1]) / "rt-shots",
+)
+assert rejected_roundtrip["passed"] is False, rejected_roundtrip
+assert "compression ratio limit" in rejected_roundtrip["error"], rejected_roundtrip
+assert rejected_roundtrip["failedStep"] == "preparing", rejected_roundtrip
+assert rejected_roundtrip["recovery"] is None, rejected_roundtrip
 
 # 8. Verify _validate_export_render_budget enforces artboard count, dimension, and total pixel budgets
 try:

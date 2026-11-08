@@ -1,6 +1,6 @@
 ---
 name: sketch-native
-description: Generate, mutate, export, and verify macOS native .sketch documents for Sketch 2026.3 and later with zero focus-stealing, zero JSC bridge crashes, CoreText line-height parity, offline structural and prototype flow auditing, and single-slot non-activating Sketch MCP roundtrips. Trigger when creating, editing, assembling, exporting, auditing, or roundtrip-validating .sketch files or Sketch MCP workflows.
+description: Generate, mutate, export, and verify macOS native .sketch documents for Sketch 2026.3 and later with CoreText measurement, offline structural and prototype flow auditing, and single-slot non-activating Sketch MCP roundtrips with save receipts. Trigger when creating, editing, assembling, exporting, auditing, or roundtrip-validating .sketch files or Sketch MCP workflows.
 metadata:
   short-description: High-throughput native .sketch generation, CoreText layout parity, offline audit, and Sketch MCP roundtrip verification
 ---
@@ -9,9 +9,7 @@ metadata:
 
 ## Overview
 
-`sketch-native` provides a high-throughput, crash-free, zero-rework workflow and companion script toolkit for generating, mutating, exporting, and verifying macOS native `.sketch` documents (`Sketch 2026.3+`). Because Sketch, `sketchtool`, and `CoreText` are macOS-exclusive, this skill is installed and executed only on macOS (`darwin`); non-macOS installation plans automatically skip `sketch-native`, and `coretext_measure.py` fails closed rather than falling back to heuristic character estimation.
-
-It combines offline `.sketch` archive engineering (`zipfile` + macOS `CoreText` + `sketchtool`) with disciplined single-slot native Sketch MCP verification (`http://localhost:31126/mcp`), incorporating best practices from Sketch's official `sketch-hq/agents` skills and built-in Sketch 2026.3 `MCPGuides`.
+`sketch-native` generates, mutates, exports, and verifies `.sketch` documents for Sketch 2026.3+. It combines offline archives, CoreText measurement, and serialized native MCP checks. Execution is macOS-only: other platforms skip installation, and measurement fails closed without CoreText. The workflow incorporates Sketch's official `sketch-hq/agents` skills and built-in `MCPGuides`.
 
 The same skill directory is delivered to Codex, Claude Code, and Antigravity CLI on macOS. Resolve script and reference paths from this installed directory. Antigravity CLI discovers it under `~/.gemini/antigravity-cli/skills/sketch-native/`; installation does not register MCP servers or configure Sketch. Native MCP operations require the local Sketch endpoint to be available.
 
@@ -60,8 +58,10 @@ All operations that do not touch the live Sketch application window or MCP socke
 
 Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the single macOS `Sketch.app` process. Only **1 process at a time** may operate a working document in the MCP slot:
 
-- **Pre-baked script execution only**: Never perform multi-turn LLM reasoning while holding the MCP slot open. Prepare all edits and assertions ahead of time, then execute [`scripts/sketch_mcp_roundtrip.py`](scripts/sketch_mcp_roundtrip.py) in a single automated batch (`5–10s` per slot).
+- **Prepared execution**: Prepare all edits and assertions before acquiring the MCP slot, then execute [`scripts/sketch_mcp_roundtrip.py`](scripts/sketch_mcp_roundtrip.py) as one batch. Completion depends on native callbacks and verified closure; a timeout or elapsed slot target does not release ownership.
 - **Disposable copy isolation**: Always run MCP roundtrip checks against a disposable copy (`<disposable-copy.sketch>`) when verifying persistence and layout stability.
+- **Unknown outcome retention**: The tool records the operation ID, exact working-copy path, stage, and confirmed save receipt in a private `operation.json`. A failed report's `recovery` field names retained materials. After an edit, save, open, or close has an unknown outcome, preserve that operation and document; do not rerun the command, close it speculatively, or remove its directory. Resolve the original callback/result and exact document identity before continuing recovery. A changed file or an absent waiting process alone is insufficient. Successful verified roundtrips remove their private working copies; failed verification retains them for diagnosis.
+  A failed report keeps the original MCP `failureResponse` even when safe pre-edit cleanup removes the private copies. A cleanup MCP failure is recorded separately as `closeFailureResponse`. On macOS, screenshot file paths are bounded by the platform's user temporary directory, independently of a caller's custom `TMPDIR`; ownership, no-link reads, and byte limits still apply.
 
 ## Five Non-Negotiable Iron Rules
 
@@ -82,9 +82,10 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
 - **Forbidden in JS `run_code`**: Never recursively traverse `layer.layers` across a document or page in `run_code`.
 - **Permitted in JS `run_code`**:
   1. Read top-level document and page counts only: `doc.id`, `doc.pages.length`, per-page top-level `page.layers.length`, `doc.swatches.length`, `doc.sharedTextStyles.length`, and `doc.sharedLayerStyles.length`.
-  2. Locate `1–3` target layers by known UUID on a known page (or via `sketch.find('#<uuid>', targetPage)`), apply targeted property/override/focus-border mutations, call `doc.processPendingChanges()`, and call a single zero-argument `doc.save()`.
-  3. Capture targeted screenshots via `get_screenshot` (`artboard_id` or `layer_id`) and close the working document via `doc.close()` within `5–10s`.
-- **100% Offline Full-Document Diffing**: Full-document before/after comparisons of `frame` coordinates, `MSImmutableFlexGroupLayout` stacks, `HotSpot` layers, prototype `flow` links, and font descriptors must be performed 100% offline in Python via `zipfile` after `doc.save()`.
+  2. Locate `1–3` target layers by known UUID on a known page (or via `sketch.find('#<uuid>', targetPage)`), apply targeted property/override/focus-border mutations, and call `doc.processPendingChanges()`. Submit one save for the bound working-copy path and wait for its matching completion receipt.
+  3. After confirmed successful saving, rebind the live document through the exact copy path, capture targeted screenshots via `get_screenshot` with `targetDocumentID` and `layerID`, and close that document once. Verify closure before offline diffing or reopening.
+- **Offline Full-Document Diffing**: Compare `frame` coordinates, `MSImmutableFlexGroupLayout` stacks, `HotSpot` layers, prototype `flow` links, and font descriptors in Python via `zipfile` after saving and closure are confirmed. A successful save callback alone does not prove persisted mutation, screenshot equality, or absence of unexpected drift; verify those on the saved archive and after reopening.
+  The native save can assign a new document ID. The roundtrip binds that ID through the successful receipt, the exact-path live probe, and the saved archive before aligning only the document root identity for comparison. The report retains both IDs. Other document facts, including color space and layer attributes, remain strict drift checks; standalone archive comparisons do not assume a save identity transition.
 
 ### Rule 3: CoreText Line-Height Parity (`0 px` `NATIVE-LAYOUT-HOTSPOT-DESYNC`)
 
@@ -121,6 +122,7 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
   - `Accept: application/json, text/event-stream`
   - Pass back `Mcp-Session-Id` when returned by the server on `initialize`.
 - **Response Framing**: The endpoint may respond with `application/json` or `text/event-stream` (`data: {...}` SSE lines). Always parse both content types.
+- **Complete tool results**: The roundtrip client accepts one JSON object log, including Sketch's single-quoted console representation, or a structured object result. It rejects mixed, duplicate, or conflicting result blocks rather than extracting a success fragment. Screenshots may be inline PNG data or the documented temporary-file message; the client validates the complete response and reads only bounded, regular, current-user-owned PNG files under the system temporary directory without following links. PNG framing checks do not replace visual inspection of the captured image.
 
 ### Built-In Sketch 2026.3 MCP Tools
 
@@ -130,7 +132,7 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
 | `get_layer_tree_summary` | `page_id` or `artboard_id`, `depth` (`1..10`, default `3`) | Inspect bounded layer hierarchy natively without creating JSC wrapper storms. |
 | `get_design_assets` | `asset_types` (`colorVariables`, `textStyles`, `layerStyles`, `symbols`) | Inspect local and library tokens/styles before creating duplicates. |
 | `get_symbol_overrides` | `layer_id` | Inspect override slots and `commonOverrideIDPrefix` on a `SymbolInstance`. |
-| `get_screenshot` | `artboard_id` or `layer_id`, `scale` | Render live canvas PNG for a specific artboard or layer. |
+| `get_screenshot` | `targetDocumentID`, `layerID` | Render live canvas PNG for the explicitly bound document and layer. |
 | `run_code` | `{"title": "...", "script": "..."}` | Execute JS in Sketch context. Parameter key is **`script`** (never `code`). Return JSON via `console.log(JSON.stringify(...))`. |
 
 ### `run_code` Parser and Execution Rules (from Sketch 2026.3 `MCPGuides` & `sketch-hq/agents`)
@@ -138,7 +140,7 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
 1. **Use `"script"`, never `"code"`**: The `run_code` tool schema requires `{"title": "...", "script": "..."}`.
 2. **Multiline JS only (`llm-script.js` parser constraint)**: Never submit minified single-line scripts; Sketch's `llm-script.js` wrapper throws `SyntaxError: Parser error` on dense one-liners. Format scripts across multiple lines with no comments (`//` or `/* */`) and no duplicate `function` declarations in the same scope.
 3. **Deferred propagation (`doc.processPendingChanges()`)**: In Sketch 2026.2+, changes to Color Variables (`Swatch`), Shared Styles, Symbol overrides, Flex Stacks, and concentric corners (`layer.style.corners.concentric = true`) propagate lazily. Always call `doc.processPendingChanges()` before reading post-mutation frames, calling `get_screenshot`, or calling `doc.save()`.
-4. **Single zero-argument `doc.save()`**: Always call `doc.save()` with **zero arguments**. Never call `doc.save(path, callback)`, which opens a modal macOS Save-As sheet and hangs automated runs.
+4. **Confirmed asynchronous saving**: Call the [official save API](https://developer.sketch.com/reference/api/#save-the-document) once with the explicit working-copy path, intended `Document.SaveMode`, and callback. Only the callback emits the operation ID, observed path, document ID, and success/error receipt; returning from `save()` is not completion. The SDK manages its asynchronous lifetime. Do not add unconditional `fiber.cleanup()`. For a separately owned fiber, verify a usable handle and release it at most once. Preserve callback, transport, script, and cleanup errors separately; none authorizes another save.
 5. **Reversed Stack (`MSImmutableFlexGroupLayout` / `stackLayout`) child index order**:
    - In Sketch Stacks, main-axis visual order is the **reverse** of the `parent.layers` array index: the highest index (`layers.length - 1`) is packed **first** (Leftmost in Horizontal/Row stacks, Topmost in Vertical/Column stacks), and index `0` is packed **last** (Rightmost in Row, Bottommost in Column).
    - Never assign `parent.layers = [...]` to reorder or reparent children (which deletes layers or crashes with duplicate IDs). Reorder with `layer.index = targetIndex` followed by `parent.stackLayout.apply()`, and reparent with `child.parent = newParent`.
