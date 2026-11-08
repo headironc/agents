@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Sub-second full offline structural, layout, font, and flow auditor for .sketch files.
+"""Bounded offline structural, layout, font, and flow auditor for .sketch files.
 
-Performs 5 invariant checks in < 1s using Python zipfile + json:
+Checks five invariant families using Python zipfile + json:
 1. Archive & do_objectID uniqueness across document.json and pages/*.json.
 2. Reference integrity: symbolID, sharedStyleID, swatchID, MSImageData, overrideValues.
 3. Font hygiene: 0 Noto*, 0 hardcoded SFPro*, 0 Type/Platform sample/*, and
@@ -27,13 +27,12 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from sketch_archive import (
+    MAX_ZIP_JSON_MEMBER_BYTES,
+    parse_archive_json as _loads_json_bounded,
+)
 from sketch_json import (
-    MAX_JSON_BYTES,
-    MAX_DOM_DICT_NODES,
-    MAX_DOM_CONTAINER_ITEMS,
-    MAX_DOM_STRING_CHARS,
     new_budget as _new_dom_budget,
-    parse_json as _loads_json_bounded,
     read_json,
 )
 
@@ -212,12 +211,12 @@ def _write_text_nofollow(file_path: Path, text: str, mode: int = 0o600) -> None:
 
 MAX_ZIP_MEMBERS = 4096
 MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
-MAX_ZIP_JSON_MEMBER_BYTES = 8 * 1024 * 1024
-MAX_ZIP_TOTAL_JSON_BYTES = MAX_JSON_BYTES
 MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 MAX_ZIP_COMPRESSION_RATIO = 100.0
 MAX_ARCHIVE_PAGES = 64
-MAX_SYMBOL_EXPANSION_STEPS = 50000
+# Whole-document reference/flow auditing visits repeated instances without
+# creating native measurement or render jobs. Bound those visits separately.
+MAX_SYMBOL_EXPANSION_STEPS = 1000000
 MAX_FLOW_EDGES = 8192
 
 
@@ -1803,7 +1802,7 @@ def run_offline_audit(
                 "findings": [
                     _new_finding(
                         "archive_and_ids",
-                        "ARCHIVE-ZIP-BUDGET-EXCEEDED",
+                        "AUDIT-WORK-BUDGET-EXCEEDED",
                         str(exc),
                     )
                 ],

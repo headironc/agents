@@ -30,13 +30,12 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from sketch_archive import (
+    MAX_ZIP_JSON_MEMBER_BYTES,
+    parse_archive_json as _loads_json_bounded,
+)
 from sketch_json import (
-    MAX_JSON_BYTES,
-    MAX_DOM_DICT_NODES,
-    MAX_DOM_CONTAINER_ITEMS,
-    MAX_DOM_STRING_CHARS,
     new_budget as _new_dom_budget,
-    parse_json as _loads_json_bounded,
     read_json,
 )
 
@@ -718,8 +717,6 @@ def convert_png_to_lossless_webp(
 
 MAX_ZIP_MEMBERS = 4096
 MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
-MAX_ZIP_JSON_MEMBER_BYTES = 8 * 1024 * 1024
-MAX_ZIP_TOTAL_JSON_BYTES = MAX_JSON_BYTES
 MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 MAX_ZIP_COMPRESSION_RATIO = 100.0
 MAX_ARCHIVE_PAGES = 64

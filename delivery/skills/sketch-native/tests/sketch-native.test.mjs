@@ -263,7 +263,7 @@ with tempfile.TemporaryDirectory(prefix="sketch-input-contract-") as td:
   assert.equal(res.status, 0, res.stderr);
 });
 
-test("archive readers and audit baselines enforce shared JSON budgets", () => {
+test("archive readers use aggregate archive limits while baselines stay small", () => {
   const res = spawnSync(
     "python3",
     [
@@ -277,23 +277,42 @@ import coretext_measure as cm
 import sketch_offline_audit as audit
 import sketch_export_manifest as export
 import sketch_mcp_roundtrip as roundtrip
+import sketch_archive as archive
+import sketch_json as bounded
 
 oversized_string = json.dumps({"artboards": [], "metadata": [["x" * 2097153]]}).encode("utf-8")
 for module in (cm, audit, export, roundtrip):
-    try:
-        module._loads_json_bounded(oversized_string, "nested.json")
-    except RuntimeError as exc:
-        assert "string character count" in str(exc), str(exc)
-    else:
-        raise AssertionError(module.__name__ + " accepted unbounded nested strings")
-    budget = module._new_dom_budget()
-    module._loads_json_bounded(json.dumps({"a": "x" * 1048576}).encode("utf-8"), "first.json", budget)
-    try:
-        module._loads_json_bounded(json.dumps({"b": ["x" * 1048576]}).encode("utf-8"), "second.json", budget)
-    except RuntimeError as exc:
-        assert "string character count" in str(exc), str(exc)
-    else:
-        raise AssertionError(module.__name__ + " reset the aggregate JSON budget")
+    assert module._loads_json_bounded(oversized_string, "nested.json")["metadata"]
+    # Seed prior members at the boundary, then charge an independently counted
+    # final member. No test needs to allocate the maximum supported archive.
+    for key, limit, raw, message in [
+        ("chars", archive.JSON_LIMITS.chars, b'"x"', "string character count"),
+        ("dicts", archive.JSON_LIMITS.dicts, b'{}', "object count"),
+        ("items", archive.JSON_LIMITS.items, b'[0]', "container item count"),
+        ("tokens", archive.JSON_LIMITS.items, b'[0]', "structural complexity"),
+        ("json_bytes", archive.JSON_LIMITS.bytes, b'0', "total size"),
+    ]:
+        budget = module._new_dom_budget()
+        budget[key] = limit
+        try:
+            module._loads_json_bounded(raw, "last.json", budget)
+        except RuntimeError as exc:
+            assert message in str(exc), str(exc)
+        else:
+            raise AssertionError(module.__name__ + " reset " + key)
+
+# Independently check exact count semantics across multiple members.
+budget = bounded.new_budget()
+limits = bounded.JsonLimits(bytes=100, dicts=2, items=4, chars=4)
+bounded.parse_json(b'{"a":["x"]}', "first", budget, limits=limits)
+bounded.parse_json(b'{"b":["y"]}', "second", budget, limits=limits)
+assert (budget["dicts"], budget["items"], budget["chars"]) == (2, 4, 4), budget
+try:
+    bounded.parse_json(b'"z"', "third", budget, limits=limits)
+except RuntimeError as exc:
+    assert "string character count" in str(exc), str(exc)
+else:
+    raise AssertionError("aggregate string boundary was not enforced")
 
 with tempfile.TemporaryDirectory(prefix="sketch-baseline-contract-") as td:
     root = Path(td)
@@ -311,6 +330,113 @@ with tempfile.TemporaryDirectory(prefix="sketch-baseline-contract-") as td:
         report = json.loads(output.getvalue())
         assert status != 0 and not report["passed"] and error in report["error"], report
         assert manifest.read_bytes() == raw
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("all archive consumers read multi-page documents beyond CLI JSON limits", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import hashlib, json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+import sketch_offline_audit as audit
+import sketch_export_manifest as export
+import sketch_mcp_roundtrip as roundtrip
+import sketch_archive as archive
+import sketch_json as bounded
+
+with tempfile.TemporaryDirectory(prefix="sketch-large-archive-") as td:
+    source = Path(td) / "large.sketch"
+    with zipfile.ZipFile(source, "w", compression=zipfile.ZIP_STORED) as z:
+        z.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc",
+            "pages": [{"_ref": "pages/p0"}, {"_ref": "pages/p1"}]}))
+        z.writestr("meta.json", "{}")
+        for page in range(2):
+            artboards = [{"_class": "artboard", "do_objectID": "ab-" + str(page * 2 + i),
+                "name": "Synthetic", "frame": {"x": 0, "y": 0, "width": 100, "height": 100},
+                "layers": [], "metadata": {"notes": "x" * 4500000,
+                    "entries": [{"a": j, "b": j, "c": j, "d": j} for j in range(10000)]}}
+                for i in range(2)]
+            raw = json.dumps({"_class": "page", "do_objectID": "p" + str(page), "layers": artboards})
+            assert len(raw) > 8 * 1024 * 1024
+            z.writestr("pages/p" + str(page) + ".json", raw)
+    before = hashlib.sha256(source.read_bytes()).digest()
+    with zipfile.ZipFile(source) as z:
+        assert sum(i.file_size for i in z.infolist()) > 16 * 1024 * 1024
+    report = audit.run_offline_audit(source)
+    assert report["passed"] and report["summary"]["artboardsCount"] == 4, report
+    boards, clocks = export.inspect_sketch_artboards_and_clocks(source)
+    assert len(boards) == 4 and not clocks, (boards, clocks)
+    snapshot = roundtrip._extract_archive_snapshot(source)
+    assert all("ab-" + str(i) in snapshot for i in range(4)), snapshot.keys()
+    def no_measurements(items, **kwargs):
+        assert not items
+        return {"results": []}
+    cm.measure_specs = no_measurements
+    report = cm.audit_and_rebake_sketch(source)
+    assert report["passed"] and report["measuredCount"] == 0, report
+    assert hashlib.sha256(source.read_bytes()).digest() == before
+
+# A large member is rejected before the standard decoder can allocate its DOM.
+def forbidden_parse(*args, **kwargs):
+    raise AssertionError("over-limit archive member reached JSON parsing")
+archive.parse_json = forbidden_parse
+try:
+    archive.parse_archive_json(b" " * (32 * 1024 * 1024 + 1), "pages/oversized.json")
+except RuntimeError as exc:
+    assert "byte limit" in str(exc), exc
+else:
+    raise AssertionError("archive member size was not bounded")
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("whole-document audit bounds repeated symbol work independently of native jobs", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_offline_audit as audit
+import coretext_measure as measure
+import sketch_export_manifest as export
+
+frame = {"x": 0, "y": 0, "width": 100, "height": 100}
+master = {"_class": "symbolMaster", "do_objectID": "master", "symbolID": "symbol", "frame": frame,
+    "layers": [{"_class": "rectangle", "do_objectID": "leaf-" + str(i), "frame": frame} for i in range(64)]}
+instances = [{"_class": "symbolInstance", "do_objectID": "instance-" + str(i), "symbolID": "symbol", "frame": frame}
+    for i in range(1000)]
+with tempfile.TemporaryDirectory(prefix="sketch-audit-work-") as td:
+    source = Path(td) / "instances.sketch"
+    with zipfile.ZipFile(source, "w") as z:
+        z.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc", "pages": [{"_ref": "pages/p"}]}))
+        z.writestr("meta.json", "{}")
+        z.writestr("pages/p.json", json.dumps({"_class": "page", "do_objectID": "p", "layers": [master,
+            {"_class": "artboard", "do_objectID": "board", "frame": frame, "layers": instances}]}))
+    report = audit.run_offline_audit(source)
+    assert report["passed"], report
+    # Show that this fixture crosses the former whole-document work boundary.
+    audit.MAX_SYMBOL_EXPANSION_STEPS = 50000
+    report = audit.run_offline_audit(source)
+    assert report["findings"][0]["code"] == "AUDIT-WORK-BUDGET-EXCEEDED", report
+    assert "50001" in report["findings"][0]["message"], report
+    assert measure.MAX_SYMBOL_EXPANSION_STEPS == export.MAX_SYMBOL_EXPANSION_STEPS == 50000
 `,
     ],
     { encoding: "utf8", env: PY_ENV, timeout: 60000 },
@@ -3550,11 +3676,15 @@ with zipfile.ZipFile(dst_style_sketch, "w") as zf:
 up_style_audit = soa.run_offline_audit(dst_style_sketch, source_sketch_path=src_style_sketch)
 assert not any(f["code"] == "REF-DANGLING-SHARED-STYLE" for f in up_style_audit["findings"]), up_style_audit["findings"]
 
-# 11. Verify _loads_json_bounded enforces DOM object/container complexity budget
+# 11. Verify archive parsing preserves the aggregate object boundary
 try:
+    import sketch_archive as archive
+    exhausted = soa._new_dom_budget()
+    exhausted["dicts"] = archive.JSON_LIMITS.dicts
     soa._loads_json_bounded(
-        b"[" + b",".join([b"{}"] * (soa.MAX_DOM_DICT_NODES + 5)) + b"]",
+        b"[{}]",
         "pages/dom-bomb.json",
+        exhausted,
     )
     raise AssertionError("Expected _loads_json_bounded to reject excessive DOM object count")
 except RuntimeError as exc:
@@ -3752,9 +3882,12 @@ with zipfile.ZipFile(dup_zip_path, "r") as zf:
 # 16. Verify _loads_json_bounded enforces DOM complexity across cm, sem, and rt
 for mod in (cm, sem, rt):
     try:
+        exhausted = mod._new_dom_budget()
+        exhausted["dicts"] = archive.JSON_LIMITS.dicts
         mod._loads_json_bounded(
-            b"[" + b",".join([b"{}"] * (mod.MAX_DOM_DICT_NODES + 5)) + b"]",
+            b"[{}]",
             "pages/dom-bomb.json",
+            exhausted,
         )
         raise AssertionError(f"Expected {mod.__name__}._loads_json_bounded to reject excessive DOM objects")
     except RuntimeError as exc:
