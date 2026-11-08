@@ -9,10 +9,10 @@
 | 能力 | 入口 | 使用边界 |
 | --- | --- | --- |
 | Codex 规则与专业偏好 | [Codex 规则](delivery/AGENTS.md)、[写作规范](delivery/policy/writing.md)、[Rust](delivery/policy/rust.md)、[SQL](delivery/policy/sql.md) | 专业偏好由项目明确采用 |
-| 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 开发设备由 Human 明确选择，可用 Mac 或 SSH 连接的原生 Linux；绑定实际宿主、工作区、模型路线及适用 Goal，按实际方向验证领取与回报路径；普通短任务直接完成，能力与限制见[使用说明](docs/usage.md#mac-与-dev-的结果回传)及[验证边界](docs/usage.md#验证能说明什么) |
-| 总协调启动提示词 | [通用模板与 Nucleus 使用约定](docs/prompts/coordinator.md) | 明确启用后，总协调派发、跟进和接纳，负责人实施与验证；普通文档，不安装，也不自动继承持续交付或合并授权 |
+| 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 采用快慢三级路由（`Architect/Debugger`、`Coder/Reviewer` 日常 `low` 档位、`Runner/Explorer` 极速 `low` 档位）与 150K Token 上下文护栏；开发设备由 Human 明确选择，普通单会话任务直接完成，多切片任务通过 `progress.md` / `spec.md` 锚点推进；能力与限制见[使用说明](docs/usage.md#mac-与-dev-的结果回传)及[验证边界](docs/usage.md#验证能说明什么) |
+| 总协调启动提示词 | [通用模板与 Nucleus 使用约定](docs/prompts/coordinator.md) | 明确启用后，总协调保持极简上下文（目标 `<50K Token`）负责拆分、派发、跟进和精简证据接纳，执行会话默认按 `Sol low` 高速完成编码验证与 PR，实现多切片全自动连续推进；普通文档，不安装 |
 | 本机协作提醒 | [使用与恢复](docs/usage.md#本机协作提醒) | 本机可选配置，独立于源码交付；启用状态与授权按实际环境核对 |
-| Claude Code 与 DeepSeek 可选委派 | [分工与授权](delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](delivery/policy/claude-code.md) | 按任务与能力适配选用，支持完整结果；负责人判断与验收，不设调用比例；未接入 CI 或审查关卡 |
+| 外部模型 CLI 桥接与 DeepSeek | [分工与授权](delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](delivery/policy/claude-code.md) | 按任务与能力适配选用（禁用 Anthropic Claude 模型，连接本合同定义的 DeepSeek 官方、OpenCode 官方或其他已获准兼容开源模型端点，默认显式 `low` 档位）；负责人判断与验收；未接入 CI 或审查关卡 |
 | 设计稿与看图验收 | [figma-design-workflow](delivery/skills/figma-design-workflow/SKILL.md)、[sketch-native](delivery/skills/sketch-native/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Figma 工作流为 Codex 专用，Sketch 原生技能限 macOS 安装与运行；保留可编辑结果与真实像素验收；历史实测范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
 | 产品指令 | [交付目录](docs/usage.md#交付目录) | 直接维护与安装位置相同的源码布局 |
 | 文档检查器 | [工具契约](delivery/policy/tool-contracts.md) | 提示中文句长，阻塞混排空格及表格编号错误 |

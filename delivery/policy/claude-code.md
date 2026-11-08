@@ -1,16 +1,16 @@
-# Claude Code
+# External Model CLI Bridge (`claude-code`)
 
 Contract subject: `claude-code`.
 
-本合同拥有 Claude Code 的公共调用、结果与日志规则。可选委派、模型及授权由[模型政策](models.md#claude-code-and-deepseek-delegation)定义。开发执行遵循[开发设备选择](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。仅在选用本客户端时，按任务选择只读、有界执行或显式设计模式。设计稿默认路线见[任务起点](models.md#task-start-and-execution-routing)，可编辑结果与视觉验收见[设计工作流](../skills/figma-design-workflow/SKILL.md)。先核对实际 CLI 版本、实际接收端点及有效参数。
+本合同定义通过本地 CLI 桥接器调用 DeepSeek、OpenCode 等非 Anthropic 模型的结构化契约、参数与结果核验规则。可选委派、模型分层及授权由[模型政策](models.md#claude-code-and-deepseek-delegation)定义。开发执行遵循[开发设备选择](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。仅在选用本桥接路线时，按任务选择只读、有界执行或显式设计模式。设计稿默认路线见[任务起点](models.md#task-start-and-execution-routing)，可编辑结果与视觉验收见[设计工作流](../skills/figma-design-workflow/SKILL.md)。先核对实际 CLI 版本、实际接收端点及有效参数。
 
-模型接口只允许 DeepSeek 官方与 OpenCode 官方服务。负责人在这两者中选择满足任务需要的路线，合适时复用当前配置，无须逐次请示。`https://api.deepseek.com/anthropic` 是 DeepSeek 官方 Anthropic 兼容端点。OpenCode 路线按其官方 API 文档核对实际地址。第三方转发或自建兼容地址不因使用同一模型名而进入允许范围。核对本次实际接收端点、凭据来源、模型和 effort，不显示密钥或鉴权头。客户端名及响应模型名不证明实际上游身份。材料、操作及更窄的用户限制继续适用。扩大接收方范围必须有用户明确决定。
+禁用 Anthropic Claude 原生模型及特化提示词写法；模型接口仅连接本合同定义的 DeepSeek 官方、OpenCode 官方或其他已获准并纳入本合同的兼容开源模型端点。负责人在允许范围内选择满足任务需要的路线，合适时复用当前配置，无须逐次请示。`https://api.deepseek.com/anthropic` 是 DeepSeek 官方兼容端点。OpenCode 路线按其官方 API 文档核对实际地址。第三方转发或自建兼容地址不因使用同一模型名而进入允许范围。核对本次实际接收端点、凭据来源、模型和 effort，不显示密钥或鉴权头。
 
-按实际服务解析模型名。[DeepSeek 的 Anthropic 兼容映射](https://api-docs.deepseek.com/guides/anthropic_api/)把 `claude-opus*` 映射到 `deepseek-v4-pro`。其他 `claude*` 别名映射到 Flash。这是兼容行为，不构成 V4 Pro 的选用建议或账号可用证明。不要把这种调用报告成 Anthropic Opus 或 Sonnet。优先使用本路线支持的明确 DeepSeek 标识，并核实际返回及计费模型。
+按实际服务解析模型名，优先显式传入目标模型标识（如 `deepseek-flash` 或 `deepseek-v4.1-flash`），避免依赖 `claude-*` 兼容别名。日常编码、重构、单测与轻量辅助任务显式将推理档位（effort）设为 `low` 以消除思考卡顿；仅在多跳复杂推理或疑难排查时升至 `high`。
 
 当前 V4.1 Flash 在 [DeepSeek 官方 API](https://api-docs.deepseek.com/quick_start/pricing/) 使用 `deepseek-flash`。[OpenCode Go 目录](https://opencode.ai/v2/docs/console/go)将其列为 `deepseek-v4.1-flash`。按实际服务和协议解析，不跨路线照搬。
 
-[DeepSeek 推理档位](https://api-docs.deepseek.com/guides/thinking_mode/)的规范值为 `low`、`high`、`max`；`medium` 和 `xhigh` 映射为 `high`。核对所选服务及客户端实际支持和传递的值。客户端接受参数，不证明服务端有效档位。
+[DeepSeek 推理档位](https://api-docs.deepseek.com/guides/thinking_mode/)的规范值为 `low`、`high`、`max`。核对所选服务及客户端实际支持和传递的值。客户端接受参数，不证明服务端有效档位。
 
 ## 只读辅助
 
@@ -32,40 +32,18 @@ Contract subject: `claude-code`.
 
 ## 工具与权限
 
-`--tools` 限制内置工具集合，不限制 MCP。`--allowedTools` 提供免提示许可，不构成封闭白名单。`dontAsk` 拒绝原本会询问的调用，已许可或无需询问的动作仍可执行。调用前核对继承权限、技能的 `allowed-tools`、hooks、其他审批扩展、插件及实际 MCP 集合。配置中的权限数组会合并。按有效授权设置本次必要许可，不要求用户逐个批准技术参数。
+`--tools` 限制内置工具集合，`--allowedTools` 提供免提示许可，调用前核对继承权限、技能 `allowed-tools`、可信 hooks 及实际 MCP 集合。需要显式 MCP 配置时使用 `--strict-mcp-config --mcp-config`。
 
 ### 权限模式与实际生效
 
-已授权的有界开发优先使用受支持的 `auto`。CLI 显式传入 `--permission-mode auto`；SDK 使用对应的 `permissionMode: "auto"`。`auto` 使用安全审查模型判断待审批动作，不等于跳过权限。核对实际 CLI 与 SDK 版本、组织限制、有效模式和审批模型。print 与 SDK 的启动默认值随版本和配置变化，不依赖默认值推断本次模式。
-
-当前官方支持以 `CLAUDE_CODE_AUTO_MODE_MODEL` 指定审批模型，要求 Claude Code 2.1.302 或更高版本。仅在本次子进程设置，并核对继承的模型映射。审批调用也受本文的服务商和材料授权约束；不要让默认审批模型引入未授权接收方。变量被接受或主模型能响应，都不证明审批模型兼容。
-
-在真实必要动作中核对有效模式及判定记录。客户端审批可从受限调试日志的 `classifier_request_started` 核对实际模型；配置被忽略时核对对应原因。服务端审查可能没有这条记录，应另核对受支持的状态及实际判定。日志先按本文要求脱敏。仅设置 `auto`、模型别名或变量，不足以宣称生效。DeepSeek 经 OpenCode 执行审批的兼容性仍须真实验收。
-
-`dontAsk` 适用于明确接受未获准动作直接失败的任务，不作为无人值守开发的通用默认。内部安全检查仍可能把匹配允许前缀的命令转交审批。将这类请求直接拒绝，不能证明任务没有授权。不要通过反复变换补丁、命令或执行者解除拒绝。
+已授权的有界开发优先按实际支持显式传入 `--permission-mode auto`（SDK 为 `permissionMode: "auto"`）；仅在当前子进程按需设置受支持的审批模型环境变量（如 `CLAUDE_CODE_AUTO_MODE_MODEL`），使审批接收方仍限原授权范围。核对实际生效模式、实际审批模型或服务端 classifier 判定及终态；仅传参数、别名、保存配置或收到主模型响应不证明 `auto` 已生效，兼容性未证时保持未知。`dontAsk` 会把内部安全预检查（如含复杂补丁或引号 heredoc 的命令）的 `ask` 直接转为拒绝，仅用于明确接受未获准动作直接失败的只读或受限任务，不作为无人值守开发的默认模式，也不将此类内部拒绝混作宿主拒绝或材料未获授权。
 
 ### 正常审批转交
 
-`auto` 不可用或正常转交审批时，使用官方 SDK 的 `canUseTool`，或 CLI 支持的 `--permission-prompt-tool` 接收请求。CLI 提示工具必须来自本次明确加载的 MCP 集合。需要时在本次调用使用 `default` 加审批回调。回调只处理实际到达的请求，不保证覆盖先前已允许或已拒绝的动作。无人值守调用必须有实际可工作的审批接收者。未收到回调、classifier 无判定或工具仍被拒时，按具体原因报告，不能当作成功回退。
-
-原负责人依据有效用户授权审查完整请求，绑定请求标识。审查覆盖工具名、原始输入、工作区、目标、效果及真实判定理由。支持的 SDK 可提供 `decisionReason` 与工具调用标识；缺失时保留缺口。范围已覆盖且正常机制允许负责人决定时，仅批准当前请求。保留原始输入与决定证据。不返回扩大许可的 `updatedPermissions`，不按工具名或命令前缀批量允许。原有 deny、可信 hook 拒绝和专属用户决定继续阻断。正常审批不代替缺失的业务或操作授权。
-
-保留 Codex 宿主已有审批政策、审批器和沙箱。Claude Code 的模式及审批模型只在本次调用内选择。区分宿主拒绝、内部待审批、明确 deny 和运行失败，沿各自支持的机制处理。实际拒绝解除后，核对原运行、真实差异、终态与匹配候选的检查。机制已确认、候选修法和端到端成功分别报告。
-
-需要显式 MCP 配置时使用 `--strict-mcp-config --mcp-config`，并核对实际载入的服务器。工具许可与路径约定不构成宿主隔离，服务器选择也不证明 Figma `fileKey` 隔离。目标限制仍由授权、委派材料与操作核对承担。保留可信 hooks、宿主和平台权限；无法满足边界时暂停依赖执行。不得全局跳过权限、禁用适用 hooks 或修改个人配置来解除限制。明确拒绝后，核对原因并沿正常支持机制处理，不换路规避拒绝。
+`auto` 不可用或触发正常审批转交时，通过 SDK `canUseTool` 或 CLI `--permission-prompt-tool` 接收范围内原始工具请求。原负责人依据有效用户授权核对完整输入、工作区、目标、实际效果、真实理由与请求标识后，范围内只批本次且不写新权限（不返回 blanket allow、按前缀批量准许或扩大许可的 `updatedPermissions`）；既有 `deny`、可信 hook 拒绝或专属用户决定保持阻断。未收到实际回调、classifier 无判定或真实开发未完成时，分开报告机制、候选与真实终态，不把配置保存或外发成功当作端到端修复完成。
 
 ## 公共调用与结果
 
-调用方绑定实际接收端点、输入材料、版本、任务范围和预期报告。通过标准输入提供材料，避免把内容放进命令参数。工具读取的文件、自动加载的指令与插件上下文同样属于材料范围，调用前核对。保留可信 hooks 和宿主权限；CLI 参数不代替宿主隔离。
+通过标准输入传递任务材料，仅在本次子进程设置模型、effort（将 `CLAUDE_CODE_EFFORT_LEVEL` 与 CLI 参数对齐，日常默认 `low`）及网关地址，不修改个人持久配置，也不默认使用会跳过 hooks 的 `--bare`。
 
-保留现有个人配置，只在本次子进程设置模型、effort 及必要的网关地址。`CLAUDE_CODE_EFFORT_LEVEL` 优先于 `--effort`。将选定值同时用于 CLI、子进程环境和本次 `--settings` 的 `env.CLAUDE_CODE_EFFORT_LEVEL`，核对有效覆盖，不写入持久配置。无法确认客户端有效值时报告缺口，服务端有效档位另行核实。`--bare` 会跳过 hooks、自动发现的指令等功能，不作为通用调用默认值。只有确认未移除适用约束、输入与凭据来源也已明确时，才使用隔离调用。不得靠跳过配置规避拒绝。
-
-结构化采集使用 `--output-format stream-json --verbose`。区分发送的模型、effort 与响应中的模型标识。服务端未证明的具体版本或有效档位仍记为未知。客户端名、配置中的模型名和端点地址都不证明实际上游身份。保留完整任务报告及必要的运行元数据。日志省略凭据、鉴权头、原始 thinking 和图片 base64。工具参数及结果也先脱敏；不因块类型为 text 或 tool_result 就认定安全。保留可读预览位置及必要调用证据。客户端费用估算不作为 DeepSeek 账单。
-
-完成时同时核对进程退出码、结果的 `is_error` 和报告完整性。要求退出码为 0、`is_error` 为 false，且报告满足本次输出合同。核对终止原因与已知流错误；只有 `subtype: success` 或 HTTP 200 不足以证明完成。缺少结构化结果、截断或只有 thinking 时，按未完成处理。报告有效不等于其中的判断正确，接纳仍由主代理负责。
-
-失败后先检查实际版本、地址、模型、参数和原运行句柄。核对已产生的差异、子进程及外部操作状态。未知写结果先回读原目标；本地取消不证明外部操作结束。沿正常支持机制修复已确认原因，或由负责人接回剩余工作。保留部分成果及其覆盖范围，不重复同一失败或重发结果未知的操作。
-
-输出截断可能触发 CLI 自动续写。Claude Code 2.1.303 的本地模拟实测中，单次启动产生了四次请求。`--max-turns 1` 也未限制这类续写。这个观察只覆盖被测版本和条件，不是固定重试合同。调用方核对实际请求及终止状态。失败后先诊断材料范围、参数与输出，再决定是否重试。超时取消后核实本地进程终止。服务端完成状态未知时保留未知，不直接重发。
-
-参数依据见 [Claude Code CLI](https://code.claude.com/docs/en/cli-reference)、[权限](https://code.claude.com/docs/en/permissions)、[权限模式与审批模型](https://code.claude.com/docs/en/permission-modes)、[SDK 权限顺序](https://code.claude.com/docs/en/agent-sdk/permissions)、[审批回调](https://code.claude.com/docs/en/agent-sdk/user-input)、[设置优先级](https://code.claude.com/docs/en/settings)、[环境变量](https://code.claude.com/docs/en/env-vars)和 [headless 模式](https://code.claude.com/docs/en/headless)。服务兼容范围见 [DeepSeek Anthropic API](https://api-docs.deepseek.com/guides/anthropic_api/) 及 [OpenCode 的 Claude Code 接入说明](https://opencode.ai/v2/docs/console/harnesses/claude-code/)。更换版本或遇到相反证据时，核对受影响的合同与行为。本仓库交付本合同，不交付 Claude Code 可执行文件或调用执行器。
+结构化采集使用 `--output-format stream-json --verbose`，日志脱敏省略凭据、鉴权头、原始 thinking 与图片 base64。完成时同时核对退出码为 `0`、`is_error: false` 以及结构化结果完整；失败或超时后先回读已产生的差异和原目标状态，诊断原因后再由负责人决定修复或接回，不盲目重发未知写操作。参数依据见 [Claude Code CLI](https://code.claude.com/docs/en/cli-reference)、[权限模式](https://code.claude.com/docs/en/permission-modes)、[DeepSeek Anthropic API](https://api-docs.deepseek.com/guides/anthropic_api/) 与 [OpenCode 接入说明](https://opencode.ai/v2/docs/console/harnesses/claude-code/)。

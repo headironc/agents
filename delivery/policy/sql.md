@@ -33,8 +33,8 @@ These preferences, including [SQL correctness](#sql-correctness), apply to proje
 
 ## Tables and schemas
 
-- Use one complete English word in lowercase plural form for each table name. Multiword table names are prohibited; do not concatenate words or invent abbreviations to evade this rule.
-- Name relationship tables for their business meaning, as in `memberships`, `assignments`, or `grants`.
+- Use lowercase plural English nouns in `snake_case` for table names. Prefer a single word when it is clear (as in `users` or `invoices`), and allow clear compound `snake_case` names for domain entities and join tables (as in `order_items`, `user_profiles`, or `audit_logs`); do not invent cryptic abbreviations.
+- Name relationship tables for their business meaning, as in `memberships`, `assignments`, `grants`, or `role_permissions`.
 - Do not use vague relationship names such as `relations` or `mappings`.
 - Name schemas for business domains or capabilities.
 - Use schemas to distinguish the same table name in different business contexts, as in `billing.accounts` and `ledger.accounts`.

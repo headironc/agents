@@ -18,9 +18,9 @@
 
 [开发设备选择](policy/models.md#local-development)绑定 Human 明确选定的实际宿主，可用 Mac 或 SSH 连接的原生 Linux。前后端、设计和验收保留原职责。[Desktop 能力核对](policy/models.md#desktop-capabilities)复用实际执行者的工具及未变证据。[委派与验收](policy/models.md#delegation-and-acceptance)按实际方向验证发送或读取路径；缺入口时，使用双方可达的既有结果路径。依赖与平台缺口沿工作区及检查规则处理，不擅自换设备，也不把安装成功当作平台兼容证据。
 
-[模型选择](policy/models.md#current-defaults)分别维护 Codex 职责映射与[外部路线模型偏好](policy/models.md#route-model-preferences)。按任务需要选择获准路线及适任模型，核实际标识、effort 和可用能力。持续选择按原始采用范围复用。创建接口的模型和档位字段分别判断，不因默认值存在就省略已允许参数。
+[模型选择](policy/models.md#current-defaults)分别维护快慢三级职责映射（`Architect/Debugger`、`Coder/Reviewer` 日常 `low` 档位、`Runner/Explorer` 极速 `low` 档位）与[外部路线模型偏好](policy/models.md#route-model-preferences)。按任务需要选择获准路线及适任模型，核实际标识、effort 和可用能力，并通过 150K Token 上下文护栏与精简 `progress.md` / `spec.md` 锚点管理长任务状态交接。
 
-[Claude Code 与 DeepSeek](policy/models.md#claude-code-and-deepseek-delegation) 按任务与能力适配选用。选用后可交付适任完整结果。设计稿采用[设计专用路线](policy/models.md#task-start-and-execution-routing)。负责人绑定单一结果与写区，并验收实际产物；不设调用比例或逐项审批。[调用合同](policy/claude-code.md)区分只读、有界执行和选用本客户端后的显式设计模式。客户端由使用者提供，安装规则不启用模型或扩大权限。
+[外部模型 CLI 桥接与 DeepSeek](policy/models.md#claude-code-and-deepseek-delegation) 按任务与能力适配选用（禁用 Anthropic Claude 模型，连接本合同定义的 DeepSeek 官方、OpenCode 官方或其他已获准兼容开源模型端点）。设计稿采用[设计专用路线](policy/models.md#task-start-and-execution-routing)（布局规划 `medium`，脚本重烘与审计修复 `low`，视觉验收 `Terra low`）。[调用合同](policy/claude-code.md)区分只读、有界执行和显式设计模式。客户端由使用者提供，安装规则不启用模型或扩大权限。
 
 [Antigravity 使用支持](policy/antigravity.md)保留安装、技能发现和使用者直接操作 CLI 的说明。Antigravity CLI 可选安装通用 Skills 及必要依赖；Codex 不再从该文档选择或委派模型路线。
 

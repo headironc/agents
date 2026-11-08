@@ -17,15 +17,17 @@ For detailed `.sketch` archive JSON structures (`MSImmutableFlexGroupLayout`, `t
 
 ## Trigger Scenarios
 
-Activate this skill whenever a task involves any of the following:
+Activate this skill whenever a task involves:
 
 - Creating, modifying, composing, or refactoring `.sketch` documents (`document.json`, `pages/*.json`, `meta.json`, `user.json`).
 - Measuring or re-baking fixed-width auto-height text layers (`textBehaviour == 1`), `SymbolInstance` text overrides, or `MSImmutableFlexGroupLayout` (Flex Stack) containers.
-- Auditing `.sketch` files for object ID uniqueness, reference integrity (`symbolID`, `sharedStyleID`, `swatchID`, `MSImageData`, `overrideValues`), font hygiene, Flex Stack closure, 2px Focus Ring clipping, or prototype flow graph completeness.
-- Driving Sketch's built-in MCP server (`http://localhost:31126/mcp`) to inspect, mutate, screenshot, save, and verify `.sketch` documents without stealing desktop focus or crashing JavaScriptCore into Safe Mode.
+- Auditing `.sketch` files for object ID uniqueness, reference integrity (`symbolID`, `sharedStyleID`, `swatchID`, `MSImageData`, `overrideValues`), font hygiene, Flex Stack closure, 2px Focus Ring clipping, or prototype flow completeness.
+- Driving Sketch's built-in MCP server (`http://localhost:31126/mcp`) to inspect, mutate, screenshot, save, and verify `.sketch` documents without stealing desktop focus or crashing JavaScriptCore.
 - Exporting artboards, pages, or layers via `sketchtool` (`1x`/`2x` PNG, lossless WebP, and layer PDFs for embedded font verification) and synchronizing `manifest.json` or `renders.json`.
 
 ## Architecture and Concurrency Model
+
+For design-draft model selection, follow the repository's staged routing: `gpt-6.1-sol` at `medium` effort (`high` only for complex multi-state constraints) for new `.sketch` page or reversed Flex Stack hierarchy planning, `gpt-6.1-sol` or `gpt-6-luna` at `low` effort for local copy edits and running `coretext_measure.py --rebake` or `sketch_offline_audit.py`, and `gpt-6.1-terra` at `low` effort for `1x`/`2x` PNG visual inspection.
 
 The measurement and font-audit commands share [text-style resolution](scripts/sketch_text.py). This module owns local and imported text-style indexing, supported descriptor forms, and inheritance from shared styles through inline attributes, attributed runs, and explicit style overrides. Font hygiene inspects stored descriptors even when another value overrides them. Clock validation consumes the resolved font used by measurement.
 
@@ -47,12 +49,12 @@ Separate all `.sketch` work into two strictly decoupled execution tiers:
 
 ### Tier 1: Offline High-Concurrency Pipeline (Multi-Agent Parallel)
 
-All operations that do not touch the live Sketch application window or MCP socket may run concurrently across multiple workers or subagents:
+Operations that do not touch the live Sketch window or MCP socket may run concurrently across workers:
 
 1. **Archive Synthesis and Mutation**: Read and write `.sketch` ZIP archives (`document.json`, `pages/*.json`, `meta.json`) directly in Python or Swift.
-2. **Native CoreText Line-Break Measurement and Re-Baking**: Run [`scripts/coretext_measure.py`](scripts/coretext_measure.py) (backed by [`scripts/measure-coretext.swift`](scripts/measure-coretext.swift)) to compute exact macOS `CoreText` line breaks (`CTTypesetterSuggestLineBreak` / `CTFramesetter`) and re-bake `MSImmutableFlexGroupLayout` vertical coordinates with `0 px` drift.
-3. **Sub-Second Offline Structural and Invariant Audit**: Run [`scripts/sketch_offline_audit.py`](scripts/sketch_offline_audit.py) to validate archive integrity, reference closure, font hygiene, Flex Stack bounds, 2px Focus Ring clipping, and prototype `flow` graphs in under `1s`.
-4. **Sandbox-Free Batch Export and Manifest Verification**: Run [`scripts/sketch_export_manifest.py`](scripts/sketch_export_manifest.py) wrapping `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool` with full system font access (`/System/Library/AssetsV2/.../PingFang.ttc`) to export `1x`/`2x` PNGs, lossless WebP files, and layer PDFs.
+2. **Native CoreText Measurement and Re-Baking**: Run [`scripts/coretext_measure.py`](scripts/coretext_measure.py) (backed by [`scripts/measure-coretext.swift`](scripts/measure-coretext.swift)) to compute macOS `CoreText` line breaks (`CTTypesetterSuggestLineBreak` / `CTFramesetter`) and re-bake `MSImmutableFlexGroupLayout` vertical coordinates with `0 px` drift.
+3. **Sub-Second Offline Audit**: Run [`scripts/sketch_offline_audit.py`](scripts/sketch_offline_audit.py) to validate archive integrity, reference closure, font hygiene, Flex Stack bounds, 2px Focus Ring clipping, and prototype `flow` graphs in under `1s`.
+4. **Sandbox-Free Batch Export and Manifest Verification**: Run [`scripts/sketch_export_manifest.py`](scripts/sketch_export_manifest.py) wrapping `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool` with full system font access (`/System/Library/AssetsV2/.../PingFang.ttc`) to export `1x`/`2x` PNGs, lossless WebP, and layer PDFs.
 
 ### Tier 2: Single-Slot Batch Native Sketch MCP Verification (Serialized)
 
@@ -60,8 +62,7 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
 
 - **Prepared execution**: Prepare all edits and assertions before acquiring the MCP slot, then execute [`scripts/sketch_mcp_roundtrip.py`](scripts/sketch_mcp_roundtrip.py) as one batch. Completion depends on native callbacks and verified closure; a timeout or elapsed slot target does not release ownership.
 - **Disposable copy isolation**: Always run MCP roundtrip checks against a disposable copy (`<disposable-copy.sketch>`) when verifying persistence and layout stability.
-- **Unknown outcome retention**: The tool records the operation ID, exact working-copy path, stage, and confirmed save receipt in a private `operation.json`. A failed report's `recovery` field names retained materials. After an edit, save, open, or close has an unknown outcome, preserve that operation and document; do not rerun the command, close it speculatively, or remove its directory. Resolve the original callback/result and exact document identity before continuing recovery. A changed file or an absent waiting process alone is insufficient. Successful verified roundtrips remove their private working copies; failed verification retains them for diagnosis.
-  A failed report keeps the original MCP `failureResponse` even when safe pre-edit cleanup removes the private copies. A cleanup MCP failure is recorded separately as `closeFailureResponse`. On macOS, screenshot file paths are bounded by the platform's user temporary directory, independently of a caller's custom `TMPDIR`; ownership, no-link reads, and byte limits still apply.
+- **Unknown outcome retention**: The tool records the operation ID, exact working-copy path, stage, and confirmed save receipt in a private `operation.json`. A failed report's `recovery` field names retained materials. After an edit, save, open, or close has an unknown outcome, preserve that operation and document; do not rerun the command, close it speculatively, or remove its directory. Resolve the original callback/result and exact document identity before continuing recovery. A changed file or an absent waiting process alone is insufficient. Successful verified roundtrips remove their private working copies; failed verification retains them for diagnosis. A failed report keeps the original MCP `failureResponse` even when safe pre-edit cleanup removes the private copies. A cleanup MCP failure is recorded separately as `closeFailureResponse`. On macOS, screenshot file paths are bounded by the platform's user temporary directory, independently of a caller's custom `TMPDIR`; ownership, no-link reads, and byte limits still apply.
 
 ## Five Non-Negotiable Iron Rules
 
@@ -84,18 +85,17 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
   1. Read top-level document and page counts only: `doc.id`, `doc.pages.length`, per-page top-level `page.layers.length`, `doc.swatches.length`, `doc.sharedTextStyles.length`, and `doc.sharedLayerStyles.length`.
   2. Locate `1–3` target layers by known UUID on a known page (or via `sketch.find('#<uuid>', targetPage)`), apply targeted property/override/focus-border mutations, and call `doc.processPendingChanges()`. Submit one save for the bound working-copy path and wait for its matching completion receipt.
   3. After confirmed successful saving, rebind the live document through the exact copy path, capture targeted screenshots via `get_screenshot` with `targetDocumentID` and `layerID`, and close that document once. Verify closure before offline diffing or reopening.
-- **Offline Full-Document Diffing**: Compare `frame` coordinates, `MSImmutableFlexGroupLayout` stacks, `HotSpot` layers, prototype `flow` links, and font descriptors in Python via `zipfile` after saving and closure are confirmed. A successful save callback alone does not prove persisted mutation, screenshot equality, or absence of unexpected drift; verify those on the saved archive and after reopening.
-  The native save can assign a new document ID. The roundtrip binds that ID through the successful receipt, the exact-path live probe, and the saved archive before aligning only the document root identity for comparison. The report retains both IDs. Other document facts, including color space and layer attributes, remain strict drift checks; standalone archive comparisons do not assume a save identity transition.
+- **Offline Full-Document Diffing**: Compare `frame` coordinates, `MSImmutableFlexGroupLayout` stacks, `HotSpot` layers, prototype `flow` links, and font descriptors in Python via `zipfile` after saving and closure are confirmed. A successful save callback alone does not prove persisted mutation, screenshot equality, or absence of unexpected drift; verify those on the saved archive and after reopening. The native save can assign a new document ID. The roundtrip binds that ID through the successful receipt, the exact-path live probe, and the saved archive before aligning only the document root identity for comparison. The report retains both IDs. Other document facts, including color space and layer attributes, remain strict drift checks; standalone archive comparisons do not assume a save identity transition.
 
 ### Rule 3: CoreText Line-Height Parity (`0 px` `NATIVE-LAYOUT-HOTSPOT-DESYNC`)
 
-- **Root cause of `NATIVE-LAYOUT-HOTSPOT-DESYNC`**: When offline generators estimate multi-line text height from character counts, Sketch's native `doc.processPendingChanges()` + `doc.save()` recalculates every `textBehaviour == 1` (fixed-width, auto-height) text layer and enclosing `MSImmutableFlexGroupLayout` (Flex Stack) container using macOS `CoreText`. A 1-line discrepancy (for example `28px`) shifts subsequent Flex Stack children vertically while leaving top-level Freeform `HotSpot` layers at their old `y` coordinates, desynchronizing hit targets from visible buttons.
-- **Mandatory CoreText measurement**: Every fixed-width text layer (`textBehaviour == 1`) and auto-height `SymbolInstance` text override must be measured or verified with [`scripts/coretext_measure.py`](scripts/coretext_measure.py) (which invokes native macOS `CoreText` `CTTypesetterSuggestLineBreak` / `CTFramesetter` in [`scripts/measure-coretext.swift`](scripts/measure-coretext.swift)) so offline `frame.height` and Flex Stack coordinates have **`0 px` error** against native `doc.save()`.
+- **Root cause**: When offline generators estimate multi-line text height from character counts, Sketch's native `doc.processPendingChanges()` + `doc.save()` recalculates every `textBehaviour == 1` (fixed-width, auto-height) text layer and enclosing `MSImmutableFlexGroupLayout` container using macOS `CoreText`. A 1-line discrepancy shifts subsequent Flex Stack children vertically while leaving top-level Freeform `HotSpot` layers at old `y` coordinates, desynchronizing hit targets from visible buttons.
+- **Mandatory CoreText measurement**: Measure or verify every `textBehaviour == 1` text layer and auto-height `SymbolInstance` text override with [`scripts/coretext_measure.py`](scripts/coretext_measure.py) (invoking [`scripts/measure-coretext.swift`](scripts/measure-coretext.swift)) so offline `frame.height` and Flex Stack coordinates have **`0 px` error** against native `doc.save()`.
 
 ### Rule 4: Font Hygiene and Native System UI Clock Font (`CTFontRegularUsage`)
 
 - **Zero cross-platform sample residue**: `.sketch` shared styles, symbol masters, layers, and overrides must contain **`0` `Noto*` fonts**, **`0` hardcoded `SFPro*` font names**, and **`0` `Type/Platform sample/*` styles**.
-- **Status bar clock font descriptor**: iOS and Mini Program status bar time layers (such as `"9:41"`) must never hardcode `"name": "SFProText-Regular"` (which triggers missing-font warnings or fallback). Always write Sketch's native system UI font descriptor inside `MSFontDescriptor.attributes`:
+- **Status bar clock font descriptor**: iOS and Mini Program status bar time layers (such as `"9:41"`) must never hardcode `"name": "SFProText-Regular"`. Always write Sketch's native system UI font descriptor inside `MSFontDescriptor.attributes`:
 
   ```json
   {
@@ -104,12 +104,12 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
   }
   ```
 
-- **PDF font subset verification**: Verify system clock layers with `sketchtool export layers --formats=pdf` (automated by [`scripts/sketch_export_manifest.py`](scripts/sketch_export_manifest.py) `--verify-clock-pdf`) and confirm the embedded font subset is `.SFNS-Regular` with `/Subtype /TrueType`.
+- **PDF font subset verification**: Verify system clock layers with `sketchtool export layers --formats=pdf` ([`scripts/sketch_export_manifest.py`](scripts/sketch_export_manifest.py) `--verify-clock-pdf`) and confirm the embedded font subset is `.SFNS-Regular` with `/Subtype /TrueType`.
 
 ### Rule 5: Unsandboxed System Font Access for `sketchtool` (`PingFang SC` Integrity)
 
-- When `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool` runs inside a sandbox that blocks read access to `/System/Library/AssetsV2/com_apple_MobileAsset_Font7/` (or `/System/Library/AssetsV2/.../PingFang.ttc`), macOS silently falls back from `PingFang SC` to `Heiti SC`, causing exported PNGs to diverge pixel-for-pixel from live Sketch MCP `get_screenshot`.
-- Always run `sketchtool` and [`scripts/sketch_export_manifest.py`](scripts/sketch_export_manifest.py) in an environment with read access to `/System/Library/AssetsV2`, and verify alignment against MCP `get_screenshot`.
+- Running `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool` in a sandbox blocking `/System/Library/AssetsV2/com_apple_MobileAsset_Font7/` (`PingFang.ttc`) causes silent fallback to `Heiti SC`, making exported PNGs diverge from live Sketch MCP `get_screenshot`.
+- Always run `sketchtool` and [`scripts/sketch_export_manifest.py`](scripts/sketch_export_manifest.py) with read access to `/System/Library/AssetsV2`, and verify alignment against MCP `get_screenshot`.
 
 ## Sketch 2026.3 MCP Protocol and Absorbed Official Best Practices
 
