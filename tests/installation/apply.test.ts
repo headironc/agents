@@ -256,6 +256,7 @@ for (const version of [5, 6] as const)
 test("retired Codex targets remain recoverable from a V7 record", (t) => {
   const f = installFixture(t, { products: ["codex"] });
   const members = [
+    ["policy", "policy/claude-code.md"],
     ["policy", "policy/codex-sessions.md"],
     ["tool", "tools/codex-sessions.mjs"],
     ["capability", "capability/codex-sessions.toml"],

@@ -28,6 +28,7 @@ import type { InstallPlan } from "../../scripts/install-records.ts";
 import {
   canonicalDigest,
   listSourcePaths,
+  readSourceEntries,
   readSourceIdentity,
 } from "../../scripts/source.ts";
 import { fixtureEnvironment, repositoryRoot } from "../validation/fixtures.ts";
@@ -497,6 +498,23 @@ export function legacyPlan(
   ]);
   plan.targets = plan.targets
     .flatMap((target) => {
+      if (target.product === "codex") {
+        if (target.key === "codex:capability/dsh-headless.patch.yml") return [];
+        if (target.key === "codex:policy/deepseek-harness.md") {
+          return [
+            {
+              ...target,
+              key: "codex:policy/claude-code.md",
+              path: path.join(codexRoot.path, "policy/claude-code.md"),
+              source: path.join(
+                plan.run.source,
+                "delivery/policy/claude-code.md",
+              ),
+            },
+          ];
+        }
+        return [target];
+      }
       if (target.product !== "dsh") return [target];
       const relative = target.path.slice(dshPath.length + 1);
       if (
@@ -529,6 +547,14 @@ export function legacyPlan(
   plan.version = version;
   plan.run.source = path.join(privateRun, "source");
   plan.run.runtime = path.join(privateRun, "runtime");
+  renameSync(
+    path.join(plan.run.source, "delivery/policy/deepseek-harness.md"),
+    path.join(plan.run.source, "delivery/policy/claude-code.md"),
+  );
+  rmSync(
+    path.join(plan.run.source, "delivery/capability/dsh-headless.patch.yml"),
+    { force: true },
+  );
   for (const file of plan.runtime.files)
     file.path = path.join(plan.run.runtime, path.basename(file.path));
   for (const target of plan.targets)
@@ -536,6 +562,20 @@ export function legacyPlan(
       privateRun,
       path.relative(previous, target.source),
     );
+  plan.candidate.entries = readSourceEntries(
+    plan.run.source,
+    plan.candidate.entries
+      .map((entry) =>
+        entry.path === "delivery/policy/deepseek-harness.md"
+          ? "delivery/policy/claude-code.md"
+          : entry.path,
+      )
+      .filter(
+        (entryPath) =>
+          entryPath !== "delivery/capability/dsh-headless.patch.yml",
+      ),
+  );
+  plan.candidate.sha256 = canonicalDigest(plan.candidate.entries);
   plan.newDirectories = [
     ...new Set(
       plan.newDirectories

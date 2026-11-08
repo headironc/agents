@@ -24,8 +24,10 @@ export const retiredClaudeMembers = [
   ["tool", "tools/check-prose.mjs"],
   ["tool", "tools/task-temp.mjs"],
 ] as const;
-export const retiredV7CodexMembers = [
+export const retiredCodexMembers = [
   ["policy", "policy/claude-code.md"],
+] as const;
+export const retiredV7CodexMembers = [
   ["policy", "policy/codex-sessions.md"],
   ["tool", "tools/codex-sessions.mjs"],
   ["capability", "capability/codex-sessions.toml"],
@@ -46,6 +48,13 @@ export function legacyFileMembers(version: 5 | 6 | 7): {
   for (const [category, relative] of retiredClaudeMembers)
     members.push({
       product: "claude",
+      category,
+      relative,
+      source: `delivery/${relative}`,
+    });
+  for (const [category, relative] of retiredCodexMembers)
+    members.push({
+      product: "codex",
       category,
       relative,
       source: `delivery/${relative}`,
