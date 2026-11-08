@@ -444,6 +444,137 @@ with tempfile.TemporaryDirectory(prefix="sketch-audit-work-") as td:
   assert.equal(res.status, 0, res.stderr);
 });
 
+test("page-level Frames and Graphics share artboard identity without resetting nested coordinates", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import copy, hashlib, json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+import sketch_offline_audit as audit
+import sketch_export_manifest as export
+import sketch_mcp_roundtrip as roundtrip
+
+def layer(cls, oid, x=0, y=0, width=60, height=60, **extra):
+    return {"_class": cls, "do_objectID": oid, "name": oid,
+            "frame": {"x": x, "y": y, "width": width, "height": height}, **extra}
+clock = layer("text", "clock", y=5, height=20, attributedString={"string": "9:41", "attributes": []},
+    style={"textStyle": {"encodedAttributes": {"MSAttributedStringFontAttribute": {
+        "attributes": {"NSCTFontUIUsageAttribute": "CTFontRegularUsage", "size": 14}}}}})
+nested = layer("group", "nested", 10, 20, 100, 100, groupBehavior=1, layers=[clock,
+    layer("rectangle", "focus", 5, 30, 44, 44, flow={"destinationArtboardID": "B"})])
+master = layer("symbolMaster", "master", symbolID="symbol", layers=[
+    layer("rectangle", "master-link", flow={"destinationArtboardID": "B"})])
+doc = {"_class": "document", "do_objectID": "doc", "pages": [{"_ref": "pages/p"}, {"_ref": "pages/q"}]}
+
+def write(p, a, b, other=None):
+    with zipfile.ZipFile(p, "w") as z:
+        for name, data in [("document.json", doc), ("meta.json", {}),
+            ("pages/p.json", {"_class": "page", "do_objectID": "p", "layers": [a, master, *(other or [])]}),
+            ("pages/q.json", {"_class": "page", "do_objectID": "q", "layers": [b]})]:
+            z.writestr(name, json.dumps(data))
+
+with tempfile.TemporaryDirectory(prefix="sketch-frame-identity-") as td:
+    p = Path(td) / "frames.sketch"
+    for cls, behavior in [("artboard", 0), ("group", 1), ("group", 2)]:
+        a = layer(cls, "A", 1000, 2000, 375, 812, groupBehavior=behavior,
+            clippingBehavior=1, isFlowHome=True, layers=[copy.deepcopy(nested),
+                layer("symbolInstance", "instance", 150, 100, symbolID="symbol")])
+        b = layer(cls, "B", -1000, 2000, 375, 812, groupBehavior=behavior, layers=[
+            layer("rectangle", "back", flow={"destinationArtboardID": "back"})])
+        ordinary = [layer("group", "ordinary-" + str(i), groupBehavior=v, layers=[])
+                    for i, v in enumerate([0, 3, "1", True, None])]
+        write(p, a, b, ordinary)
+        original = hashlib.sha256(p.read_bytes()).hexdigest()
+        report = audit.run_offline_audit(p)
+        assert report["passed"], report["findings"]
+        summary = report["summary"]
+        assert summary["artboardsCount"] == 2 and summary["symbolMastersCount"] == 1, summary
+        assert summary["flowDirectUUIDCount"] == 2 and summary["flowBackActionCount"] == 1, summary
+        assert summary["danglingFlowCount"] == 0 and summary["clockLayersVerified"] == 1, summary
+        boards, clocks = export.inspect_sketch_artboards_and_clocks(p)
+        assert [n["artboardID"] for n in boards] == ["A", "B"], boards
+        assert [(n["artboardID"], n["layerID"]) for n in clocks] == [("A", "clock")], clocks
+        rects = cm._collect_artboard_rects(a)
+        assert rects["focus"] == (15, 50, 44, 44), rects
+        assert "A" not in rects and rects["nested"] == (10, 20, 100, 100), rects
+        snap = roundtrip._extract_archive_snapshot(p)
+        assert snap["A"]["rawAttributes"]["groupBehavior"] == behavior
+        assert hashlib.sha256(p.read_bytes()).hexdigest() == original
+
+        # A nested Frame is not a valid screen destination or a new coordinate origin.
+        a["layers"][0]["layers"][1]["flow"]["destinationArtboardID"] = "nested"
+        a["layers"][0]["clippingBehavior"] = 1
+        a["layers"][0]["frame"]["x"] = 360
+        write(p, a, b)
+        codes = {f["code"] for f in audit.run_offline_audit(p)["findings"]}
+        assert {"FLOW-DANGLING-DESTINATION", "FOCUS-RING-ANCESTOR-CLIPPED", "FOCUS-RING-OUTSIDE-ARTBOARD"} <= codes, codes
+
+    # Recognition must still enforce existing export workload limits.
+    saved = export.MAX_EXPORT_ARTBOARDS
+    export.MAX_EXPORT_ARTBOARDS = 1
+    try:
+        export.inspect_sketch_artboards_and_clocks(p)
+        raise AssertionError("modern artboards bypassed export count limit")
+    except RuntimeError as exc:
+        assert "artboard count" in str(exc), str(exc)
+    finally:
+        export.MAX_EXPORT_ARTBOARDS = saved
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("Frame rebake keeps screen bounds and moves matching hotspots in screen coordinates", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+cm.measure_specs = lambda items, swift_bin=None: {"engine": "test", "results": [
+    {"id": s["id"], "bakedHeight": 20, "lineCount": 1, "resolvedPostScriptName": "test"} for s in items]}
+
+with tempfile.TemporaryDirectory(prefix="sketch-frame-rebake-") as td:
+    p = Path(td) / "rebake.sketch"
+    for cls, behavior in [("artboard", 0), ("group", 1), ("group", 2)]:
+        group = {"_class": "group", "do_objectID": "nested", "groupBehavior": 1,
+            "frame": {"x": 10, "y": 20, "width": 100, "height": 40}, "layers": [
+                {"_class": "text", "do_objectID": "text", "textBehaviour": 1,
+                 "frame": {"x": 0, "y": 0, "width": 100, "height": 10}, "attributedString": {"string": "text", "attributes": []}},
+                {"_class": "rectangle", "do_objectID": "target", "frame": {"x": 0, "y": 20, "width": 100, "height": 10}}]}
+        board = {"_class": cls, "do_objectID": "A", "groupBehavior": behavior,
+            "frame": {"x": 1000, "y": 2000, "width": 375, "height": 812}, "layers": [group,
+                {"_class": "MSImmutableHotspotLayer", "do_objectID": "hotspot", "frame": {"x": 10, "y": 40, "width": 100, "height": 10}}]}
+        with zipfile.ZipFile(p, "w") as z:
+            for name, data in [("document.json", {"_class": "document", "pages": [{"_ref": "pages/p"}]}),
+                ("meta.json", {}), ("pages/p.json", {"_class": "page", "do_objectID": "p", "layers": [board]})]:
+                z.writestr(name, json.dumps(data))
+        report = cm.audit_and_rebake_sketch(p, rebake=True)
+        assert report["drifts"][0]["artboardID"] == "A", report
+        with zipfile.ZipFile(p) as z:
+            result = json.loads(z.read("pages/p.json"))["layers"][0]
+        assert result["frame"] == board["frame"], result
+        assert result["layers"][0]["layers"][1]["frame"]["y"] == 30, result
+        assert result["layers"][1]["frame"] == {"x": 10, "y": 50, "width": 100, "height": 10}, result
+        assert cm.audit_and_rebake_sketch(p)["driftCount"] == 0
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
 function runPython(scriptPath, args, options = {}) {
   return spawnSync("python3", ["-B", scriptPath, ...args], {
     encoding: "utf8",
