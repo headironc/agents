@@ -27,6 +27,21 @@ from typing import Any, Dict, List, Optional, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SWIFT_SOURCE = SCRIPT_DIR / "measure-coretext.swift"
+MAX_MEASURE_SPECS = 8192
+MAX_SYMBOL_EXPANSION_STEPS = 50000
+
+
+def _charge_expansion_step(
+    expansion_budget: Optional[Dict[str, int]],
+    count: int = 1,
+) -> None:
+    if expansion_budget is None:
+        return
+    expansion_budget["steps"] = int(expansion_budget.get("steps", 0)) + count
+    if expansion_budget["steps"] > MAX_SYMBOL_EXPANSION_STEPS:
+        raise RuntimeError(
+            f"Symbol instance expansion step count ({expansion_budget['steps']}) exceeds limit ({MAX_SYMBOL_EXPANSION_STEPS})"
+        )
 
 
 def _open_pinned_parent_dir(
@@ -245,6 +260,10 @@ def measure_specs(
         raise FileNotFoundError(
             f"Required Swift CoreText helper not found: {SWIFT_SOURCE}"
         )
+    if len(items) > MAX_MEASURE_SPECS:
+        raise RuntimeError(
+            f"CoreText measurement spec count ({len(items)}) exceeds limit ({MAX_MEASURE_SPECS})"
+        )
     if not items:
         return {
             "tool": "coretext_measure.py",
@@ -252,6 +271,33 @@ def measure_specs(
             "count": 0,
             "results": [],
         }
+
+    unique_items: List[Dict[str, Any]] = []
+    key_to_canon_id: Dict[str, str] = {}
+    item_id_to_canon_id: List[Tuple[str, str]] = []
+    for idx, spec in enumerate(items):
+        spec_id = str(spec.get("id", f"item-{idx}"))
+        dedup_payload = {
+            "text": spec.get("text", ""),
+            "fontName": spec.get("fontName"),
+            "uiUsage": spec.get("uiUsage"),
+            "fontSize": spec.get("fontSize"),
+            "lineHeight": spec.get("lineHeight"),
+            "width": spec.get("width"),
+            "paragraphSpacing": spec.get("paragraphSpacing"),
+            "kerning": spec.get("kerning"),
+            "textBehaviour": spec.get("textBehaviour"),
+            "runs": spec.get("runs"),
+        }
+        dedup_key = json.dumps(dedup_payload, sort_keys=True, ensure_ascii=False)
+        canon_id = key_to_canon_id.get(dedup_key)
+        if canon_id is None:
+            canon_id = f"__canon_{len(unique_items)}__"
+            key_to_canon_id[dedup_key] = canon_id
+            canon_spec = dict(spec)
+            canon_spec["id"] = canon_id
+            unique_items.append(canon_spec)
+        item_id_to_canon_id.append((spec_id, canon_id))
 
     if swift_bin:
         cmd = [swift_bin, str(SWIFT_SOURCE)]
@@ -261,7 +307,7 @@ def measure_specs(
 
     proc = subprocess.run(
         cmd + ["--input", "-"],
-        input=json.dumps(items, ensure_ascii=False),
+        input=json.dumps(unique_items, ensure_ascii=False),
         capture_output=True,
         text=True,
         timeout=30,
@@ -275,6 +321,20 @@ def measure_specs(
     parsed = json.loads(proc.stdout)
     if not isinstance(parsed, dict) or not isinstance(parsed.get("results"), list):
         raise RuntimeError("Native macOS CoreText returned invalid JSON structure.")
+    canon_by_id = {
+        str(res.get("id", "")): res
+        for res in parsed["results"]
+        if isinstance(res, dict)
+    }
+    expanded_results: List[Dict[str, Any]] = []
+    for spec_id, canon_id in item_id_to_canon_id:
+        canon_res = canon_by_id.get(canon_id)
+        if canon_res is not None:
+            cloned = dict(canon_res)
+            cloned["id"] = spec_id
+            expanded_results.append(cloned)
+    parsed["count"] = len(expanded_results)
+    parsed["results"] = expanded_results
     return parsed
 
 
@@ -497,8 +557,13 @@ def _index_symbol_masters(
 
 
 def _find_layer_by_id(
-    root: Dict[str, Any], target_id: str, ox: float = 0.0, oy: float = 0.0
+    root: Dict[str, Any],
+    target_id: str,
+    ox: float = 0.0,
+    oy: float = 0.0,
+    expansion_budget: Optional[Dict[str, int]] = None,
 ) -> Optional[Tuple[Dict[str, Any], float, float]]:
+    _charge_expansion_step(expansion_budget, 1)
     is_root = root.get("_class") in ("page", "artboard", "symbolMaster")
     frame = root.get("frame") or {}
     cur_x = 0.0 if is_root else ox + float(frame.get("x", 0.0))
@@ -507,7 +572,9 @@ def _find_layer_by_id(
         return root, cur_x, cur_y
     for child in root.get("layers") or []:
         if isinstance(child, dict):
-            found = _find_layer_by_id(child, target_id, cur_x, cur_y)
+            found = _find_layer_by_id(
+                child, target_id, cur_x, cur_y, expansion_budget=expansion_budget
+            )
             if found is not None:
                 return found
     return None
@@ -517,12 +584,14 @@ def _merge_nested_instance_overrides(
     root_master: Dict[str, Any],
     symbol_masters: Dict[str, Dict[str, Any]],
     outer_overrides: List[Dict[str, Any]],
+    expansion_budget: Optional[Dict[str, int]] = None,
 ) -> List[Dict[str, Any]]:
     """Merge nested symbolInstance default overrideValues under root_master with outer_overrides taking precedence."""
     merged_by_name: Dict[str, Dict[str, Any]] = {}
     swap_map: Dict[str, str] = {}
 
     for ov in outer_overrides:
+        _charge_expansion_step(expansion_budget, 1)
         if not isinstance(ov, dict):
             continue
         ov_name = str(ov.get("overrideName", ""))
@@ -537,7 +606,9 @@ def _merge_nested_instance_overrides(
         prefix: str,
         visited: set[str],
     ) -> None:
+        _charge_expansion_step(expansion_budget, 1)
         for ch in node.get("layers") or []:
+            _charge_expansion_step(expansion_budget, 1)
             if not isinstance(ch, dict) or not _participates_in_flex_flow(ch):
                 continue
             ch_id = str(ch.get("do_objectID", ""))
@@ -550,6 +621,7 @@ def _merge_nested_instance_overrides(
                 if not eff_sym or eff_sym.lower() == "none":
                     continue
                 for nested_ov in ch.get("overrideValues") or []:
+                    _charge_expansion_step(expansion_budget, 1)
                     if not isinstance(nested_ov, dict):
                         continue
                     raw_name = str(nested_ov.get("overrideName", ""))
@@ -583,6 +655,7 @@ def _collect_master_auto_text_paths(
     master: Dict[str, Any],
     symbol_masters: Dict[str, Dict[str, Any]],
     inst_overrides: List[Dict[str, Any]],
+    expansion_budget: Optional[Dict[str, int]] = None,
 ) -> List[str]:
     """Collect override paths for all participating auto-height (textBehaviour == 1) text layers in master."""
     swap_map: Dict[str, str] = {}
@@ -600,7 +673,9 @@ def _collect_master_auto_text_paths(
         prefix: str,
         visited: set[str],
     ) -> None:
+        _charge_expansion_step(expansion_budget, 1)
         for ch in node.get("layers") or []:
+            _charge_expansion_step(expansion_budget, 1)
             if not isinstance(ch, dict) or not _participates_in_flex_flow(ch):
                 continue
             ch_id = str(ch.get("do_objectID", ""))
@@ -630,6 +705,7 @@ def _collect_master_static_leaf_intervals(
     overridden_paths: set[str],
     symbol_masters: Dict[str, Dict[str, Any]],
     inst_overrides: List[Dict[str, Any]],
+    expansion_budget: Optional[Dict[str, int]] = None,
 ) -> List[Tuple[float, float, float]]:
     """Collect (abs_y, height, height) for unmodified visible leaf layers in master."""
     swap_map: Dict[str, str] = {}
@@ -648,7 +724,9 @@ def _collect_master_static_leaf_intervals(
         abs_y: float,
         visited: set[str],
     ) -> None:
+        _charge_expansion_step(expansion_budget, 1)
         for ch in node.get("layers") or []:
+            _charge_expansion_step(expansion_budget, 1)
             if not isinstance(ch, dict) or not _participates_in_flex_flow(ch):
                 continue
             ch_id = str(ch.get("do_objectID", ""))
@@ -684,6 +762,7 @@ def _simulate_master_tree_height(
     inst_overrides: List[Dict[str, Any]],
     base_heights_by_path: Dict[str, float],
     target_heights_by_path: Dict[str, float],
+    expansion_budget: Optional[Dict[str, int]] = None,
 ) -> Tuple[float, float]:
     """Recursively evaluate (old_height, simulated_height) across root_master's hierarchy, stopping at non-Fit containers."""
     swap_map: Dict[str, str] = {}
@@ -711,6 +790,7 @@ def _simulate_master_tree_height(
         visited: set[str],
         is_root: bool = False,
     ) -> Tuple[float, float]:
+        _charge_expansion_step(expansion_budget, 1)
         frame = node.get("frame") or {}
         node_h = float(frame.get("height", 0.0))
         node_id = str(node.get("do_objectID", ""))
@@ -824,6 +904,7 @@ def _resolve_nested_override_text_target(
     symbol_masters: Dict[str, Dict[str, Any]],
     instance_overrides: List[Dict[str, Any]],
     seen_height_prefixes: Optional[set[str]] = None,
+    expansion_budget: Optional[Dict[str, int]] = None,
 ) -> Optional[Tuple[Dict[str, Any], float, float, float]]:
     """Resolve a potentially nested override path (<inst-id>/.../<text-id>) to (target_text_layer, abs_y_in_root_master, width_adjust, height_adjust)."""
     segments = [seg for seg in override_path.split("/") if seg]
@@ -842,7 +923,9 @@ def _resolve_nested_override_text_target(
     width_adjust = 0.0
     height_adjust = 0.0
     for idx, seg_id in enumerate(segments):
-        found_res = _find_layer_by_id(cur_master, seg_id)
+        found_res = _find_layer_by_id(
+            cur_master, seg_id, expansion_budget=expansion_budget
+        )
         if found_res is None:
             return None
         found, _seg_x, seg_y = found_res
@@ -1088,7 +1171,12 @@ def _collect_artboard_rects(
     w = float(frame.get("width", 0.0))
     h = float(frame.get("height", 0.0))
     oid = str(node.get("do_objectID", ""))
-    if oid and node.get("_class") not in ("page", "artboard", "symbolMaster"):
+    if oid and node.get("_class") not in (
+        "page",
+        "artboard",
+        "symbolMaster",
+        "MSImmutableHotspotLayer",
+    ):
         rects[oid] = (abs_x, abs_y, w, h)
     next_x = 0.0 if node.get("_class") in ("page", "artboard", "symbolMaster") else abs_x
     next_y = 0.0 if node.get("_class") in ("page", "artboard", "symbolMaster") else abs_y
@@ -1395,6 +1483,7 @@ def _audit_and_rebake_members(
 
     measure_queue: List[Dict[str, Any]] = []
     targets_meta: List[Dict[str, Any]] = []
+    expansion_budget: Dict[str, int] = {"steps": 0}
 
     def scan_node(
         page_file: str,
@@ -1409,6 +1498,10 @@ def _audit_and_rebake_members(
         )
         spec = _extract_text_layer_spec(node, shared_text_styles)
         if spec is not None:
+            if len(measure_queue) >= MAX_MEASURE_SPECS:
+                raise RuntimeError(
+                    f"CoreText measurement spec count ({len(measure_queue) + 1}) exceeds limit ({MAX_MEASURE_SPECS})"
+                )
             measure_queue.append(spec)
             targets_meta.append(
                 {
@@ -1426,7 +1519,10 @@ def _audit_and_rebake_members(
             if master is not None:
                 raw_inst_overrides = node.get("overrideValues") or []
                 inst_overrides = _merge_nested_instance_overrides(
-                    master, symbol_masters, raw_inst_overrides
+                    master,
+                    symbol_masters,
+                    raw_inst_overrides,
+                    expansion_budget=expansion_budget,
                 )
                 inst_frame = node.get("frame") or {}
                 m_frame = master.get("frame") or {}
@@ -1448,7 +1544,10 @@ def _audit_and_rebake_members(
                         entry.setdefault("primaryOverrideName", ov_name)
 
                 for auto_path in _collect_master_auto_text_paths(
-                    master, symbol_masters, inst_overrides
+                    master,
+                    symbol_masters,
+                    inst_overrides,
+                    expansion_budget=expansion_budget,
                 ):
                     if auto_path not in path_overrides:
                         path_overrides[auto_path] = {
@@ -1463,6 +1562,7 @@ def _audit_and_rebake_members(
                         symbol_masters,
                         inst_overrides,
                         seen_height_prefixes=seen_height_prefixes,
+                        expansion_budget=expansion_budget,
                     )
                     if resolved_target is None:
                         continue
@@ -1494,6 +1594,10 @@ def _audit_and_rebake_members(
                     if "stringValue" in ov_info:
                         ov_spec["text"] = str(ov_info["stringValue"])
                     ov_spec["width"] = max(1.0, scale_w)
+                    if len(measure_queue) >= MAX_MEASURE_SPECS:
+                        raise RuntimeError(
+                            f"CoreText measurement spec count ({len(measure_queue) + 1}) exceeds limit ({MAX_MEASURE_SPECS})"
+                        )
                     measure_queue.append(ov_spec)
                     override_entries.append(
                         {
@@ -1525,6 +1629,7 @@ def _audit_and_rebake_members(
                         set(path_overrides.keys()),
                         symbol_masters,
                         inst_overrides,
+                        expansion_budget=expansion_budget,
                     )
                     targets_meta.append(
                         {
@@ -1625,6 +1730,7 @@ def _audit_and_rebake_members(
                         meta.get("instOverrides") or [],
                         base_heights_by_path,
                         measured_heights_by_path,
+                        expansion_budget=expansion_budget,
                     )
                     total_delta_text = sim_new_h - sim_old_h
                 else:
@@ -1707,23 +1813,41 @@ def _audit_and_rebake_members(
                         hy = float(hs_frame.get("y", 0.0))
                         hw = float(hs_frame.get("width", 0.0))
                         hh = float(hs_frame.get("height", 0.0))
-                        for oid, (bx, by, bw, bh) in before_rects.items():
-                            if oid == top_child.get("do_objectID"):
-                                continue
-                            if (
-                                abs(hx - bx) <= 2.0
-                                and abs(hy - by) <= 2.0
-                                and abs(hw - bw) <= 2.0
-                                and abs(hh - bh) <= 2.0
-                            ):
+                        explicit_tid = str(
+                            top_child.get("targetLayerID")
+                            or top_child.get("boundLayerID")
+                            or ""
+                        ).strip()
+                        if explicit_tid:
+                            if explicit_tid in before_rects:
+                                bx, by, bw, bh = before_rects[explicit_tid]
                                 ax, ay, aw, ah = after_rects.get(
-                                    oid, (bx, by, bw, bh)
+                                    explicit_tid, (bx, by, bw, bh)
                                 )
                                 hs_frame["x"] = round(ax + (hx - bx), 2)
                                 hs_frame["y"] = round(ay + (hy - by), 2)
                                 hs_frame["width"] = round(aw + (hw - bw), 2)
                                 hs_frame["height"] = round(ah + (hh - bh), 2)
-                                break
+                        else:
+                            for oid, (bx, by, bw, bh) in reversed(
+                                list(before_rects.items())
+                            ):
+                                if oid == top_child.get("do_objectID"):
+                                    continue
+                                if (
+                                    abs(hx - bx) <= 2.0
+                                    and abs(hy - by) <= 2.0
+                                    and abs(hw - bw) <= 2.0
+                                    and abs(hh - bh) <= 2.0
+                                ):
+                                    ax, ay, aw, ah = after_rects.get(
+                                        oid, (bx, by, bw, bh)
+                                    )
+                                    hs_frame["x"] = round(ax + (hx - bx), 2)
+                                    hs_frame["y"] = round(ay + (hy - by), 2)
+                                    hs_frame["width"] = round(aw + (hw - bw), 2)
+                                    hs_frame["height"] = round(ah + (hh - bh), 2)
+                                    break
 
             dirty_pages.add(meta["pageFile"])
             rebaked_layers.append(drift_record)

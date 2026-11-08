@@ -155,30 +155,30 @@ func makeParagraphStyle(lineHeight: Double, paragraphSpacing: Double) -> CTParag
     var minLH = CGFloat(lineHeight)
     var maxLH = CGFloat(lineHeight)
     var pSpace = CGFloat(paragraphSpacing)
-    let settings: [CTParagraphStyleSetting] = [
-        withUnsafeBytes(of: &minLH) { raw in
-            CTParagraphStyleSetting(
-                spec: .minimumLineHeight,
-                valueSize: MemoryLayout<CGFloat>.size,
-                value: raw.baseAddress!
-            )
-        },
-        withUnsafeBytes(of: &maxLH) { raw in
-            CTParagraphStyleSetting(
-                spec: .maximumLineHeight,
-                valueSize: MemoryLayout<CGFloat>.size,
-                value: raw.baseAddress!
-            )
-        },
-        withUnsafeBytes(of: &pSpace) { raw in
-            CTParagraphStyleSetting(
-                spec: .paragraphSpacing,
-                valueSize: MemoryLayout<CGFloat>.size,
-                value: raw.baseAddress!
-            )
+    return withUnsafeBytes(of: &minLH) { minRaw in
+        withUnsafeBytes(of: &maxLH) { maxRaw in
+            withUnsafeBytes(of: &pSpace) { pSpaceRaw in
+                let settings: [CTParagraphStyleSetting] = [
+                    CTParagraphStyleSetting(
+                        spec: .minimumLineHeight,
+                        valueSize: MemoryLayout<CGFloat>.size,
+                        value: minRaw.baseAddress!
+                    ),
+                    CTParagraphStyleSetting(
+                        spec: .maximumLineHeight,
+                        valueSize: MemoryLayout<CGFloat>.size,
+                        value: maxRaw.baseAddress!
+                    ),
+                    CTParagraphStyleSetting(
+                        spec: .paragraphSpacing,
+                        valueSize: MemoryLayout<CGFloat>.size,
+                        value: pSpaceRaw.baseAddress!
+                    )
+                ]
+                return CTParagraphStyleCreate(settings, settings.count)
+            }
         }
-    ]
-    return CTParagraphStyleCreate(settings, settings.count)
+    }
 }
 
 func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {

@@ -784,6 +784,7 @@ MAX_SINGLE_RENDER_PIXELS = 64 * 1024 * 1024
 MAX_TOTAL_RENDER_TASKS = 256
 MAX_TOTAL_RENDER_PIXELS = 256 * 1024 * 1024
 MAX_CLOCK_PDF_EXPORTS = 128
+MAX_SYMBOL_EXPANSION_STEPS = 50000
 MAX_EXPORT_WORKERS = 8
 SCALE_TOKEN_RE = re.compile(r"^\d+(?:\.\d+)?$")
 
@@ -1007,6 +1008,8 @@ def inspect_sketch_artboards_and_clocks(
 
             index_masters(page)
 
+        expansion_steps = 0
+
         for _, page in pages_list:
             page_id = str(page.get("do_objectID", ""))
             page_name = str(page.get("name", ""))
@@ -1060,6 +1063,12 @@ def inspect_sketch_artboards_and_clocks(
                     symbol_id_overrides: Dict[str, str],
                     visited_syms: Set[str],
                 ) -> None:
+                    nonlocal expansion_steps
+                    expansion_steps += 1
+                    if expansion_steps > MAX_SYMBOL_EXPANSION_STEPS:
+                        raise RuntimeError(
+                            f"Symbol instance expansion step count ({expansion_steps}) exceeds limit ({MAX_SYMBOL_EXPANSION_STEPS})"
+                        )
                     sm_name = str(sm_node.get("name", ""))
                     master_anc = ancestors + ([sm_name] if sm_name else [])
 
@@ -1069,6 +1078,12 @@ def inspect_sketch_artboards_and_clocks(
                         mx: float,
                         my: float,
                     ) -> None:
+                        nonlocal expansion_steps
+                        expansion_steps += 1
+                        if expansion_steps > MAX_SYMBOL_EXPANSION_STEPS:
+                            raise RuntimeError(
+                                f"Symbol instance expansion step count ({expansion_steps}) exceeds limit ({MAX_SYMBOL_EXPANSION_STEPS})"
+                            )
                         if not bool(mnode.get("isVisible", True)):
                             return
                         mcls = mnode.get("_class")
@@ -1088,6 +1103,10 @@ def inspect_sketch_artboards_and_clocks(
                                 else raw_txt
                             ).strip()
                             if _is_statusbar_clock_layer(txt, mname, cur_anc, cy):
+                                if len(clock_layers) >= MAX_CLOCK_PDF_EXPORTS:
+                                    raise RuntimeError(
+                                        f"Status-bar clock PDF layer count ({len(clock_layers) + 1}) exceeds export limit ({MAX_CLOCK_PDF_EXPORTS})"
+                                    )
                                 clock_layers.append(
                                     {
                                         "pageID": page_id,
@@ -1119,6 +1138,11 @@ def inspect_sketch_artboards_and_clocks(
                                     merged_str_ovr = dict(string_overrides)
                                     merged_sym_ovr = dict(symbol_id_overrides)
                                     for nov in mnode.get("overrideValues") or []:
+                                        expansion_steps += 1
+                                        if expansion_steps > MAX_SYMBOL_EXPANSION_STEPS:
+                                            raise RuntimeError(
+                                                f"Symbol instance expansion step count ({expansion_steps}) exceeds limit ({MAX_SYMBOL_EXPANSION_STEPS})"
+                                            )
                                         if not isinstance(nov, dict):
                                             continue
                                         nov_name = str(nov.get("overrideName", ""))
@@ -1179,6 +1203,10 @@ def inspect_sketch_artboards_and_clocks(
                         attr_str = node.get("attributedString") or {}
                         txt = str(attr_str.get("string", "")).strip()
                         if _is_statusbar_clock_layer(txt, lname, ancestors, cur_y):
+                            if len(clock_layers) >= MAX_CLOCK_PDF_EXPORTS:
+                                raise RuntimeError(
+                                    f"Status-bar clock PDF layer count ({len(clock_layers) + 1}) exceeds export limit ({MAX_CLOCK_PDF_EXPORTS})"
+                                )
                             clock_layers.append(
                                 {
                                     "pageID": page_id,

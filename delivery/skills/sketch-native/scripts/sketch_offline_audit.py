@@ -208,6 +208,21 @@ MAX_ARCHIVE_PAGES = 64
 MAX_DOM_DICT_NODES = 30000
 MAX_DOM_CONTAINER_ITEMS = 120000
 MAX_DOM_STRING_CHARS = 2 * 1024 * 1024
+MAX_SYMBOL_EXPANSION_STEPS = 50000
+MAX_FLOW_EDGES = 8192
+
+
+def _charge_expansion_step(
+    expansion_budget: Optional[Dict[str, int]],
+    count: int = 1,
+) -> None:
+    if expansion_budget is None:
+        return
+    expansion_budget["steps"] = int(expansion_budget.get("steps", 0)) + count
+    if expansion_budget["steps"] > MAX_SYMBOL_EXPANSION_STEPS:
+        raise RuntimeError(
+            f"Symbol instance expansion step count ({expansion_budget['steps']}) exceeds limit ({MAX_SYMBOL_EXPANSION_STEPS})"
+        )
 
 
 def _new_dom_budget() -> Dict[str, int]:
@@ -378,12 +393,15 @@ def _new_finding(
 
 
 def _find_layer_in_symbol_master(
-    master: Dict[str, Any], target_layer_id: str
+    master: Dict[str, Any],
+    target_layer_id: str,
+    expansion_budget: Optional[Dict[str, int]] = None,
 ) -> Optional[Dict[str, Any]]:
     found: Optional[Dict[str, Any]] = None
 
     def walk(node: Dict[str, Any]) -> None:
         nonlocal found
+        _charge_expansion_step(expansion_budget, 1)
         if found is not None:
             return
         if str(node.get("do_objectID", "")) == target_layer_id:
@@ -403,6 +421,7 @@ def _resolve_override_path_in_masters(
     symbol_masters: Dict[str, Dict[str, Any]],
     foreign_symbol_ids: Set[str],
     override_values: List[Dict[str, Any]],
+    expansion_budget: Optional[Dict[str, int]] = None,
 ) -> Tuple[bool, str, str]:
     """Validate every segment of a potentially nested override path (`instA/instB/leaf`).
 
@@ -414,6 +433,7 @@ def _resolve_override_path_in_masters(
 
     symbol_swaps: Dict[str, str] = {}
     for ov in override_values:
+        _charge_expansion_step(expansion_budget, 1)
         if not isinstance(ov, dict):
             continue
         ov_name = str(ov.get("overrideName", ""))
@@ -433,7 +453,9 @@ def _resolve_override_path_in_masters(
                 return True, "", cur_sym_id
             return False, seg, cur_sym_id
 
-        target_node = _find_layer_in_symbol_master(cur_master, seg)
+        target_node = _find_layer_in_symbol_master(
+            cur_master, seg, expansion_budget=expansion_budget
+        )
         if target_node is None:
             return False, seg, cur_sym_id
 
@@ -443,6 +465,7 @@ def _resolve_override_path_in_masters(
                 return False, seg, cur_sym_id
             prefix_key = "/".join(prefix_segments)
             for nov in target_node.get("overrideValues") or []:
+                _charge_expansion_step(expansion_budget, 1)
                 if not isinstance(nov, dict):
                     continue
                 nov_name = str(nov.get("overrideName", ""))
@@ -849,6 +872,7 @@ def run_offline_audit(
     upstream_style_ids: Set[str] = set()
     upstream_layer_style_ids: Set[str] = set()
     upstream_text_style_ids: Set[str] = set()
+    shared_text_style_font_descs: Dict[str, Dict[str, Any]] = {}
     upstream_swatch_ids: Set[str] = set()
     if source_sketch_path and source_sketch_path.exists() and zipfile.is_zipfile(source_sketch_path):
         with zipfile.ZipFile(source_sketch_path, "r") as uzf:
@@ -871,6 +895,14 @@ def run_offline_audit(
                         sid_u = str(s["do_objectID"])
                         upstream_style_ids.add(sid_u)
                         upstream_text_style_ids.add(sid_u)
+                        u_f_desc = (
+                            ((s.get("value") or {}).get("textStyle") or {}).get(
+                                "encodedAttributes"
+                            )
+                            or {}
+                        ).get("MSAttributedStringFontAttribute")
+                        if isinstance(u_f_desc, dict):
+                            shared_text_style_font_descs[sid_u] = u_f_desc
                 for sw in (udoc.get("sharedSwatches") or {}).get("objects") or []:
                     if sw.get("do_objectID"):
                         upstream_swatch_ids.add(str(sw["do_objectID"]))
@@ -1014,6 +1046,8 @@ def run_offline_audit(
         f_desc = t_style.get("MSAttributedStringFontAttribute")
         if isinstance(f_desc, dict):
             inspect_font_descriptor(f_desc, f"{label_prefix}:{sname}")
+            if sid and is_text_style:
+                shared_text_style_font_descs[str(sid)] = f_desc
         collected_shared_styles.append((st, label_prefix))
 
     for style_group_key, is_txt in (
@@ -1227,6 +1261,15 @@ def run_offline_audit(
             )
         )
 
+    expansion_budget: Dict[str, int] = {"steps": 0}
+
+    def _check_flow_record_budget() -> None:
+        total_flows = len(flow_edges) + len(back_flows) + len(dangling_flows)
+        if total_flows >= MAX_FLOW_EDGES:
+            raise RuntimeError(
+                f"Expanded prototype flow record count ({total_flows + 1}) exceeds limit ({MAX_FLOW_EDGES})"
+            )
+
     for page_member, page_obj in audit_roots:
         page_id = str(page_obj.get("do_objectID") or page_member)
 
@@ -1349,6 +1392,7 @@ def run_offline_audit(
                                 symbol_masters,
                                 foreign_symbol_ids,
                                 override_list,
+                                expansion_budget=expansion_budget,
                             )
                         )
                         if not is_valid_path:
@@ -1440,6 +1484,24 @@ def run_offline_audit(
                 is_clock = _is_statusbar_clock_layer(
                     txt_content, lname, ancestor_names, cur_abs_y
                 )
+                inline_enc = (
+                    ((node.get("style") or {}).get("textStyle") or {}).get(
+                        "encodedAttributes"
+                    )
+                    or {}
+                )
+                inline_f_desc = inline_enc.get("MSAttributedStringFontAttribute")
+                if isinstance(inline_f_desc, dict):
+                    inspect_font_descriptor(
+                        inline_f_desc, f"text.style:{lname}", page_id, aid, oid
+                    )
+                check_color_obj(
+                    inline_enc.get("MSAttributedStringColorAttribute"),
+                    page_id,
+                    aid,
+                    oid,
+                )
+                clock_checked_in_runs = False
                 for seg in attr_str.get("attributes") or []:
                     if not isinstance(seg, dict):
                         continue
@@ -1450,6 +1512,7 @@ def run_offline_audit(
                             f_desc, f"text:{lname}", page_id, aid, oid
                         )
                         if is_clock and CLOCK_TEXT_RE.match(txt_content):
+                            clock_checked_in_runs = True
                             f_attrs = f_desc.get("attributes") or {}
                             ui_usage = f_attrs.get("NSCTFontUIUsageAttribute")
                             hard_name = f_attrs.get("name")
@@ -1483,6 +1546,45 @@ def run_offline_audit(
                         aid,
                         oid,
                     )
+                if (
+                    is_clock
+                    and CLOCK_TEXT_RE.match(txt_content)
+                    and not clock_checked_in_runs
+                ):
+                    eff_f_desc: Dict[str, Any] = {}
+                    if isinstance(inline_f_desc, dict):
+                        eff_f_desc = inline_f_desc
+                    elif node.get("sharedStyleID"):
+                        eff_f_desc = shared_text_style_font_descs.get(
+                            str(node.get("sharedStyleID", "")), {}
+                        )
+                    f_attrs = eff_f_desc.get("attributes") or {}
+                    ui_usage = f_attrs.get("NSCTFontUIUsageAttribute")
+                    hard_name = f_attrs.get("name")
+                    clock_ok = (
+                        ui_usage == "CTFontRegularUsage" and not hard_name
+                    )
+                    clock_font_Checks.append(
+                        {
+                            "layerID": oid,
+                            "name": lname,
+                            "text": txt_content,
+                            "uiUsage": ui_usage,
+                            "fontName": hard_name,
+                            "valid": clock_ok,
+                        }
+                    )
+                    if not clock_ok:
+                        findings.append(
+                            _new_finding(
+                                "font_hygiene",
+                                "CLOCK-MISSING-CTFONT-REGULAR-USAGE",
+                                f"Status bar clock '{txt_content}' ({oid}) must use NSCTFontUIUsageAttribute='CTFontRegularUsage' without hardcoded font name",
+                                page_id=page_id,
+                                artboard_id=aid,
+                                layer_id=oid,
+                            )
+                        )
 
             # Flex Stack closure check
             if (node.get("groupLayout") or {}).get(
@@ -1564,6 +1666,7 @@ def run_offline_audit(
                 is_in_master = (cur_artboard or {}).get("_class") == "symbolMaster"
                 if dest == "back":
                     if not is_in_master and eff_visible:
+                        _check_flow_record_budget()
                         back_flows.append(
                             {
                                 "pageID": page_id,
@@ -1575,6 +1678,7 @@ def run_offline_audit(
                         )
                 elif dest:
                     if dest not in artboards_by_id:
+                        _check_flow_record_budget()
                         dangling_flows.append(
                             {
                                 "pageID": page_id,
@@ -1594,6 +1698,7 @@ def run_offline_audit(
                             )
                         )
                     elif not is_in_master and eff_visible:
+                        _check_flow_record_budget()
                         flow_edges.append(
                             {
                                 "pageID": page_id,
@@ -1620,6 +1725,7 @@ def run_offline_audit(
                     flow_ov_map: Dict[str, str] = {}
                     swap_ov_map: Dict[str, str] = {}
                     for ov in inst_ovs:
+                        _charge_expansion_step(expansion_budget, 1)
                         ov_name = str(ov.get("overrideName", ""))
                         if ov_name.endswith("_flowDestination"):
                             p = ov_name[: -len("_flowDestination")]
@@ -1638,12 +1744,14 @@ def run_offline_audit(
                         cur_swap_map: Dict[str, str],
                         parent_vis: bool,
                     ) -> None:
+                        _charge_expansion_step(expansion_budget, 1)
                         m_sid = str(m_node.get("symbolID", ""))
                         if m_sid:
                             if m_sid in visited_syms:
                                 return
                             visited_syms = visited_syms | {m_sid}
                         for ch in m_node.get("layers") or []:
+                            _charge_expansion_step(expansion_budget, 1)
                             if not isinstance(ch, dict):
                                 continue
                             ch_vis = parent_vis and bool(ch.get("isVisible", True))
@@ -1668,6 +1776,7 @@ def run_offline_audit(
                                 )
                             if eff_dest == "back":
                                 if ch_vis:
+                                    _check_flow_record_budget()
                                     back_flows.append(
                                         {
                                             "pageID": page_id,
@@ -1679,6 +1788,7 @@ def run_offline_audit(
                                     )
                             elif eff_dest:
                                 if eff_dest not in artboards_by_id:
+                                    _check_flow_record_budget()
                                     dangling_flows.append(
                                         {
                                             "pageID": page_id,
@@ -1698,6 +1808,7 @@ def run_offline_audit(
                                         )
                                     )
                                 elif ch_vis:
+                                    _check_flow_record_budget()
                                     flow_edges.append(
                                         {
                                             "pageID": page_id,
@@ -1720,6 +1831,7 @@ def run_offline_audit(
                                     next_flow_map = dict(cur_flow_map)
                                     next_swap_map = dict(cur_swap_map)
                                     for nov in ch.get("overrideValues") or []:
+                                        _charge_expansion_step(expansion_budget, 1)
                                         if not isinstance(nov, dict):
                                             continue
                                         nov_name = str(
@@ -1784,7 +1896,23 @@ def run_offline_audit(
                 if isinstance(child, dict):
                     walk_layer(child, cur_artboard, next_ancestors, cur_abs_x, cur_abs_y)
 
-        walk_layer(page_obj, None, [], 0.0, 0.0)
+        try:
+            walk_layer(page_obj, None, [], 0.0, 0.0)
+        except RuntimeError as exc:
+            return {
+                "tool": "sketch_offline_audit.py",
+                "sketch": str(sketch_path),
+                "passed": False,
+                "elapsedMs": round((time.perf_counter() - start_ts) * 1000.0, 2),
+                "blockingCount": 1,
+                "findings": [
+                    _new_finding(
+                        "archive_and_ids",
+                        "ARCHIVE-ZIP-BUDGET-EXCEEDED",
+                        str(exc),
+                    )
+                ],
+            }
 
         # Check Freeform HotSpot alignment against underlying Flex controls on each artboard
         for top_layer in page_obj.get("layers") or []:

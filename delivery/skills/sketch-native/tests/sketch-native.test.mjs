@@ -3307,6 +3307,120 @@ for mod in (cm, sem, rt):
         raise AssertionError(f"Expected {mod.__name__}._loads_json_bounded to reject excessive DOM objects")
     except RuntimeError as exc:
         assert "exceeds" in str(exc), exc
+
+# 17. Verify _collect_artboard_rects excludes MSImmutableHotspotLayer so HotSpot sync never matches another HotSpot
+ab_with_hs = {
+    "_class": "artboard",
+    "do_objectID": "ab-hs-test",
+    "layers": [
+        {
+            "_class": "MSImmutableHotspotLayer",
+            "do_objectID": "hs-layer-1",
+            "frame": {"x": 10, "y": 20, "width": 100, "height": 44},
+        },
+        {
+            "_class": "group",
+            "do_objectID": "ctrl-group-1",
+            "frame": {"x": 10, "y": 20, "width": 100, "height": 44},
+            "layers": [],
+        },
+    ],
+}
+rects_map = cm._collect_artboard_rects(ab_with_hs)
+assert "hs-layer-1" not in rects_map and "ctrl-group-1" in rects_map, rects_map
+
+# 18. Verify inline textStyle.encodedAttributes font hygiene and status-bar clock check without run fontDescriptor
+inline_font_sketch = Path(sys.argv[1]) / "inline-font-clock.sketch"
+with zipfile.ZipFile(inline_font_sketch, "w") as zf:
+    zf.writestr("meta.json", json.dumps({"app": "com.bohemiancoding.sketch3", "version": 136}))
+    zf.writestr("document.json", json.dumps({
+        "_class": "document",
+        "do_objectID": "doc-inline-font",
+        "pages": [{"_class": "MSJSONFileReference", "_ref": "pages/p-inline"}],
+        "layerStyles": {"objects": []},
+        "layerTextStyles": {"objects": []},
+        "sharedSwatches": {"objects": []},
+    }))
+    zf.writestr("pages/p-inline.json", json.dumps({
+        "_class": "page",
+        "do_objectID": "p-inline",
+        "name": "Page 1",
+        "layers": [
+            {
+                "_class": "artboard",
+                "do_objectID": "ab-inline",
+                "name": "Home",
+                "frame": {"x": 0, "y": 0, "width": 375, "height": 812},
+                "layers": [
+                    {
+                        "_class": "text",
+                        "do_objectID": "txt-inline-noto",
+                        "name": "InlineNotoCopy",
+                        "frame": {"x": 16, "y": 100, "width": 200, "height": 22},
+                        "style": {
+                            "_class": "style",
+                            "textStyle": {
+                                "_class": "textStyle",
+                                "encodedAttributes": {
+                                    "MSAttributedStringFontAttribute": {
+                                        "_class": "fontDescriptor",
+                                        "attributes": {"name": "NotoSansCJKsc-Regular", "size": 14},
+                                    }
+                                },
+                            },
+                        },
+                        "attributedString": {
+                            "_class": "attributedString",
+                            "string": "Inline Noto",
+                            "attributes": [],
+                        },
+                    },
+                    {
+                        "_class": "text",
+                        "do_objectID": "txt-inline-clock",
+                        "name": "StatusBar/Time",
+                        "frame": {"x": 24, "y": 14, "width": 54, "height": 20},
+                        "style": {
+                            "_class": "style",
+                            "textStyle": {
+                                "_class": "textStyle",
+                                "encodedAttributes": {
+                                    "MSAttributedStringFontAttribute": {
+                                        "_class": "fontDescriptor",
+                                        "attributes": {"name": "Helvetica", "size": 15},
+                                    }
+                                },
+                            },
+                        },
+                        "attributedString": {
+                            "_class": "attributedString",
+                            "string": "9:41",
+                            "attributes": [],
+                        },
+                    },
+                ],
+            }
+        ],
+    }))
+inline_audit = soa.run_offline_audit(inline_font_sketch)
+inline_codes = {f["code"] for f in inline_audit["findings"]}
+assert "FONT-FORBIDDEN-NOTO" in inline_codes, inline_codes
+assert "CLOCK-MISSING-CTFONT-REGULAR-USAGE" in inline_codes, inline_codes
+
+# 19. Verify symbol expansion step budget and measure_specs cap are enforced
+exp_budget = {"steps": cm.MAX_SYMBOL_EXPANSION_STEPS}
+try:
+    cm._charge_expansion_step(exp_budget, 1)
+    raise AssertionError("Expected cm._charge_expansion_step to reject budget overflow")
+except RuntimeError as exc:
+    assert "expansion step count" in str(exc), exc
+
+soa_exp_budget = {"steps": soa.MAX_SYMBOL_EXPANSION_STEPS}
+try:
+    soa._charge_expansion_step(soa_exp_budget, 1)
+    raise AssertionError("Expected soa._charge_expansion_step to reject budget overflow")
+except RuntimeError as exc:
+    assert "expansion step count" in str(exc), exc
 `,
         tmpDir,
       ],
