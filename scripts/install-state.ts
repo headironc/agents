@@ -12,10 +12,10 @@ import {
 } from "node:fs";
 import type { Stats } from "node:fs";
 import path from "node:path";
-import type { Product } from "./delivery.ts";
 import { isNormalizedAbsolute } from "./install-records.ts";
 import type {
   InstallRoots,
+  RecordedProduct,
   RootRecord,
   TargetState,
 } from "./install-records.ts";
@@ -194,7 +194,7 @@ export function attempt<T>(
 export function inspectRoots(
   environment: NodeJS.ProcessEnv,
   gaps: Gap[],
-  selected: readonly Product[],
+  selected: readonly RecordedProduct[],
 ): { roots: InstallRoots; unusable: RootName[] } | undefined {
   const home = environment.HOME ?? "";
   if (!isNormalizedAbsolute(home)) {
@@ -239,6 +239,7 @@ export function inspectRoots(
     variable:
       | "CODEX_HOME"
       | "CLAUDE_CONFIG_DIR"
+      | "DSH_HOME"
       | "XDG_STATE_HOME"
       | "AGENTS_BACKUP_ROOT",
     fallback: string,
@@ -271,6 +272,11 @@ export function inspectRoots(
             ),
           }
         : {}),
+      ...(selected.includes("dsh")
+        ? {
+            dsh: select("dsh", "DSH_HOME", path.join(home, ".dsh")),
+          }
+        : {}),
       ...(selected.includes("antigravity")
         ? {
             antigravity: root(
@@ -300,7 +306,7 @@ export function inspectRoots(
 export function resolveInstallRoots(
   environment: NodeJS.ProcessEnv,
   gaps: Gap[],
-  selected: readonly Product[],
+  selected: readonly RecordedProduct[],
 ): InstallRoots | undefined {
   const inspected = inspectRoots(environment, gaps, selected);
   return inspected && !inspected.unusable.length ? inspected.roots : undefined;

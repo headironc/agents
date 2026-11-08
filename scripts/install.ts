@@ -34,7 +34,7 @@ import {
 } from "./install-apply.ts";
 import { readCurrentInstallation } from "./install-current.ts";
 import {
-  adoptKeyPattern,
+  activeAdoptKeyPattern,
   InstallPlanSchema,
   installationProducts,
   installPathCollisions,
@@ -45,6 +45,7 @@ import type {
   InstallReceipt,
   InstallRoots,
   InstallTarget,
+  RecordedProduct,
   RuntimeRecord,
 } from "./install-records.ts";
 import {
@@ -78,7 +79,7 @@ import type { SourceEntry } from "./source.ts";
 const closureCheck = "Installer build closure";
 const usage = [
   "Usage: install.sh plan --product PRODUCT [--product PRODUCT]... --source DIR --report FILE --output PLAN [--target KEY]... [--adopt KEY]...",
-  "       PRODUCT: codex | claude | antigravity (explicit selection required)",
+  "       PRODUCT: codex | dsh | antigravity (explicit selection required)",
   "       install.sh apply --plan PLAN",
   "       install.sh verify --receipt RECEIPT",
   "       install.sh rollback --receipt RECEIPT",
@@ -136,7 +137,7 @@ export function parsePlanArguments(args: string[]): PlanArguments {
       selected.push(value as Product);
     } else if (name === "--adopt" || name === "--target") {
       const selected = name === "--adopt" ? adopt : targets;
-      if (!adoptKeyPattern.test(value) || selected.includes(value))
+      if (!activeAdoptKeyPattern.test(value) || selected.includes(value))
         throw new UsageError(`Invalid or repeated ${name} key: ${value}`);
       selected.push(value);
     } else {
@@ -149,7 +150,7 @@ export function parsePlanArguments(args: string[]): PlanArguments {
     if (!values.has(name)) throw new UsageError(`Missing --${name}`);
   if (!selected.length)
     throw new UsageError(
-      "Missing --product: select codex, claude or antigravity explicitly",
+      "Missing --product: select codex, dsh or antigravity explicitly",
     );
   const resolved = (name: string) => path.resolve(values.get(name)!);
   return {
@@ -162,10 +163,16 @@ export function parsePlanArguments(args: string[]): PlanArguments {
   };
 }
 
-function git(directory: string, args: string[]): string {
+function git(
+  directory: string,
+  args: string[],
+  baseEnvironment: NodeJS.ProcessEnv = process.env,
+): string {
   // Repository-selection variables could redirect identity reads to another checkout.
   const environment = Object.fromEntries(
-    Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+    Object.entries(baseEnvironment).filter(
+      ([name]) => !name.startsWith("GIT_"),
+    ),
   );
   return execFileSync("git", ["-C", directory, ...args], {
     env: environment,
@@ -457,7 +464,7 @@ function inspectUnlisted(
         ? readdirSync(directory).sort(bytewise)
         : [],
     ) ?? [];
-  for (const product of ["codex", "claude", "antigravity"] as const) {
+  for (const product of products) {
     const root = roots[product];
     if (!root) continue;
     const layout = publicMembers(entries, product, process.platform);
@@ -489,7 +496,7 @@ function inspectUnlisted(
     for (const directory of [
       "policy",
       "tools",
-      ...(product === "codex" ? ["capability"] : []),
+      ...(product === "codex" || product === "dsh" ? ["capability"] : []),
     ])
       fixed(
         directory,
@@ -939,7 +946,10 @@ export function planInstallation(
 function runFromRuntime(
   runtime: InstallReceipt["runtime"],
   argv: string[],
-): number | undefined {
+  environment: NodeJS.ProcessEnv = process.env,
+  capture = false,
+  delegate = true,
+): { status: number; stdout: string; stderr: string } | undefined {
   const problems: { code: string; path: string }[] = [];
   for (const [file, digest] of [
     [runtime.node, runtime.nodeSha256],
@@ -958,6 +968,7 @@ function runFromRuntime(
     }
   }
   if (problems.length) throw new InstallRefused(problems);
+  if (!delegate) return undefined;
   if (realpathSync(fileURLToPath(import.meta.url)) === runtime.installer) {
     if (realpathSync(process.execPath) !== runtime.node)
       throw new InstallRefused([
@@ -965,11 +976,23 @@ function runFromRuntime(
       ]);
     return undefined;
   }
+  if (capture) {
+    const result = spawnSync(runtime.node, [runtime.installer, ...argv], {
+      encoding: "utf8",
+      env: environment,
+      timeout: 60_000,
+    });
+    return {
+      status: result.status ?? 1,
+      stdout: result.stdout ?? "",
+      stderr: result.stderr ?? "",
+    };
+  }
   const result = spawnSync(runtime.node, [runtime.installer, ...argv], {
     stdio: "inherit",
-    env: process.env,
+    env: environment,
   });
-  return result.status ?? 1;
+  return { status: result.status ?? 1, stdout: "", stderr: "" };
 }
 
 type InstallationStatus = {
@@ -980,7 +1003,7 @@ type InstallationStatus = {
   checkout?: { directory: string; commit: string } | undefined;
   candidate?: { sha256: string } | undefined;
   selectedTargets?: string[] | undefined;
-  products?: Product[] | undefined;
+  products?: RecordedProduct[] | undefined;
   // `ahead` is what the baseline commit has and the checkout's HEAD does not. Zero means the
   // baseline is on this line of history and `behind` is a distance; anything else means the two
   // diverged and `behind` is one side of that, not a number to close.
@@ -998,19 +1021,23 @@ type InstallationStatus = {
 /** How the checkout a deployment was taken from has moved since. */
 function comparedWith(
   plan: InstallPlan,
+  environment: NodeJS.ProcessEnv = process.env,
 ): NonNullable<InstallationStatus["repository"]> {
   try {
-    const head = git(plan.checkout.directory, ["rev-parse", "HEAD"]).trim();
+    const head = git(
+      plan.checkout.directory,
+      ["rev-parse", "HEAD"],
+      environment,
+    ).trim();
     // Both sides in one call. `A..HEAD` alone counts what HEAD has and A does not, which is a
     // distance behind only while A is an ancestor. This repository squash-merges, so a deployment
     // taken from a feature branch stops being one the moment its pull request lands: the commit is
     // still there, nothing throws, and the count silently becomes the size of a divergence.
-    const [ahead, behind] = git(plan.checkout.directory, [
-      "rev-list",
-      "--left-right",
-      "--count",
-      `${plan.checkout.commit}...HEAD`,
-    ])
+    const [ahead, behind] = git(
+      plan.checkout.directory,
+      ["rev-list", "--left-right", "--count", `${plan.checkout.commit}...HEAD`],
+      environment,
+    )
       .trim()
       .split(/\s+/)
       .map(Number);
@@ -1072,23 +1099,32 @@ function installationStatus(
     candidate: { sha256: plan.candidate.sha256 },
     products: installationProducts(plan.roots),
     ...(plan.selectedTargets ? { selectedTargets: plan.selectedTargets } : {}),
-    repository: comparedWith(plan),
+    repository: comparedWith(plan, environment),
   };
 }
 
-function main(argv: string[]): void {
+export function runInstallCli(
+  argv: string[],
+  environment: NodeJS.ProcessEnv = process.env,
+  capture = true,
+  delegate = true,
+): { status: number; stdout: string; stderr: string } {
   try {
     const [command, ...rest] = argv;
     if (command === "status") {
       if (rest.length) throw new UsageError(usage);
-      console.log(JSON.stringify(installationStatus(process.env)));
-      return;
+      return {
+        status: 0,
+        stdout: `${JSON.stringify(installationStatus(environment))}\n`,
+        stderr: "",
+      };
     }
     if (command === "plan") {
-      console.log(
-        JSON.stringify(planInstallation(parsePlanArguments(rest), process.env)),
-      );
-      return;
+      return {
+        status: 0,
+        stdout: `${JSON.stringify(planInstallation(parsePlanArguments(rest), environment))}\n`,
+        stderr: "",
+      };
     }
     const option =
       command === "apply"
@@ -1103,42 +1139,60 @@ function main(argv: string[]): void {
       command === "apply"
         ? runtimeOf(loadPlanForApply(file))
         : loadReceipt(file).receipt.runtime;
-    const delegated = runFromRuntime(runtime, [command!, option, file]);
-    if (delegated !== undefined) {
-      process.exitCode = delegated;
-      return;
-    }
+    const delegated = runFromRuntime(
+      runtime,
+      [command!, option, file],
+      environment,
+      capture,
+      delegate,
+    );
+    if (delegated !== undefined) return delegated;
     const result =
       command === "apply"
-        ? applyInstallPlan(file, process.env)
+        ? applyInstallPlan(file, environment)
         : command === "verify"
-          ? verifyInstallation(file, process.env)
-          : rollbackInstallation(file, process.env);
-    console.log(JSON.stringify(result));
+          ? verifyInstallation(file, environment)
+          : rollbackInstallation(file, environment);
     const succeeded =
       "verified" in result
         ? result.verified
         : result.status === (command === "apply" ? "installed" : "rolled-back");
-    process.exitCode = succeeded ? 0 : 1;
+    return {
+      status: succeeded ? 0 : 1,
+      stdout: `${JSON.stringify(result)}\n`,
+      stderr: "",
+    };
   } catch (error) {
     if (error instanceof UsageError || error instanceof RecordVersionError) {
-      console.error(error.message);
-      process.exitCode = 2;
-    } else if (error instanceof PlanBlocked) {
-      console.log(JSON.stringify({ status: "blocked", gaps: error.gaps }));
-      process.exitCode = 1;
-    } else if (error instanceof InstallRefused) {
-      console.log(
-        JSON.stringify({ status: "refused", problems: error.problems }),
-      );
-      process.exitCode = 1;
-    } else {
-      console.error(
-        error instanceof Error ? error.message : "Installation command failed",
-      );
-      process.exitCode = 1;
+      return { status: 2, stdout: "", stderr: `${error.message}\n` };
     }
+    if (error instanceof PlanBlocked) {
+      return {
+        status: 1,
+        stdout: `${JSON.stringify({ status: "blocked", gaps: error.gaps })}\n`,
+        stderr: "",
+      };
+    }
+    if (error instanceof InstallRefused) {
+      return {
+        status: 1,
+        stdout: `${JSON.stringify({ status: "refused", problems: error.problems })}\n`,
+        stderr: "",
+      };
+    }
+    return {
+      status: 1,
+      stdout: "",
+      stderr: `${error instanceof Error ? error.message : "Installation command failed"}\n`,
+    };
   }
+}
+
+function main(argv: string[]): void {
+  const result = runInstallCli(argv, process.env, false);
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.status !== 0) process.exitCode = result.status;
 }
 
 if (

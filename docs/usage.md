@@ -1,6 +1,6 @@
 # 交付与使用指南
 
-本仓库按产品交付 Skills 及必要依赖。安装支持 Codex、Claude Code 和 Antigravity CLI。安装计划没有默认产品，只向明确选中的产品交付内容。Codex 另接收指令、模型选择政策和 Rust/SQL 偏好。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
+本仓库按产品交付 Skills 及必要依赖。安装支持 Codex、DeepSeek Harness (`dsh`) 和 Antigravity CLI。安装计划没有默认产品，只向明确选中的产品交付内容。Codex 与 DeepSeek Harness 接收全局指令 `AGENTS.md`、模型选择政策、调用合同、Rust/SQL 偏好与对应推荐配置片段。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
 
 按任务查阅：[阅读与采用](#阅读与采用)列出文档入口，[交付目录](#交付目录)说明源码布局。[产品选择与安装](#产品选择与安装)给出计划、应用与恢复步骤，[验证能说明什么](#验证能说明什么)列出证据边界。各技能的使用说明见本页对应章节。
 
@@ -12,13 +12,13 @@
 | 维护或审查 Codex 规则 | [Codex 规则](../delivery/AGENTS.md)、[行为场景](../tests/scenarios/rules.md) | 核对现行规则归属、例外和独立推导的预期；场景不是第二份运行规则 |
 | 维护产品指令 | [交付目录](#交付目录)、[Codex 规则](../delivery/AGENTS.md)、[产品场景](../tests/scenarios/adapters.md) | 直接维护交付目录的唯一规则源 |
 | 组织执行、选择模型路线、安排会话与 Goal，或协作、接续和收尾 | [任务起点](../delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](../delivery/policy/models.md)、[模型场景](../tests/scenarios/rules.md#模型选择与接续) | 由 Codex 规则入口按需加载；衔接需求与授权、工作区选择与绑定、Goal、自主执行、结果接纳及收尾，实际经验见[验证边界](#验证能说明什么) |
-| 按任务选用 Claude Code 与 DeepSeek | [分工与授权](../delivery/policy/models.md#claude-code-and-deepseek-delegation)、[调用合同](../delivery/policy/claude-code.md) | 仅使用 DeepSeek 官方或 OpenCode 官方 API；按能力适配交付完整工作，保留任务边界及验收，不设调用比例 |
+| 按任务选用 DeepSeek Harness (`dsh`) | [分工与授权](../delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](../delivery/policy/deepseek-harness.md) | 仅使用本合同定义的 OpenCode Go 或 DeepSeek 官方路由；按能力适配交付完整工作，保留任务边界及验收，不设调用比例 |
 | 项目明确采用 Rust 偏好 | [Rust 偏好](../delivery/policy/rust.md)与[代码偏好](../delivery/AGENTS.md#code-preferences) | 依项目明确采用的范围读取 |
 | 项目明确采用 SQL 偏好 | [SQL 偏好](../delivery/policy/sql.md)与[代码偏好](../delivery/AGENTS.md#code-preferences) | 按项目采用范围加载 SQL correctness 及其错误处理引用；PostgreSQL 约定仅适用于该数据库，表名遵循[表与模式命名偏好](../delivery/policy/sql.md#tables-and-schemas) |
 | 协同设计数据模型 | [代码偏好](../delivery/AGENTS.md#code-preferences)、[SQL 建模偏好](../delivery/policy/sql.md#data-modeling) | 先恢复整体流程与已定职责，再围绕实际未决选择细化；不设固定逐表审批，具体拆分、应用 ID 和类型取值由所属项目记录 |
 | 撰写中文或英文文档 | [写作参考](../delivery/policy/writing.md)、[检查脚本](../scripts/check-prose.mjs) | 脚本阻塞中西文空格错误，句长只给出提示；其余由作者判断 |
 | 维护按编号引用的表格 | [标识符检查](../scripts/check-ids.mjs) | 同一前缀按出现顺序递增、不重复；跳号允许 |
-| 采用能力配置推荐值 | [能力配置](../delivery/capability/README.md)、[Codex 片段](../delivery/capability/codex.toml)、[Rust lint](../delivery/capability/rust-lints.toml) | 全是推荐文本，合并由本人做一次。安装后位于 `${CODEX_HOME:-$HOME/.codex}/capability/`。本仓库不写任何产品或消费项目的配置文件 |
+| 采用能力配置推荐值 | [能力配置](../delivery/capability/README.md)、[Codex 片段](../delivery/capability/codex.toml)、[DeepSeek Harness 片段](../delivery/capability/dsh-headless.patch.yml)、[Rust lint](../delivery/capability/rust-lints.toml) | 全是推荐文本，合并由本人做一次。安装后位于 `${CODEX_HOME:-$HOME/.codex}/capability/` 或 `${DSH_HOME:-$HOME/.dsh}/capability/`。本仓库不写任何产品或消费项目的配置文件 |
 | 准备或验证本仓库工具 | [工具说明](tooling.md) | 使用仓库固定工具和锁定依赖；不安装个人配置 |
 | 发现项目资料或执行项目检查 | [project-guide](../delivery/skills/project-guide/SKILL.md) | 共享技能；按目标版本发现权威来源与原生检查，报告实际覆盖及缺口；来源与演练边界见[登记](skill-sources.md#project-guide) |
 | 维护规则与工具绑定 | [登记维护](tooling.md#仓库登记维护)、[工具调用](../delivery/policy/tool-contracts.md) | inventory、owner 索引和 consumer bindings 各自承担不同职责；只登记已交付能力 |
@@ -45,7 +45,7 @@
 
 [总协调模板](prompts/coordinator.md)提供明确启用时的分工和可选授权文本，采用方法由模板拥有。
 
-[Claude Code 与 DeepSeek 委派政策](../delivery/policy/models.md#claude-code-and-deepseek-delegation)拥有选用、材料授权、服务范围、分工与兜底条件。[调用合同](../delivery/policy/claude-code.md)拥有实际调用、权限与恢复。本仓库交付这些规则和合同；CLI、账号与服务由使用者提供。该路线未接入 CI 或项目审查关卡，实际演练范围见[验证边界](#验证能说明什么)。
+[DeepSeek Harness 委派政策](../delivery/policy/models.md#deepseek-harness-delegation)拥有选用、材料授权、服务范围、分工与兜底条件。[调用合同](../delivery/policy/deepseek-harness.md)拥有实际客户端定位、凭据优先级、权限参数、事件流终态核验与异常恢复。本仓库交付这些规则、合同及无密钥配置片段 [`dsh-headless.patch.yml`](../delivery/capability/dsh-headless.patch.yml)；CLI、账号与密钥由使用者提供并托管。该路线未接入 CI 或项目审查关卡，实际演练范围见[验证边界](#验证能说明什么)。
 
 这种分层依据 [Codex 指令发现文档](https://developers.openai.com/codex/guides/agents-md)。Codex 分层加载全局与项目入口，普通政策文件由入口按需引用。[Astra 指令建议](https://developers.openai.com/api/docs/guides/latest-model#instruction-following)强调处理含混或冲突的文件指令。这里据此明确采用范围、规则归属与切片停止点。它们是本仓库的工作约定，不是模型自动保证的行为。
 
@@ -135,7 +135,7 @@ DevTools 要求 CLI 访问令牌时，本单元报告不支持并停止。出现
 
 ## 阿里云技能发现
 
-[alibabacloud-find-skills](../delivery/skills/alibabacloud-find-skills/SKILL.md) 已交付给 Codex、Claude 与 Antigravity CLI。它适用于明确的阿里云技能发现请求，或已确认的能力缺口。已有匹配能力时直接使用。不要从普通阿里云关键词启动发现。
+[alibabacloud-find-skills](../delivery/skills/alibabacloud-find-skills/SKILL.md) 已交付给 Codex、DeepSeek Harness 与 Antigravity CLI。它适用于明确的阿里云技能发现请求，或已确认的能力缺口。已有匹配能力时直接使用。不要从普通阿里云关键词启动发现。
 
 入口负责需求拆分、搜索选择、互补技能和结果交接。[HTTP 参考](../delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md)拥有请求形式。[验证参考](../delivery/skills/alibabacloud-find-skills/references/verification-method.md)拥有响应和分页判据。[安装参考](../delivery/skills/alibabacloud-find-skills/references/installation.md)区分下载、安装与后续使用。[示例](../delivery/skills/alibabacloud-find-skills/references/search-examples.md)仅说明选择方法。来源、原件摘要和退役依据见[来源记录](skill-sources.md#alibabacloud-find-skills)。
 
@@ -202,7 +202,7 @@ run 保持原工作目录，只清理本次分配的 scratch 及归属目录。�
 
 ## 产品选择与安装
 
-安装器已交付 plan、apply、verify 和 rollback。plan 必须至少传入一个 `--product`，值为 `codex`、`claude` 或 `antigravity`。重复该参数可明确选择多个产品；没有默认双端安装。缺少选择、无效值或重复产品均返回参数错误，不创建计划。旧 `--include-product` 参数不再接受。在候选源码上完成构建和完整门禁后生成 V7 计划。未提交改动由门禁报告的源码身份绑定：
+安装器已交付 plan、apply、verify 和 rollback。plan 必须至少传入一个 `--product`，值为 `codex`、`dsh` 或 `antigravity`。重复该参数可明确选择多个产品；没有默认双端安装。缺少选择、无效值或重复产品均返回参数错误，不创建计划。旧 `--include-product` 参数及已退役的 `claude` 产品名不再接受。在候选源码上完成构建和完整门禁后生成 V7 计划。未提交改动由门禁报告的源码身份绑定：
 
 ```bash
 umask 077
@@ -213,7 +213,9 @@ bash scripts/install.sh plan --product codex --source "$PWD" --report .cache/rep
   --output /path/outside/checkout/agents-plan.json
 ```
 
-上例只选择 Codex。改为 `--product claude` 或 `--product antigravity` 可单独选择另一产品。两端安装使用 `--product codex --product claude`；三端安装再加 `--product antigravity`。计划只记录选中产品的根，并仅核对这些产品的变量和目标。未选产品的目录、权限和既有安装保持原状；无效的未选产品变量也不阻止计划。
+上例只选择 Codex。改为 `--product dsh` 或 `--product antigravity` 可单独选择另一产品。两端安装使用 `--product codex --product dsh`；三端安装再加 `--product antigravity`。计划只记录选中产品的根，并仅核对这些产品的变量和目标。未选产品的目录、权限和既有安装保持原状；无效的未选产品变量也不阻止计划。
+
+DeepSeek Harness（`0.2.2-rc.1` 实测）的 `desktop` 与 `headless` 两个 profile 共同继承 `@deepseek-ai/dsh-base`，默认启用 `@deepseek-ai/dsh-agent-instructions`、`@deepseek-ai/dsh-skill`、`@deepseek-ai/dsh-skill-filesystem` 和 `@deepseek-ai/dsh-tool-skill`，并共享用户主目录 `${DSH_HOME:-$HOME/.dsh}`。全局指令按固定顺序先读取 `${DSH_HOME:-$HOME/.dsh}/AGENTS.md`，再读取 `${DSH_AGENTS_HOME:-$HOME/.agents}/AGENTS.md`（正文去首尾空白相同则去重），随后按从 Git 根到当前工作目录（`cwd`）由浅入深读取项目级 `AGENTS.md`、`CLAUDE.md`、`AGENTS.local.md` 与 `CLAUDE.local.md`（总上限 64 KiB；全局级不读取 `CLAUDE.md`）。技能发现按单层 `<root>/<name>/SKILL.md` 或 `<root>/<name>.md` 扫描（跳过 `.` 开头隐藏目录，单文件上限 256 KiB），优先级由高到低为：项目 `<projectRoot>/.dsh/skills`（`100`）> `<projectRoot>/.agents/skills`（`200`）> 自定义 `customSkillDirs`（`300`）> 用户级 `${DSH_HOME:-$HOME/.dsh}/skills`（`400`）> `${DSH_AGENTS_HOME:-$HOME/.agents}/skills`（`500`）> 内置技能目录（`600`）。因此 `--product dsh` 直接将规则与技能安装到 `${DSH_HOME:-$HOME/.dsh}`，桌面端与 `headless` 共享同一安装位置且无须额外开关即可自动加载指令与技能；用户原有的 `.credentials.yaml`、`.anonymous-user-id`、`profiles/`、`sessions/`、`storages/` 和 `attachments/` 保持原样。
 
 Antigravity CLI 的目标根固定为 `$HOME/.gemini/antigravity-cli`，只发布下表成员。安装器不创建 Plugin，也不写 `settings.json`、发现 manifest、hooks、MCP 或规则入口。该根的 `skills/` 由 CLI 自动发现，App 不读取。已有 CLI 专属或共享目录中的同名技能可能影响优先级；实际来源通过 `/skills` 核对，见[官方发现规则](https://antigravity.google/docs/customization-discovery?tab=cli)。
 
@@ -255,25 +257,27 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | 目标类别 | 安装位置 | 候选来源 |
 | --- | --- | --- |
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
-| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,claude-code,antigravity}.md` | `delivery/policy/` 对应八个文件 |
+| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,deepseek-harness,antigravity}.md` | `delivery/policy/` 对应八个文件 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
-| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应三个文件 |
+| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应四个文件 |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
 | Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
-| Claude 按需参考 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/policy/{writing,tool-contracts,review}.md` | 同一份 `delivery/policy/` 公共合同 |
-| Claude 工具 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
-| Claude 技能 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/<name>` | 清单选择 Claude 的完整顶层目录 |
+| DeepSeek Harness 按需参考 | `${DSH_HOME:-$HOME/.dsh}/policy/{writing,tool-contracts,review,rust,sql,models,deepseek-harness}.md` | 同一份 `delivery/policy/` 七个适用文件 |
+| DeepSeek Harness 工具 | `${DSH_HOME:-$HOME/.dsh}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
+| DeepSeek Harness 推荐配置 | `${DSH_HOME:-$HOME/.dsh}/capability/{README.md,dsh-headless.patch.yml,rust-lints.toml}` | 同一份 `delivery/capability/` 适用配置片段 |
+| DeepSeek Harness 指令 | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` | `delivery/AGENTS.md` |
+| DeepSeek Harness 技能 | `${DSH_HOME:-$HOME/.dsh}/skills/<name>` | 清单选择 `dsh` 的完整顶层目录 |
 | Antigravity CLI 按需参考 | `$HOME/.gemini/antigravity-cli/policy/{writing,tool-contracts,review}.md` | 同一份公共合同，由技能引用 |
 | Antigravity CLI 工具 | `$HOME/.gemini/antigravity-cli/tools/<name>.mjs` | 同一份打包工具 |
 | Antigravity CLI 技能 | `$HOME/.gemini/antigravity-cli/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
-Codex 交付八个完整顶层技能包，十七个内容入口参与验证。Claude 接收其中七个共享包、十六个内容入口。`figma-design-workflow` 依赖 Codex 的模型路线与负责人验收，仅交付给 Codex。`sketch-native` 依赖 macOS 原生 Sketch 与 CoreText，仅在 macOS 上向 Codex、Claude 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，不要求 Claude 自动发现所有内容入口。Claude 不接收 `CLAUDE.md`、`AGENTS.md`、模型政策、Rust/SQL 偏好或配置片段。推荐配置只交付给 Codex，合并到产品配置由本人完成。
+Codex 交付八个完整顶层技能包，十七个内容入口参与验证。DeepSeek Harness（`dsh`）接收其中七个共享包、十六个内容入口。`figma-design-workflow` 依赖 Codex 的模型路线与负责人验收，仅交付给 Codex。`sketch-native` 依赖 macOS 原生 Sketch 与 CoreText，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收 `AGENTS.md`、七份政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
 
-Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共六个顶层包及六个入口；其他平台保持五个包。配套依赖为三份公共合同和三个工具，不接收 Codex 规则、模型路线、Figma 设计工作流或配置片段。wechatide 的执行器只接受 `Codex` 与 `ClaudeCode`，本片不向 Antigravity 发布。清单支持按固定顺序列出 `codex,claude,antigravity` 的子集；历史 `shared` 仅表示 Codex 与 Claude，不自动扩张。
+Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共六个顶层包及六个入口；其他平台保持五个包。配套依赖为三份公共合同和三个工具，不接收 Codex 规则、模型路线、Figma 设计工作流或配置片段。wechatide 的执行器只接受 `Codex` 与 `ClaudeCode`，本片不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
 
-Codex 与 Claude 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。选择 Antigravity CLI 时使用上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
+Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。选择 Antigravity CLI 时使用上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
-adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `claude:gh`；其他成员使用 `codex:AGENTS.md`、`claude:policy/writing.md` 等相对路径。一个 KEY 只接管对应产品的目标。裸技能名、未知、未选产品或未使用的 KEY 均拒绝。任一选中产品的根、权限或接管缺口阻止整个计划。清单外名称仅报告，保留原值。
+adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `dsh:gh`；其他成员使用 `codex:AGENTS.md`、`dsh:policy/writing.md` 等相对路径。一个 KEY 只接管对应产品的目标。裸技能名、未知、未选产品或未使用的 KEY 均拒绝。任一选中产品的根、权限或接管缺口阻止整个计划。清单外名称仅报告，保留原值。
 
 ### 安装记录与恢复边界
 
@@ -329,7 +333,7 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 
 2026-10-23 在 dev 上通过当前网关运行 Claude Code 2.1.309，完成调用合同、使用说明和对应场景的有界编辑及原有文档检查。请求模型和响应标识均为 `deepseek-v4.1-flash`，请求 effort 为 low，CLI、子进程环境与临时 settings 对齐。实际使用 Read 和 Bash，通过 apply_patch 修改三个限定文件。进程退出码为 0，结果 `is_error` 为 false；负责人读取原始运行与差异后接纳。进程枚举曾被 dontAsk 拒绝，该限制保留在原始报告中。此记录只覆盖该次执行，不证明实际上游身份、服务端有效 effort、完整场景行为或现有客户端已加载新合同。
 
-[设计工作流](../delivery/skills/figma-design-workflow/SKILL.md)从已授权设计实践提炼。当前模型与 effort 由[模型政策](../delivery/policy/models.md#current-defaults)维护。技能绑定材料、目标、可编辑结果与真实像素验收。Figma 按需使用。选用 Claude Code 或 Design 插件时，再适用对应合同。负责人亲自核对实际预览。请求模型、客户端设置与实际运行身份分别报告。
+[设计工作流](../delivery/skills/figma-design-workflow/SKILL.md)从已授权设计实践提炼。当前模型与 effort 由[模型政策](../delivery/policy/models.md#current-defaults)维护。技能绑定材料、目标、可编辑结果与真实像素验收。Figma 按需使用。显式选用 DeepSeek Harness (`dsh`) 或 Design 插件时，再适用对应合同。负责人亲自核对实际预览。请求模型、客户端设置与实际运行身份分别报告。
 
 来源实践使用 Claude Code 请求 DeepSeek；历史成功调用请求 effort 为 low，响应标识为 `deepseek-flash`。日志包含实际 `design:design-critique` 调用与 PNG 读取，评审也曾误读颜色、图片类型和文字布局。主代理核实后筛选修正。这些历史观察不证明独立审查或服务端有效档位。来源范围见[技能来源](skill-sources.md#figma-design-workflow)。
 
@@ -343,7 +347,7 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 
 本地审查路线没有本仓库交付的执行器，门禁也不启动任何模型。场景只静态核对规则文本。门禁证据不覆盖实际审查者行为。CLI 服务兼容性与评审者资格也不在其中。
 
-Claude Code 的[权限模式与审批转交](../delivery/policy/claude-code.md#权限模式与实际生效)按实际支持选择 `auto`，并核对审批模型及判定。2.1.309 的一次真实开发失败中，`dontAsk` 将内部待审批的补丁直接拒绝。离线核对原 18 条补丁输入。10 条被拒输入全部命中 brace 与 quote 预检查，8 条成功输入均未命中。该检查把 quoted heredoc 的补丁正文纳入判断。这是特定版本的拒绝原因证据。不能将其归为 Codex 宿主再次拒绝，也不证明候选修法成功。官方审批回调的机制已确认。DeepSeek/OpenCode 的实际 `auto` 审批及完整开发链路仍待真实验收，由原业务负责人负责。文档检查和无模型加载不补足这项缺口。
+官方 DeepSeek Harness（`dsh 0.2.2-rc.1`）的[凭据来源与终态核验](../delivery/policy/deepseek-harness.md#事件采集成功判据与异常恢复)要求同时满足退出码 `0` 与 `final.reason.kind === "completed"`。本机实测中，桌面端 `opencode-go` / `deepseek-v4.1-flash` 通过 `${DSH_HOME:-$HOME/.dsh}/.credentials.yaml` 托管 `OPENCODE_GO_API_KEY` 并返回 `DSH_OK`。由于发布的 `headless` profile 默认关闭 `credentials`、`authorization` 与 `deepseek-account`，用 `--patch` 临时叠加 [`dsh-headless.patch.yml`](../delivery/capability/dsh-headless.patch.yml) 并显式移除启动环境中的 `OPENCODE_GO_API_KEY` 后，`dsh headless` 仍成功复用托管凭据并返回 `DSH_OK`（退出码 `0`）。持久写入 `${DSH_HOME:-$HOME/.dsh}/profiles/headless/cordis.patch.yml` 受宿主审批边界保护时，由使用者手动合并该片段或按单次调用传入 `--patch`。
 
 本机可见任务的派发、跟进和等待已有实际观察。授权范围内的结果报告和协调者读取也已有观察。候选的真实差异与源码身份验收也已使用。已观察到同机、同工作树的新会话接任，当时协作任务均空闲。证据保留在现有会话与任务记录。实际模型与 effort 未独立核实，请求配置不能充当运行身份。
 
@@ -361,7 +365,7 @@ Codex App 有发现时通常发布行内评论；没有发现时没有 finding �
 
 pre-commit 源码已提供，现有 `core.hooksPath` 保持原配置。覆盖选择、工具前置和临时仓库测试边界见[提交入口](tooling.md#提交入口)。`pr-review` 不作为独立技能恢复或安装。PR 打开、审查与合并操作由 [gh 操作参考](../delivery/skills/gh/references/operations.md)承担。原已验证候选保留原交接和验证范围。位置见 [README 执行记录](../README.md#执行记录)。
 
-[公共行为场景](../tests/scenarios/rules.md)和[产品场景](../tests/scenarios/adapters.md)从设计和历史契约推导输入与预期。作者静态核对、候选审查和实际模型演练分别记录。模型演练必须有覆盖模型、材料和调用范围的授权。授权复用与范围变化按[模型政策](../delivery/policy/models.md#claude-code-and-deepseek-delegation)处理。旧交接修复的五类演练保留原版本范围，不算当前候选的行为证据。安装切换后的结果以实际目标回读为准。
+[公共行为场景](../tests/scenarios/rules.md)和[产品场景](../tests/scenarios/adapters.md)从设计和历史契约推导输入与预期。作者静态核对、候选审查和实际模型演练分别记录。模型演练必须有覆盖模型、材料和调用范围的授权。授权复用与范围变化按[模型政策](../delivery/policy/models.md#deepseek-harness-delegation)处理。旧交接修复的五类演练保留原版本范围，不算当前候选的行为证据。安装切换后的结果以实际目标回读为准。
 
 ## 阿里云短信
 

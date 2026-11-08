@@ -85,7 +85,7 @@ test("a product cannot borrow the other product's dependency to close its refere
   f.put("delivery/policy/review.md", "# Review\n");
   const skill: Member = {
     category: "skill",
-    product: "claude",
+    product: "dsh",
     relative: "skills/probe",
     source: "delivery/skills/probe",
   };
@@ -99,7 +99,7 @@ test("a product cannot borrow the other product's dependency to close its refere
   assert.ok(
     f.check([skill]).some((finding) => finding.target === "policy/review.md"),
   );
-  assert.deepEqual(f.check([skill, { ...review, product: "claude" }]), []);
+  assert.deepEqual(f.check([skill, { ...review, product: "dsh" }]), []);
 });
 
 test("a link is resolved at the depth the file is published at, not written at", (t) => {

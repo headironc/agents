@@ -73,9 +73,9 @@ Node 和 Bun 的版本由 [package.json](../package.json) 指定。[tool-version
 
 ## 技能格式校验
 
-每项技能按清单中的产品集合运行对应官方验证器。历史 `shared` 固定展开为 Codex 与 Claude；新增产品由有序列表显式选择。成员解析器验证完整清单、顶层与嵌套归属以及元数据。所有嵌套入口随所属产品参与校验。安装和验证使用同一产品选择。
+每项技能按清单中的产品集合运行对应官方验证器。`shared` 固定展开为 Codex 与 DeepSeek Harness (`dsh`)；新增产品由有序列表显式选择。成员解析器验证完整清单、顶层与嵌套归属以及元数据。所有嵌套入口随所属产品参与校验。安装和验证使用同一产品选择。
 
-[适配器](../scripts/check-skills.ts)调用[固定上游执行入口](../scripts/skill-validator.py)。Codex 使用 OpenAI `codex` 仓库的 `skill-creator/scripts/quick_validate.py`；Claude 使用 Anthropic `skills` 仓库的同名工具。版本、下载地址与 SHA-256 由验证器清单唯一维护。保留上游原字节与许可证，不修改校验规则来让候选通过。
+[适配器](../scripts/check-skills.ts)调用[固定上游执行入口](../scripts/skill-validator.py)。Codex 使用 OpenAI `codex` 仓库的 `skill-creator/scripts/quick_validate.py`；DeepSeek Harness (`dsh`) 复用固定上游 Agent Skills（Anthropic `skills` 仓库）的同名工具校验 `SKILL.md` frontmatter 与结构。版本、下载地址与 SHA-256 由验证器清单唯一维护。保留上游原字节与许可证，不修改校验规则来让候选通过。
 
 `repository` 和 `all` 门禁分别登记各产品的校验结果与实际入口数量。任何验证器失败、缺失、损坏或覆盖不完整都阻断门禁。显式执行空选择同样失败。离线回归覆盖两套工具的真实正反例、共享与专用选择、嵌套入口以及缓存完整性。校验子进程使用临时 HOME，不传递模型凭据。
 
@@ -83,7 +83,7 @@ Antigravity CLI 的官方校验入口是 `agy plugin validate --strict --json`�
 
 三个产品的格式校验均进入统一门禁。Antigravity 回归使用官方二进制验证有效技能、缺失 frontmatter、名称不匹配与空选择。固定工具版本和实际二进制进入源码身份报告。官方插件校验不证明普通全局目录已被发现、模型会按需使用技能或外部服务操作可用。本片不运行个人安装、登录或模型请求；`/skills` 的真实全局发现仍需在获准安装后核对。
 
-各产品还分别检查完整发布引用。上游工具只校验其固定版本支持的技能格式，不证明完整客户端兼容性、加载或模型行为。Anthropic 技能验证器不等于 Claude 插件包验证器。当前没有 Claude CLI 加载或模型使用证明；新增产品字段时先核对上游支持范围。
+各产品还分别检查完整发布引用。上游工具只校验其固定版本支持的技能格式，不证明完整客户端兼容性、加载或模型行为。新增产品字段时先核对上游支持范围。
 
 ## 选择检查
 

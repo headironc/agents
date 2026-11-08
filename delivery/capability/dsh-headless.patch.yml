@@ -1,0 +1,21 @@
+# Merge into ${DSH_HOME:-$HOME/.dsh}/profiles/headless/cordis.patch.yml
+# or pass with `dsh headless --patch <path>` to enable Harness-managed
+# credentials and the OpenCode Go `deepseek-v4.1-flash` default route.
+- id: credentials
+  disabled: false
+- id: authorization
+  disabled: false
+- id: deepseek-account
+  disabled: false
+- id: llm-pi-ai
+  name: "@deepseek-ai/dsh-llm-pi-ai"
+  config:
+    providers:
+      opencode-go:
+        apiKeyEnv: OPENCODE_GO_API_KEY
+- id: agent-default-model
+  name: "@deepseek-ai/dsh-agent-default-model"
+  config:
+    provider: opencode-go
+    model: deepseek-v4.1-flash
+    reasoningEffort: low

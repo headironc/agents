@@ -46,10 +46,11 @@ test("the CLI requires an explicit nonempty unique product selection before crea
     ["--product"],
     ["--product", ""],
     ["--product", "unknown"],
-    ["--product", "codex,claude"],
+    ["--product", "claude"],
+    ["--product", "codex,dsh"],
     ["--product", "Codex"],
     ["--product", "codex", "--product", "codex"],
-    ["--product", "claude", "--product", "claude"],
+    ["--product", "dsh", "--product", "dsh"],
     ["--product", "antigravity", "--product", "antigravity"],
     ["--include-product", "antigravity"],
     ["--product", "codex", "--include-product", "antigravity"],
@@ -100,23 +101,23 @@ test("product roots record each explicit subset in canonical order and exclude e
   const f = installFixture(t);
   for (const selected of [
     ["codex"],
-    ["claude"],
+    ["dsh"],
     ["antigravity"],
-    ["claude", "codex"],
+    ["dsh", "codex"],
     ["codex", "antigravity"],
-    ["antigravity", "claude"],
-    ["antigravity", "claude", "codex"],
+    ["antigravity", "dsh"],
+    ["antigravity", "dsh", "codex"],
   ] as const) {
     const { plan } = f.planned(
       selected.flatMap((product) => ["--product", product]),
     );
-    const canonical = (["codex", "claude", "antigravity"] as const).filter(
+    const canonical = (["codex", "dsh", "antigravity"] as const).filter(
       (product) => (selected as readonly string[]).includes(product),
     );
     assert.equal(plan.version, 7);
     assert.deepEqual(
       Object.keys(plan.roots).filter((key) =>
-        ["codex", "claude", "antigravity"].includes(key),
+        ["codex", "dsh", "antigravity"].includes(key),
       ),
       canonical,
     );
@@ -138,7 +139,7 @@ test("product roots record each explicit subset in canonical order and exclude e
 });
 
 test("unselected product variables do not block planning or permit target or adoption claims", (t) => {
-  const f = installFixture(t, { products: ["claude"] });
+  const f = installFixture(t, { products: ["dsh"] });
   const environment = { CODEX_HOME: "invalid-unused-root" };
   const { plan } = f.planned([], environment);
   assert.equal(plan.roots.codex, undefined);
@@ -155,11 +156,11 @@ test("unselected product variables do not block planning or permit target or ado
 });
 
 test("V7 records reject empty product roots, unselected targets and legacy recovery paths", (t) => {
-  const f = installFixture(t, { products: ["claude"] });
+  const f = installFixture(t, { products: ["dsh"] });
   const { plan } = f.planned();
   for (const mutate of [
     (value: typeof plan) => {
-      delete value.roots.claude;
+      delete value.roots.dsh;
     },
     (value: typeof plan) => {
       value.version = 5;
@@ -189,11 +190,11 @@ function installDistinctProducts(
   environment: NodeJS.ProcessEnv,
 ): void {
   const codex = environment.CODEX_HOME ?? path.join(f.home, ".codex");
-  const claude = environment.CLAUDE_CONFIG_DIR ?? path.join(f.home, ".claude");
+  const dsh = environment.DSH_HOME ?? path.join(f.home, ".dsh");
   const { plan, review } = f.planned([], environment);
-  const expected = expectedTargets(f.home, plan.run.source, codex, claude);
+  const expected = expectedTargets(f.home, plan.run.source, codex, dsh);
   assert.equal(plan.roots.codex?.path, codex);
-  assert.equal(plan.roots.claude?.path, claude);
+  assert.equal(plan.roots.dsh?.path, dsh);
   assert.deepEqual(
     plan.targets.map((target) => [target.path, target.source]),
     expected,
@@ -201,19 +202,31 @@ function installDistinctProducts(
   const apply = f.cli(["apply", "--plan", review], environment);
   assert.equal(apply.status, 0, apply.stderr + apply.stdout);
   assert.equal(JSON.parse(apply.stdout).status, "installed");
-  assert.notEqual(lstatSync(codex).ino, lstatSync(claude).ino);
+  assert.notEqual(lstatSync(codex).ino, lstatSync(dsh).ino);
   for (const [target, source] of expected)
     assert.deepEqual(readTargetState(target), readTargetState(source));
-  assert.deepEqual(readdirSync(claude).sort(), ["policy", "skills", "tools"]);
-  assert.deepEqual(readdirSync(path.join(claude, "policy")).sort(), [
+  assert.deepEqual(readdirSync(dsh).sort(), [
+    "AGENTS.md",
+    "capability",
+    "policy",
+    "skills",
+    "tools",
+  ]);
+  assert.deepEqual(readdirSync(path.join(dsh, "policy")).sort(), [
+    "deepseek-harness.md",
+    "models.md",
     "review.md",
+    "rust.md",
+    "sql.md",
     "tool-contracts.md",
     "writing.md",
   ]);
-  assert.deepEqual(
-    readdirSync(path.join(claude, "skills")).sort(),
-    skills.claude,
-  );
+  assert.deepEqual(readdirSync(path.join(dsh, "capability")).sort(), [
+    "README.md",
+    "dsh-headless.patch.yml",
+    "rust-lints.toml",
+  ]);
+  assert.deepEqual(readdirSync(path.join(dsh, "skills")).sort(), skills.dsh);
   const verified = f.cli(
     ["verify", "--receipt", plan.run.receipt],
     environment,
@@ -323,9 +336,9 @@ test("a plan binds both products to independent roots and shared source", (t) =>
   assert.equal(plan.version, 7);
   assert.deepEqual(Object.keys(plan.roots).sort(), [
     "backup",
-    "claude",
     "codex",
     "deploy",
+    "dsh",
     "home",
     "state",
   ]);
@@ -350,15 +363,15 @@ test("a plan binds both products to independent roots and shared source", (t) =>
 test("custom product roots preserve the independent target contract", (t) => {
   const f = installFixture(t);
   const codex = path.join(f.home, "custom codex");
-  const claude = path.join(f.home, "custom claude");
+  const dsh = path.join(f.home, "custom dsh");
   const { plan } = f.planned(undefined, {
     CODEX_HOME: codex,
-    CLAUDE_CONFIG_DIR: claude,
+    DSH_HOME: dsh,
   });
   assert.equal(plan.roots.codex?.path, codex);
   assert.deepEqual(
     plan.targets.map((target) => [target.path, target.source]),
-    expectedTargets(f.home, plan.run.source, codex, claude),
+    expectedTargets(f.home, plan.run.source, codex, dsh),
   );
 });
 
@@ -583,41 +596,40 @@ test("the plan requires machine identity", (t) => {
 
 test("product-qualified adoption never claims the other product's same-named skill", (t) => {
   const f = installFixture(t);
-  for (const product of ["codex", "claude"]) {
+  for (const product of ["codex", "dsh"]) {
     const target = path.join(f.home, `.${product}/skills/gh`);
     mkdirSync(target, { recursive: true });
     writeFileSync(path.join(target, "personal.txt"), product);
   }
   assert.equal(f.plan(["--adopt", "gh"]).status, 2);
+  assert.equal(f.plan(["--adopt", "claude:gh"]).status, 2);
   const gaps = f.gaps(f.plan(["--adopt", "codex:gh"]));
   assert.ok(
-    gaps.some(
-      (gap) => gap.code === "adopt-required" && gap.key === "claude:gh",
-    ),
+    gaps.some((gap) => gap.code === "adopt-required" && gap.key === "dsh:gh"),
   );
   assert.deepEqual(f.runs(), []);
-  const { plan } = f.planned(["--adopt", "codex:gh", "--adopt", "claude:gh"]);
+  const { plan } = f.planned(["--adopt", "codex:gh", "--adopt", "dsh:gh"]);
   assert.deepEqual(
     plan.targets
       .filter((target) => target.adopted)
       .map((target) => target.key)
       .sort(),
-    ["claude:gh", "codex:gh"],
+    ["codex:gh", "dsh:gh"],
   );
 });
 
 test("overlapping deployment, backup, source and private roots block before plan writes", (t) => {
   const f = installFixture(t);
   for (const environment of [
-    { CLAUDE_CONFIG_DIR: path.join(f.home, ".codex") },
-    { CLAUDE_CONFIG_DIR: path.join(f.home, ".codex/child") },
-    { CODEX_HOME: path.join(f.home, ".claude/child") },
-    { CLAUDE_CONFIG_DIR: path.join(f.home, ".codex/.agents-install") },
-    { AGENTS_BACKUP_ROOT: path.join(f.home, ".claude/skills") },
+    { DSH_HOME: path.join(f.home, ".codex") },
+    { DSH_HOME: path.join(f.home, ".codex/child") },
+    { CODEX_HOME: path.join(f.home, ".dsh/child") },
+    { DSH_HOME: path.join(f.home, ".codex/.agents-install") },
+    { AGENTS_BACKUP_ROOT: path.join(f.home, ".dsh/skills") },
     { AGENTS_BACKUP_ROOT: f.home },
-    { CLAUDE_CONFIG_DIR: path.join(f.checkout, "installed") },
-    { CLAUDE_CONFIG_DIR: path.join(f.deploy, "public") },
-    { CLAUDE_CONFIG_DIR: f.outputs },
+    { DSH_HOME: path.join(f.checkout, "installed") },
+    { DSH_HOME: path.join(f.deploy, "public") },
+    { DSH_HOME: f.outputs },
   ]) {
     assert.ok(
       f
@@ -715,7 +727,7 @@ test("a source under an actual delivery directory is refused before plan writes"
 test("existing case variants use physical identity for root collisions", async (t) => {
   for (const scenario of [
     "product roots",
-    "Claude child",
+    "DSH child",
     "Codex child",
     "new children",
     "backup root",
@@ -727,21 +739,21 @@ test("existing case variants use physical identity for root collisions", async (
       mkdirSync(root);
       const aliasStat = lstatSync(alias, { throwIfNoEntry: false });
       const environment = {
-        "product roots": { CODEX_HOME: root, CLAUDE_CONFIG_DIR: alias },
-        "Claude child": {
+        "product roots": { CODEX_HOME: root, DSH_HOME: alias },
+        "DSH child": {
           CODEX_HOME: root,
-          CLAUDE_CONFIG_DIR: path.join(alias, "child"),
+          DSH_HOME: path.join(alias, "child"),
         },
         "Codex child": {
           CODEX_HOME: path.join(root, "child"),
-          CLAUDE_CONFIG_DIR: alias,
+          DSH_HOME: alias,
         },
         "new children": {
           CODEX_HOME: path.join(root, "new"),
-          CLAUDE_CONFIG_DIR: path.join(alias, "new"),
+          DSH_HOME: path.join(alias, "new"),
         },
         "backup root": {
-          CLAUDE_CONFIG_DIR: root,
+          DSH_HOME: root,
           AGENTS_BACKUP_ROOT: path.join(alias, "backups"),
         },
       }[scenario];
@@ -768,7 +780,7 @@ test("new case variants collide only on a case-insensitive filesystem", (t) => {
   const aliasStat = lstatSync(aliasHome, { throwIfNoEntry: false });
   const environment = {
     CODEX_HOME: path.join(f.home, "NewProduct"),
-    CLAUDE_CONFIG_DIR: path.join(f.home, "newproduct"),
+    DSH_HOME: path.join(f.home, "newproduct"),
   };
   if (aliasStat && aliasStat.ino === lstatSync(f.home).ino) {
     assert.ok(
@@ -787,12 +799,12 @@ test("distinct product roots can share newly created ancestor aliases", (t) => {
   const f = installFixture(t, { realRuntime: true });
   installDistinctProducts(f, {
     CODEX_HOME: path.join(f.home, "NewParent/codex"),
-    CLAUDE_CONFIG_DIR: path.join(f.home, "newparent/claude"),
+    DSH_HOME: path.join(f.home, "newparent/dsh"),
   });
 });
 
 test("a failed runtime preparation removes only this plan's newly created product and storage directories", (t) => {
-  const f = installFixture(t, { products: ["claude"] });
+  const f = installFixture(t, { products: ["dsh"] });
   f.put(
     ".cache/agents-build/install.mjs",
     "throw new Error('fixture runtime failure');\n",
@@ -805,18 +817,18 @@ test("a failed runtime preparation removes only this plan's newly created produc
   assert.deepEqual(readdirSync(f.outputs), []);
 });
 
-test("Claude roots reject relative values and linked ancestors", (t) => {
+test("DeepSeek Harness roots reject relative values and linked ancestors", (t) => {
   const f = installFixture(t);
   assert.ok(
     f
-      .gaps(f.plan([], { CLAUDE_CONFIG_DIR: "relative" }))
+      .gaps(f.plan([], { DSH_HOME: "relative" }))
       .some((gap) => gap.code === "invalid-root"),
   );
-  const linked = path.join(f.base, "linked-claude");
+  const linked = path.join(f.base, "linked-dsh");
   symlinkSync(f.home, linked);
   assert.ok(
     f
-      .gaps(f.plan([], { CLAUDE_CONFIG_DIR: path.join(linked, "claude") }))
+      .gaps(f.plan([], { DSH_HOME: path.join(linked, "dsh") }))
       .some((gap) => gap.code === "linked-or-invalid-root"),
   );
   assert.deepEqual(f.runs(), []);
@@ -828,23 +840,25 @@ test("record validation binds product, path, source and backup even with a recom
   for (const mutate of [
     (value: typeof plan) => {
       value.targets.find((target) => target.key === "codex:gh")!.product =
-        "claude";
+        "dsh";
     },
     (value: typeof plan) => {
-      value.targets.find((target) => target.key === "claude:gh")!.path =
-        path.join(f.home, ".codex/skills/gh");
+      value.targets.find((target) => target.key === "dsh:gh")!.path = path.join(
+        f.home,
+        ".codex/skills/gh",
+      );
     },
     (value: typeof plan) => {
-      value.targets.find((target) => target.key === "claude:gh")!.source =
+      value.targets.find((target) => target.key === "dsh:gh")!.source =
         path.join(value.run.source, "delivery/AGENTS.md");
     },
     (value: typeof plan) => {
       value.targets.find(
-        (target) => target.key === "claude:policy/review.md",
-      )!.key = "claude:AGENTS.md";
+        (target) => target.key === "dsh:policy/review.md",
+      )!.key = "dsh:AGENTS.md";
     },
     (value: typeof plan) => {
-      value.roots.claude!.path = value.roots.codex!.path;
+      value.roots.dsh!.path = value.roots.codex!.path;
     },
   ]) {
     const changed = structuredClone(plan);

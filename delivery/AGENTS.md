@@ -51,7 +51,7 @@ Reuse effective Human authorization that covers continuing work across slices wi
 - Keep secrets out of source, logs, and review material. Host access is not business authorization. Respect host permissions and repository protections; do not bypass denied access or required checks.
 - Use the relevant tool skill for its supported invocation and failure handling. Load references only as needed, resolving them from the physical installed skill directory.
 - Before running code tools, including Codex sessions, Git, builds, and tests, apply the shared [execution context contract](policy/tool-contracts.md#执行上下文). Reuse a verified binding while its inputs remain unchanged.
-- Before selecting or invoking an external model CLI bridge, read its [route conditions](policy/models.md#route-model-preferences) and dedicated invocation contract ([external CLI bridge](policy/claude-code.md)). Mentioning a CLI does not authorize a model call.
+- Before selecting or invoking an external model CLI (`dsh`), read its [route conditions](policy/models.md#route-model-preferences) and dedicated invocation contract ([DeepSeek Harness](policy/deepseek-harness.md)). Mentioning a CLI does not authorize a model call.
 - For everyday CLI tools (`git`, `rg`, `jq`, `curl`, `ssh`), follow standard safe invocation (quote arguments, use literal `rg -F` when appropriate, pass `jq --arg`, use `git fetch` rather than implicit `git pull`). Read the specific section in [tool-contracts.md](policy/tool-contracts.md) only when performing non-routine remote pushes, complex pagination, or repository gate checks.
 - Check the outcome of external writes. When the outcome is unknown, read back the same target before considering another attempt; preserve the tool's attempt and recovery limits.
 - Make persistent configuration changes only within their authorized targets, with a recoverable previous state.
@@ -91,11 +91,11 @@ See [the shared rules](policy/review.md#review-provenance).
 ## Writing
 
 - For substantive documentation, read relevant sections of [writing.md](policy/writing.md) and follow the target project's documentation conventions. If the installed reference is unavailable, report the missing reference without inventing its contents or claiming it was checked.
-- Run `node "${CODEX_HOME:-$HOME/.codex}/tools/check-prose.mjs"` on the documents you changed to enforce spacing between Chinese and Latin characters or digits. Run `node "${CODEX_HOME:-$HOME/.codex}/tools/check-ids.mjs"` where a table names its rows by number. A zero exit status confirms only that the spacing and identifier checks found no errors; judge clarity and the other writing conventions yourself.
+- Resolve `tools/check-prose.mjs` and `tools/check-ids.mjs` relative to the directory containing this installed `AGENTS.md` (the active product root, such as `${CODEX_HOME:-$HOME/.codex}` or `${DSH_HOME:-$HOME/.dsh}`). Run `node <product-root>/tools/check-prose.mjs` on the documents you changed to enforce spacing between Chinese and Latin characters or digits, and run `node <product-root>/tools/check-ids.mjs` where a table names its rows by number. A zero exit status confirms only that the spacing and identifier checks found no errors; judge clarity and the other writing conventions yourself.
 
 ## Codex behavior
 
 - Use `apply_patch` for manual local file edits, and do not replace it with shell redirection or ad hoc scripts. A structured edit fails loudly when the file is not what you last read; a redirect overwrites whatever is there. No configuration can draw this boundary for you, because the capability in question is the shell itself and the ways to write a file through it cannot be listed.
 - Respect configured hooks. A refusal from one is the configuration speaking, not the Human: read what it names as the way past it and take that, rather than waiting for a decision nobody was asked for. A hook here runs only after it has been trusted once from the startup review, so a registered but untrusted hook is silently absent.
-- Follow Codex `AGENTS.md` discovery and closer-directory precedence.
+- Follow the host client's `AGENTS.md` discovery and closer-directory precedence (`${CODEX_HOME:-$HOME/.codex}/AGENTS.md` in Codex, or `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` then `${DSH_AGENTS_HOME:-$HOME/.agents}/AGENTS.md` in DeepSeek Harness, followed by project instructions).
 - Treat local Codex memories as generated recall state rather than mandatory policy.

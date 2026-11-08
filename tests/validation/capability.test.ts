@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { load } from "js-yaml";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const bun = path.join(root, ".cache/agents-tools/bin/bun");
@@ -105,4 +106,42 @@ test("the readers used here reject a malformed file", () => {
     0,
     "the TOML reader accepts text it should reject",
   );
+  assert.throws(
+    () => load("- id: [unclosed\n"),
+    "the YAML reader accepts text it should reject",
+  );
+});
+
+test("delivery/capability/dsh-headless.patch.yml parses as a secret-free Cordis patch list", () => {
+  const body = readFileSync(
+    path.join(root, "delivery/capability/dsh-headless.patch.yml"),
+    "utf8",
+  );
+  const parsed = load(body);
+  assert.equal(Array.isArray(parsed), true);
+  assert.deepEqual(parsed, [
+    { id: "credentials", disabled: false },
+    { id: "authorization", disabled: false },
+    { id: "deepseek-account", disabled: false },
+    {
+      id: "llm-pi-ai",
+      name: "@deepseek-ai/dsh-llm-pi-ai",
+      config: {
+        providers: {
+          "opencode-go": {
+            apiKeyEnv: "OPENCODE_GO_API_KEY",
+          },
+        },
+      },
+    },
+    {
+      id: "agent-default-model",
+      name: "@deepseek-ai/dsh-agent-default-model",
+      config: {
+        provider: "opencode-go",
+        model: "deepseek-v4.1-flash",
+        reasoningEffort: "low",
+      },
+    },
+  ]);
 });

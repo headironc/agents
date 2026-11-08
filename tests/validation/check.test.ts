@@ -103,9 +103,12 @@ const required = [
   "delivery/tools/check-prose.mjs",
   "delivery/tools/check-ids.mjs",
   "delivery/tools/task-temp.mjs",
-  ...["README.md", "codex.toml", "rust-lints.toml"].map(
-    (name) => `delivery/capability/${name}`,
-  ),
+  ...[
+    "README.md",
+    "codex.toml",
+    "dsh-headless.patch.yml",
+    "rust-lints.toml",
+  ].map((name) => `delivery/capability/${name}`),
   ...[
     "personal-skills",
     "tool-inventory",
@@ -116,7 +119,7 @@ const required = [
   "delivery/policy/writing.md",
   "delivery/policy/models.md",
   "delivery/policy/review.md",
-  "delivery/policy/claude-code.md",
+  "delivery/policy/deepseek-harness.md",
   "delivery/policy/antigravity.md",
   "delivery/skills/figma-design-workflow/SKILL.md",
   "delivery/skills/sketch-native/SKILL.md",
@@ -140,6 +143,7 @@ const required = [
   "delivery/skills/gh/references/workflow-authorization.md",
   "scripts/install.sh",
   "scripts/install.ts",
+  "scripts/install-legacy.ts",
   "scripts/install-records.ts",
   "scripts/install-state.ts",
   "scripts/install-apply.ts",
@@ -535,7 +539,7 @@ test("repository and all gates register each official product validator", async 
     const specs = await checkSpecs([...groups], "all");
     for (const [product, name] of [
       ["codex", "Codex skill validation: 17 entries"],
-      ["claude", "Claude skill validation: 16 entries"],
+      ["dsh", "DeepSeek Harness skill validation: 16 entries"],
       ["antigravity", "Antigravity skill validation: 6 entries"],
     ]) {
       const selected = specs.filter((spec) => spec.name === name);

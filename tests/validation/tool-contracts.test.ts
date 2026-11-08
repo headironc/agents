@@ -42,7 +42,7 @@ test("core inventory has the independently expected delivered subjects and valid
     "skill-validation",
     "codex-cli-loader",
     "codex-cli",
-    "claude-code",
+    "dsh",
     "pinned-tool-bootstrap",
   ];
   assert.deepEqual(
@@ -64,7 +64,7 @@ test("every delivered consumer has its independently expected binding and declar
       "git",
       "python",
     ],
-    "delivery/skills/figma-design-workflow/SKILL.md": ["claude-code"],
+    "delivery/skills/figma-design-workflow/SKILL.md": ["dsh"],
     "delivery/skills/gh-identity/SKILL.md": ["gh"],
     "delivery/skills/project-guide/SKILL.md": ["git", "rg"],
     "delivery/skills/gh-identity/references/auth-readiness.md": ["gh"],
@@ -111,8 +111,8 @@ test("every delivered consumer has its independently expected binding and declar
       "wechatide-call",
     ],
     "delivery/policy/tool-contracts.md": ["rg", "jq", "curl", "git", "openssh"],
-    "delivery/policy/claude-code.md": ["claude-code"],
-    "delivery/policy/models.md": ["claude-code", "task-temp"],
+    "delivery/policy/deepseek-harness.md": ["dsh"],
+    "delivery/policy/models.md": ["dsh", "task-temp"],
     "delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md":
       ["curl"],
     "delivery/skills/alibabacloud-find-skills/references/verification-method.md":

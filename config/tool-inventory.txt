@@ -31,5 +31,5 @@ subject	python	core	runtime	active	defined
 subject	skill-validation	core	cli	active	defined
 subject	codex-cli-loader	core	platform-interface	active	defined
 subject	codex-cli	core	cli	active	defined
-subject	claude-code	core	cli	active	defined
+subject	dsh	core	cli	active	defined
 subject	pinned-tool-bootstrap	core	platform-interface	active	defined
