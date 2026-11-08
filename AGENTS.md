@@ -1,6 +1,7 @@
 # Repository Instructions
 
-- Before repository work, read and apply [Codex rules](delivery/AGENTS.md), then [current delivery and maintenance navigation](README.md), the relevant [usage contracts](docs/usage.md), and [tooling contracts](docs/tooling.md).
+- Before repository work, read [Codex rules](delivery/AGENTS.md). Load only the task-relevant sections of [README](README.md), [usage contracts](docs/usage.md), and [tooling contracts](docs/tooling.md) via heading lookup rather than reading whole files upfront.
+- Keep active session context below the 150K-token ceiling (avoiding long-context latency and 272K tiered-pricing cliffs). Filter search and diff outputs before loading them into context, and hand off cross-session or heavy-context tasks through a compact `progress.md` or `spec.md` anchor (under 100 lines).
 - Use README for current delivery status and follow [execution-record navigation](README.md#执行记录) when exact task evidence is needed.
 - Load [Rust](delivery/policy/rust.md) or [SQL](delivery/policy/sql.md) preferences only under their stated adoption scope and the selected review contract's required sections.
 - Keep work within the authorized scope and branch. Reassess a design when implementation changes its agreed boundaries.
