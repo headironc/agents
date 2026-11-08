@@ -874,7 +874,17 @@ class SketchMCPClient:
                 prefix = "The screenshot has been generated at "
                 if text.startswith(prefix):
                     path = Path(text[len(prefix):])
-                    temporary_root = Path(tempfile.gettempdir()).resolve()
+                    if sys.platform == "darwin":
+                        result = subprocess.run(
+                            ["/usr/bin/getconf", "DARWIN_USER_TEMP_DIR"],
+                            capture_output=True, text=True, check=True, timeout=5,
+                        )
+                        temporary_path = result.stdout.strip()
+                        if not temporary_path or not Path(temporary_path).is_absolute():
+                            raise ValueError("system temporary directory lookup returned an invalid path")
+                        temporary_root = Path(temporary_path).resolve()
+                    else:
+                        temporary_root = Path(tempfile.gettempdir()).resolve()
                     if (not path.is_absolute() or path.suffix.lower() != ".png"
                             or not path.resolve().is_relative_to(temporary_root)):
                         raise ValueError("screenshot path must be a PNG in the system temporary directory")
@@ -892,7 +902,8 @@ class SketchMCPClient:
                     or png[-12:] != b"\x00\x00\x00\x00IEND\xaeB`\x82"):
                 raise ValueError("invalid or incomplete PNG framing")
             return png
-        except (ValueError, TypeError, KeyError, AttributeError, OSError, RuntimeError) as exc:
+        except (ValueError, TypeError, KeyError, AttributeError, OSError,
+                RuntimeError, subprocess.SubprocessError) as exc:
             raise MCPToolError("get_screenshot", res, f"returned an invalid result: {exc}") from exc
 
 
@@ -1712,6 +1723,7 @@ def run_mcp_roundtrip(
         )
 
     except Exception as exc:
+        failed_step = operation["stage"]
         if isinstance(exc, MCPToolError):
             operation["failureResponse"] = {"tool": exc.tool, "payload": exc.payload}
         # A pre-edit failure can close its known copy once. After dispatching an
@@ -1731,6 +1743,10 @@ def run_mcp_roundtrip(
                 )
             except Exception as close_error:
                 operation["closeError"] = str(close_error)
+                if isinstance(close_error, MCPToolError):
+                    operation["closeFailureResponse"] = {
+                        "tool": close_error.tool, "payload": close_error.payload,
+                    }
         operation["error"] = str(exc)
         operation["slotReleased"] = slot_released
         recovery = {"directory": tmpdir, "operationFile": str(operation_path), **operation}
@@ -1751,8 +1767,10 @@ def run_mcp_roundtrip(
             "sketch": str(sketch_path),
             "anchorID": anchor_id,
             "passed": False,
-            "failedStep": operation["stage"],
+            "failedStep": failed_step,
             "error": str(exc),
+            "failureResponse": operation.get("failureResponse"),
+            "closeFailureResponse": operation.get("closeFailureResponse"),
             "recovery": recovery,
         }
 

@@ -818,6 +818,36 @@ with tempfile.TemporaryDirectory(prefix="sketch-response-contract-") as td:
     path.unlink()
     os.link(target, path)
     rejected({"content": [path_block]}, capture)
+    path.unlink()
+    path.write_bytes(png)
+    caller_temp = root / "caller-only"
+    caller_temp.mkdir()
+    original_platform, original_run = rt.sys.platform, rt.subprocess.run
+    original_tmpdir, original_cache = os.environ.get("TMPDIR"), tempfile.tempdir
+    try:
+        rt.sys.platform = "darwin"
+        os.environ["TMPDIR"] = str(caller_temp)
+        tempfile.tempdir = None
+        assert Path(tempfile.gettempdir()) == caller_temp
+        def platform_temp(args, **kwargs):
+            assert args == ["/usr/bin/getconf", "DARWIN_USER_TEMP_DIR"]
+            assert kwargs["check"] and kwargs["timeout"] == 5
+            return type("Result", (), {"stdout": str(root) + "\n"})()
+        rt.subprocess.run = platform_temp
+        response({"content": [path_block]})
+        assert capture() == png, "Sketch's PNG can be outside the caller's TMPDIR"
+        for invalid_root in ["", "relative/path"]:
+            rt.subprocess.run = lambda *a, **kw: type("Result", (), {"stdout": invalid_root})()
+            rejected({"content": [path_block]}, capture)
+        def unavailable(*args, **kwargs):
+            raise rt.subprocess.CalledProcessError(1, args[0])
+        rt.subprocess.run = unavailable
+        rejected({"content": [path_block]}, capture)
+    finally:
+        rt.sys.platform, rt.subprocess.run = original_platform, original_run
+        tempfile.tempdir = original_cache
+        if original_tmpdir is None: os.environ.pop("TMPDIR", None)
+        else: os.environ["TMPDIR"] = original_tmpdir
 `,
       SCRIPTS_DIR,
     ],
@@ -899,6 +929,62 @@ with tempfile.TemporaryDirectory(prefix="sketch-save-outcomes-") as td:
             assert receipt["operationID"] == recovery["operationID"] and receipt["ok"] is True
         # The fixture owns every retained operation and removes it after assertions.
         rt.shutil.rmtree(recovery["directory"])
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("safe pre-edit cleanup preserves original MCP diagnostics in the report", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import sketch_mcp_roundtrip as rt
+with tempfile.TemporaryDirectory(prefix="sketch-failure-report-") as td:
+    root = Path(td)
+    source = root / "source.sketch"
+    with zipfile.ZipFile(source, "w") as z:
+        z.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc"}))
+    allocate = rt.tempfile.mkdtemp
+    rt.tempfile.mkdtemp = lambda **kwargs: allocate(dir=root, **kwargs)
+    rt._launch_sketch_background = lambda *args: ["open", "-g"]
+    original = {"isError": True, "content": [{"type": "text", "text": "Original native exception"}]}
+    cleanup = {"isError": True, "content": [{"type": "text", "text": "Close exception"}]}
+    for stage in ["precheck", "screenshot", "close-error"]:
+        calls = []
+        class Client:
+            def __init__(self, **kwargs): pass
+            def get_screenshot(self, **kwargs):
+                raise rt.MCPToolError("get_screenshot", original)
+            def run_code(self, title, script):
+                calls.append(title)
+                if "precheck" in title:
+                    if stage == "precheck": raise rt.MCPToolError("run_code", original)
+                    return {"anchorPresent": True, "matching": []}
+                if "wait-open" in title: return {"ready": True, "docId": "doc"}
+                if "close" in title:
+                    if stage == "close-error": raise rt.MCPToolError("run_code", cleanup)
+                    return {"closed": True, "anchorPresent": True, "remainingNonAnchor": []}
+                raise AssertionError(title)
+        rt.SketchMCPClient = Client
+        report = rt.run_mcp_roundtrip(source, "anchor", {"edits": []}, root / (stage + "-shots"))
+        assert not report["passed"] and report["failureResponse"]["payload"] == original, report
+        assert report["failedStep"] == ("prepared" if stage == "precheck" else "opened"), report
+        assert not any("mutate" in c or "save" in c for c in calls), calls
+        if stage == "close-error":
+            assert report["closeFailureResponse"]["payload"] == cleanup
+            assert report["recovery"]["failureResponse"]["payload"] == original
+            rt.shutil.rmtree(report["recovery"]["directory"])
+        else:
+            assert report["recovery"] is None and report["closeFailureResponse"] is None, report
+        assert not list(root.glob("sketch-roundtrip-*"))
 `,
     ],
     { encoding: "utf8", env: PY_ENV, timeout: 60000 },
