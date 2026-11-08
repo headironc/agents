@@ -22,7 +22,7 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, BinaryIO, Dict, List, Optional, Tuple
 
 from sketch_text import (
     index_shared_text_styles as _index_shared_text_styles,
@@ -1096,12 +1096,12 @@ def _loads_json_bounded(
     member_name: str,
     dom_budget: Optional[Dict[str, int]] = None,
 ) -> Any:
-    """Parse JSON member while enforcing aggregate byte, object node, container item, and string character limits."""
+    """Parse bounded JSON and count every container and string, including root lists."""
     budget = dom_budget if dom_budget is not None else _new_dom_budget()
     budget["json_bytes"] += len(raw_bytes)
     if budget["json_bytes"] > MAX_ZIP_TOTAL_JSON_BYTES:
         raise RuntimeError(
-            f"Archive JSON total size ({budget['json_bytes']}) exceeds limit ({MAX_ZIP_TOTAL_JSON_BYTES})"
+            f"JSON total size ({budget['json_bytes']}) exceeds limit ({MAX_ZIP_TOTAL_JSON_BYTES})"
         )
     struct_tokens = (
         raw_bytes.count(b"{") + raw_bytes.count(b"[") + raw_bytes.count(b",")
@@ -1115,29 +1115,50 @@ def _loads_json_bounded(
         budget["dicts"] += 1
         if budget["dicts"] > MAX_DOM_DICT_NODES:
             raise RuntimeError(
-                f"Sketch JSON DOM object count ({budget['dicts']}) exceeds limit ({MAX_DOM_DICT_NODES}) in '{member_name}'"
-            )
-        budget["items"] += len(obj)
-        for k, v in obj.items():
-            budget["chars"] += len(k)
-            if isinstance(v, str):
-                budget["chars"] += len(v)
-            elif isinstance(v, list):
-                budget["items"] += len(v)
-                for elem in v:
-                    if isinstance(elem, str):
-                        budget["chars"] += len(elem)
-        if budget["items"] > MAX_DOM_CONTAINER_ITEMS:
-            raise RuntimeError(
-                f"Sketch JSON DOM container item count ({budget['items']}) exceeds limit ({MAX_DOM_CONTAINER_ITEMS}) in '{member_name}'"
-            )
-        if budget["chars"] > MAX_DOM_STRING_CHARS:
-            raise RuntimeError(
-                f"Sketch JSON DOM string character count ({budget['chars']}) exceeds limit ({MAX_DOM_STRING_CHARS}) in '{member_name}'"
+                f"JSON DOM object count ({budget['dicts']}) exceeds limit ({MAX_DOM_DICT_NODES}) in '{member_name}'"
             )
         return obj
 
-    return json.loads(raw_bytes.decode("utf-8"), object_hook=_obj_hook)
+    parsed = json.loads(raw_bytes.decode("utf-8"), object_hook=_obj_hook)
+    pending = [parsed]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            budget["items"] += len(value)
+            budget["chars"] += sum(len(key) for key in value)
+        elif isinstance(value, list):
+            budget["items"] += len(value)
+        elif isinstance(value, str):
+            budget["chars"] += len(value)
+        if budget["items"] > MAX_DOM_CONTAINER_ITEMS:
+            raise RuntimeError(
+                f"JSON DOM container item count ({budget['items']}) exceeds limit ({MAX_DOM_CONTAINER_ITEMS}) in '{member_name}'"
+            )
+        if budget["chars"] > MAX_DOM_STRING_CHARS:
+            raise RuntimeError(
+                f"JSON DOM string character count ({budget['chars']}) exceeds limit ({MAX_DOM_STRING_CHARS}) in '{member_name}'"
+            )
+        if isinstance(value, dict):
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+
+    return parsed
+
+
+def _read_measurement_json(stream: BinaryIO, source_name: str) -> Any:
+    """Bound file and stdin bytes before UTF-8 decoding or JSON parsing."""
+    raw = bytearray()
+    while True:
+        chunk = stream.read(min(65536, MAX_MEASURE_JSON_BYTES - len(raw) + 1))
+        if not chunk:
+            break
+        if len(raw) + len(chunk) > MAX_MEASURE_JSON_BYTES:
+            raise RuntimeError(
+                f"Measurement JSON input '{source_name}' exceeds byte limit ({MAX_MEASURE_JSON_BYTES})"
+            )
+        raw.extend(chunk)
+    return _loads_json_bounded(raw, source_name)
 
 
 def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
@@ -1882,10 +1903,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             exit_code = 0 if report.get("passed", False) else 1
         else:
             if args.input == "-":
-                raw = sys.stdin.read()
+                parsed = _read_measurement_json(sys.stdin.buffer, "stdin")
             else:
-                raw = Path(args.input).read_text(encoding="utf-8")
-            parsed = json.loads(raw)
+                with Path(args.input).open("rb") as stream:
+                    parsed = _read_measurement_json(stream, args.input)
             items = parsed["items"] if isinstance(parsed, dict) and "items" in parsed else parsed
             if not isinstance(items, list):
                 raise ValueError("Input JSON must be a list of specs or {'items': [...]}")

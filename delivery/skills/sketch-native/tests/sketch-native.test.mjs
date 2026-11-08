@@ -165,6 +165,104 @@ rejected(lambda: cm.measure_specs([base], swift_bin="unused-test-helper"), "inco
   assert.equal(res.status, 0, res.stderr);
 });
 
+test("direct measurement bounds file and stdin JSON before parsing", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import contextlib, io, json, sys, tempfile
+from pathlib import Path
+from types import SimpleNamespace
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+cm.platform.system = lambda: "Darwin"
+native_calls = []
+def native(cmd, **kwargs):
+    items = json.loads(kwargs["input"])
+    native_calls.append(items)
+    return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"count": len(items), "results": [{"id": item["id"], "bakedHeight": 20} for item in items]}))
+cm.subprocess.run = native
+original_loads = json.loads
+def forbidden_parse(*args, **kwargs):
+    raise AssertionError("JSON parser must not receive over-limit input")
+
+class ReadProbe(io.BytesIO):
+    def read(self, size=-1):
+        assert 0 < size <= 65536, size
+        return super().read(size)
+
+with tempfile.TemporaryDirectory(prefix="sketch-input-contract-") as td:
+    root = Path(td)
+    def invoke(raw, mode, before_parse=False):
+        input_file = root / "specs.json"
+        input_file.write_bytes(raw)
+        stream = ReadProbe(raw)
+        old_stdin = sys.stdin
+        sys.stdin = SimpleNamespace(buffer=stream)
+        output = io.StringIO()
+        try:
+            if before_parse:
+                cm.json.loads = forbidden_parse
+            with contextlib.redirect_stdout(output):
+                status = cm.main(["--input", "-" if mode == "stdin" else str(input_file), "--swift-bin", "unused-test-helper"])
+        finally:
+            cm.json.loads = original_loads
+            sys.stdin = old_stdin
+        return status, json.loads(output.getvalue()), stream.tell()
+
+    spec = {"id": "text", "text": "界", "fontSize": 14, "width": 100}
+    # The inclusive limit is in bytes, and padding is still part of the input.
+    original_limit = cm.MAX_MEASURE_JSON_BYTES
+    cm.MAX_MEASURE_JSON_BYTES = 1024
+    for mode in ("file", "stdin"):
+        for value in ([spec], {"items": [spec]}):
+            raw = json.dumps(value, ensure_ascii=False).encode("utf-8")
+            raw += b" " * (1024 - len(raw))
+            status, report, _ = invoke(raw, mode)
+            assert status == 0 and report["count"] == 1, (mode, report)
+            before = len(native_calls)
+            status, report, consumed = invoke(raw + b" " * 4096, mode, before_parse=True)
+            assert status == 2 and not report["passed"] and "exceeds byte limit" in report["error"], (mode, report)
+            assert len(native_calls) == before
+            if mode == "stdin":
+                assert consumed == 1025, consumed
+        multibyte = json.dumps({"items": [], "extra": "界" * 400}, ensure_ascii=False).encode("utf-8")
+        assert len(multibyte.decode("utf-8")) < 1024 < len(multibyte)
+        status, report, _ = invoke(multibyte, mode, before_parse=True)
+        assert status == 2 and "exceeds byte limit" in report["error"], report
+    cm.MAX_MEASURE_JSON_BYTES = original_limit
+
+    # Raw-input DOM limits also cover metadata, root arrays, and nested arrays.
+    cases = [
+        ([{}] * 30001, "object count"),
+        ([0] * 120001, "structural complexity"),
+        (["x" * 2097153], "string character count"),
+        ({"items": [], "metadata": [["x" * 2097153]]}, "string character count"),
+        ([spec] * 8193, "spec count"),
+        ([dict(spec, text="x" * 131073)], "UTF-16"),
+    ]
+    for value, error in cases:
+        raw = json.dumps(value).encode("utf-8")
+        for mode in ("file", "stdin"):
+            before = len(native_calls)
+            status, report, _ = invoke(raw, mode)
+            assert status == 2 and not report["passed"] and error in report["error"], (mode, error, report)
+            assert len(native_calls) == before
+    for raw in (b"{", b'[{"text":"' + bytes([255]) + b'"}]'):
+        for mode in ("file", "stdin"):
+            before = len(native_calls)
+            status, report, _ = invoke(raw, mode)
+            assert status == 2 and not report["passed"], (mode, report)
+            assert len(native_calls) == before
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
 function runPython(scriptPath, args, options = {}) {
   return spawnSync("python3", ["-B", scriptPath, ...args], {
     encoding: "utf8",
