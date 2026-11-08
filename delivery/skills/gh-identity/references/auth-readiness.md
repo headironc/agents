@@ -35,7 +35,7 @@ Leave the selected profile active. Do not restore an earlier account.
 
 ## Human profile: `headironc`
 
-This is the only profile. Use it for `pr-open`, `pr-review`, `pr-merge` and `github-release`. The `cladiron[bot]` profile, its fixed credential provider and the `pr-approve` capability were retired once `main` stopped requiring a separate approving review; no App installation token is created, stored or used here.
+`headironc` is the only supported profile for GitHub workflows and [gh operations](../../gh/references/operations.md) (opening, reviewing, merging PRs, and publishing releases). No GitHub App, bot profile (`cladiron[bot]`), installation token, or separate credential provider is used; a workflow that cannot proceed under `headironc` stops and reports that gap.
 
 Unless the initial status check already verifies the active account as `headironc`, first try the fixed account selection:
 
@@ -58,7 +58,3 @@ gh auth login --hostname <host> --git-protocol https
 At the `Authenticate Git with your GitHub credentials?` prompt, explicitly select **No** unless the existing authorization also covers configuring Git credentials. Do not accept the default Yes with Enter: it can install gh as the helper when none is configured, or write credentials through an existing helper. If Git configuration is required, obtain authorization for that target and effect before accepting Yes. An existing gh helper can omit this prompt because it already returns the active account's token; still verify the effective helper and target access afterward. This behavior is implemented by the [gh credential flow](https://github.com/cli/cli/blob/v2.98.0/pkg/cmd/auth/shared/git_credential.go).
 
 Both recovery commands require the Human to complete their browser or device interaction. Stop until that interaction completes, then repeat the status and `viewer.login` checks. Never supply, replace, persist, or display a human token.
-
-## Retired bot profile
-
-No App, installation token or credential provider is used. A workflow that cannot proceed under `headironc` stops and reports that; it does not look for another account, an installed launcher or a stored bot credential.

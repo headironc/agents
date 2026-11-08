@@ -44,4 +44,4 @@ Do not repeat a refresh or page open to work around an unexplained symptom, and 
 
 ## Return
 
-Return the operations run, the exact project, page or file, what each result does and does not prove, the requested evidence and remaining blockers. Hand off only to delivered entries in the capability index: console, network, screenshot, wx API and cache evidence belongs to debugger, phone previews, preview QR codes and uploads to previewer, the project list and code snippets to project-manager, page or canvas automation to automator, and cloud environments, functions, database, storage and message push to cloudbase-operator, and installation diagnosis to installer.
+Return the operations run, the exact project, page or file, what each result does and does not prove, the requested evidence and remaining blockers. Route any follow-up work to its owning entry in the [capability index](../../references/capabilities.md).

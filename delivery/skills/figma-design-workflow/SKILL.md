@@ -5,7 +5,7 @@ description: Create and iterate authorized editable design drafts through Codex,
 
 # Figma Design Workflow
 
-This is a Codex design workflow. Codex owns requirements, authorization, bounded draft work, and acceptance. Use the staged design route in the [model policy](../../policy/models.md#current-defaults): `gpt-6.1-sol` at `medium` effort for initial page/stack layout composition, `low` effort for local property refinements and script execution, and `gpt-6.1-terra` at `low` effort for pixel-based visual inspection. Figma is an output option when the task needs it; external CLI bridges and a separate Design plugin are not required for the default route.
+This is a Codex design workflow. Codex owns requirements, authorization, bounded draft work, and acceptance. Use the staged design route in the [model policy](../../policy/models.md#current-defaults): `gpt-6.1-sol` at `medium` effort (`high` only for complex multi-state layout constraints) for initial page/stack layout composition, `gpt-6.1-sol` or `gpt-6-luna` at `low` effort for local property refinements and script execution, and `gpt-6.1-terra` at `low` effort for pixel-based visual inspection. Figma is an output option when the task needs it; external CLI bridges and a separate Design plugin are not required for the default route.
 
 ## Bind the design task
 

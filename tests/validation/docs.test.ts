@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -81,4 +81,17 @@ test("scenario identifiers stay unique and ascend within their prefix", () => {
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /^id-check: 2 files, 0 errors$/m, "both scenario files must be read");
+});
+
+test("tracked Markdown stays free of consumer repository names and unpublished delivery paths", () => {
+  const files = listMarkdown(root);
+  const forbiddenEverywhere = [/\bNucleus\b/, /\bRota\b/, /\bhaloUnrelated\b/, /docs\/task-architecture\.md/];
+  const forbiddenInDelivery = [/docs\/prompts\/coordinator\.md/, /delivery\/skills\/sketch-native\/scripts\//];
+  for (const relative of files) {
+    const content = readFileSync(path.join(root, relative), "utf8");
+    for (const pattern of forbiddenEverywhere) assert.doesNotMatch(content, pattern, `${relative} matched ${pattern.source}`);
+    if (relative.startsWith("delivery/")) {
+      for (const pattern of forbiddenInDelivery) assert.doesNotMatch(content, pattern, `${relative} matched ${pattern.source}`);
+    }
+  }
 });

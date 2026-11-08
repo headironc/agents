@@ -6,7 +6,7 @@ Contract subject: `dsh`.
 
 ## 执行客户端、接收服务与凭据来源
 
-- **执行客户端与路由定位（及与已退役桥接器的对照）**：使用官方 DeepSeek Harness 桌面应用内置或已链接到 `PATH` 的 `dsh`（macOS 默认路径为 `/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh`，实测版本 `0.2.2-rc.1`）。调用前通过 `dsh --version`、`dsh --help` 与 `dsh headless --help` 核对实际二进制、支持选项及 profile 组合。相较于已从本仓库移除的 Claude Code 桥接器（以第三方 `claude` CLI 为执行客户端、经 Anthropic 兼容协议转发 DeepSeek/OpenCode 端点、仅依赖启动环境变量注入密钥并通过 `-p --output-format stream-json` 调用），官方 `dsh headless` 直接以原生 Cordis 插件树连接 OpenCode Go（`openai-completions` 协议）或 DeepSeek 官方服务，支持桌面端 `${DSH_HOME:-$HOME/.dsh}/.credentials.yaml` 托管凭据复用（配合 patch 叠加）与 `.env`/环境变量分级回退，并以 `--permission-mode`、`--approval-policy`、`--add-dir` 与 `--json` 提供只读分析、有界工作区写入及显式设计原型辅助。
+- **执行客户端与路由定位**：使用官方 DeepSeek Harness 桌面应用内置或已链接到 `PATH` 的 `dsh`（macOS 默认路径为 `/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh`，实测版本 `0.2.2-rc.1`）。调用前通过 `dsh --version`、`dsh --help` 与 `dsh headless --help` 核对实际二进制、支持选项及 profile 组合。`dsh headless` 直接以原生 Cordis 插件树连接 OpenCode Go（`openai-completions` 协议）或 DeepSeek 官方服务，支持桌面端 `${DSH_HOME:-$HOME/.dsh}/.credentials.yaml` 托管凭据复用（配合 patch 叠加）与 `.env`/环境变量分级回退，并以 `--permission-mode`、`--approval-policy`、`--add-dir` 与 `--json` 提供只读分析、有界工作区写入及显式设计原型辅助。
 - **模型接收服务与模型标识**：仅连接本合同定义的官方服务路由：
   - **OpenCode Go 路由（`opencode-go`）**：由 `@deepseek-ai/dsh-llm-pi-ai` 承载，默认端点为 `https://opencode.ai/inference/go/v1`（`openai-completions` 协议，`thinkingFormat: "deepseek"`），日常编码与重构默认模型为 `deepseek-v4.1-flash`。
   - **DeepSeek 官方路由（`deepseek-official`）**：由 `@deepseek-ai/dsh-llm-deepseek-api-key` 承载，连接 DeepSeek 官方 API，对应 V4.1 Flash 模型标识为 `deepseek-flash`。

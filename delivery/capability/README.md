@@ -12,14 +12,12 @@
 
 `codex.toml` 里的两项保持注释，展示与[操作边界](../AGENTS.md#operation-boundaries)相配的可选设置。仅安装这个片段不会改变个人配置。
 
-`sandbox_mode` 与 `approval_policy` 对应操作边界。`workspace-write` 实测过四格。工作目录内的写入落盘。目录外的同一条写入报只读，文件不落盘。同一条写入在 `read-only` 下同样被拒，所以第一格的成功来自这个设置。而目录外的读取成功。所以它管写不管读。`on-request` 表示外部动作前请求人确认的形态。推荐理由是这个形状与操作边界同形，不是任何越界率数字。本仓库没有测过它，采用与否由你判断。
+`sandbox_mode` 与 `approval_policy` 对应操作边界：`workspace-write` 限制写入当前工作区目录（不限制只读访问），`on-request` 在越界或外部动作前请求确认。是否启用由使用者自行决定。
 
 `dsh-headless.patch.yml` 提供官方 DeepSeek Harness `headless` profile 的无密钥 Cordis patch 列表。官方默认 `headless` profile 停用了托管凭据存储（`credentials`、`authorization`、`deepseek-account` 均为 `disabled: true`），且默认模型指向 `deepseek-official` / `deepseek-flash`。合并该片段（或通过 `--patch` 临时叠加）后，`headless` 可直接复用桌面端在 `${DSH_HOME:-$HOME/.dsh}/.credentials.yaml` 中托管的 `OPENCODE_GO_API_KEY` 凭据引用，并将默认模型路由设为 `opencode-go` / `deepseek-v4.1-flash`（`reasoningEffort: low`）。片段仅含插件开关与凭据引用变量名，不包含任何 API key。
 
 ## 规则与执行配置
 
-规则的预期行为由 [Rust 规范](../policy/rust.md)与 [DeepSeek Harness 调用合同](../policy/deepseek-harness.md)定义。`rust-lints.toml` 提供其中可机械判定部分的执行配置，`dsh-headless.patch.yml` 提供 `dsh headless` 启用托管凭据与 `opencode-go` 路由的声明配置。规范保留要求，配置拥有启用方式，两者职责不同。测试从要求推导预期，验证执行器的行为。消费者未启用配置时，已采用的要求仍然适用。此时存在执行缺口，不能声称工具已经强制。
+规则的预期行为由 [Rust 规范](../policy/rust.md)与 [DeepSeek Harness 调用合同](../policy/deepseek-harness.md)定义。`rust-lints.toml` 提供其中可机械判定部分的执行配置，`dsh-headless.patch.yml` 提供 `dsh headless` 启用托管凭据与 `opencode-go` 路由的声明配置。规范保留要求，配置拥有启用方式，两者职责不同。消费者未启用配置时，已采用的要求仍然适用，但不能声称工具已强制执行。
 
-`rust-lints.toml` 里面每一条都在真实工具链上看着它让一个违规 crate 失败过。对照是同一份代码、不带配置。写进去却判不了任何东西的条目不该留。两条这样的条目已移出，并写明了原因。
-
-维护配置时还要验证符合要求的输入能通过。只看违规输入失败，无法排除执行器拒绝所有输入。工具漏报或误报时，按规范核对并修正执行边界。不能用当前工具的输出反向改写要求。
+`rust-lints.toml` 仅收录在目标工具链上实测能拦截违规输入且放行合规输入的 lint 条目；工具链未能生效的规则仍由 `policy/rust.md` 正文约束。

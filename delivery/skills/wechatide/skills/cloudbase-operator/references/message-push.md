@@ -22,20 +22,14 @@ Valid event names for `msg_type event` come from `cloud_query_msg_push --action 
 | Cloud function, the default | Each `(MsgType, Event)` pair pushes to its own bound cloud function |
 | Container | One cloud-hosting service receives everything on a single path, and the cloud-function callbacks stop taking effect |
 
-`cloud_query_msg_push --action list` reports the current `pushMode`. In container mode `subscribe`, `unsubscribe` and `setEnable` are refused with a note to switch back to cloud-function mode first. This entry does not switch into container mode. `ensureCloudFunctionMode` is its only mode action, and `ensureContainerMode` and `setContainerCallback` are not delivered, because container mode disables every cloud-function callback and needs a cloud-hosting service and path that no delivered entry owns. Report a request for container mode as unavailable and name the DevTools cloud console instead.
-
-`ensureCloudFunctionMode` is a write in the other direction: it moves the AppID back to cloud-function push, so a cloud-hosting service that was receiving every message stops receiving any. Read the current `pushMode` first, report what the switch would stop, and verify authorization for that AppID-wide effect under the entry's write rules. A subscription-only grant does not cover stopping the existing receiver.
+`cloud_query_msg_push --action list` reports the current `pushMode`. In container mode, `subscribe`, `unsubscribe` and `setEnable` are refused until the AppID switches back to cloud-function mode via `ensureCloudFunctionMode` (after reading `pushMode` and verifying authorization for stopping the existing container receiver as the [cloudbase-operator entry](../SKILL.md) requires). `ensureContainerMode` and `setContainerCallback` are not delivered; report container-mode setup requests as unavailable and direct the user to the DevTools cloud console.
 
 ## The receiving cloud function
 
-Deploy the receiver with `cloud_fn_deploy` and `--remote-npm-install`, because its dependencies install in the cloud; without that flag a missing dependency usually surfaces at runtime as `Cannot find module`. The function directory's name is the function name.
-
-A cloud function in push mode does not reply to the user by returning a value. A customer-service reply is sent actively through the OpenAPI call `customerServiceMessage.send`, which the function's own `config.json` must declare under `permissions.openapi`. Writing that function and its configuration is ordinary source work outside this entry, and deploying it is still a write requiring deployment authority. Reuse a task or batch grant that already covers that deployment.
+A cloud function in push mode does not reply to the user by returning a value. A customer-service reply is sent actively through the OpenAPI call `customerServiceMessage.send`, which the function's own `config.json` must declare under `permissions.openapi`. Writing that function and its configuration is ordinary source work outside this entry, and deploying it via `cloud_fn_deploy --remote-npm-install` requires deployment authority under the [cloudbase-operator entry](../SKILL.md).
 
 Cloud-function logs are read in the DevTools cloud console, under the function's own log view. No delivered operation queries them, and no lower-level interface is used in their place.
 
 ## Verifying on a phone
 
-Publishing a trial version or pushing a preview belongs to previewer: `upload` publishes the trial version and `auto_preview` pushes a preview into the developer's WeChat. A customer-service entry point in the Mini Program usually needs a `<button open-type="contact">`.
-
-Upstream material names two invocations that this delivery does not accept. `miniprogram_upload` is an alias that the DevTools CLI resolves to `upload` internally; the call executor matches the literal operation name and refuses an alias as an undelivered operation. `-t TOOLNAME` selects the tool through the MCP bridge, and the executor reserves that option along with `-c` and `-a`. Use the delivered operation name as the executor's second argument instead.
+Publishing a trial version (`upload`) or pushing a preview (`auto_preview`) belongs to `previewer` (passing the registered operation ID rather than the `miniprogram_upload` alias or reserved `-t` flag). A customer-service entry point in the Mini Program usually needs a `<button open-type="contact">`.

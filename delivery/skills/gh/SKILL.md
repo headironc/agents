@@ -8,7 +8,7 @@ metadata:
   upstream-revision: 40b742f76d68e6b1f472942a6368db4b5d765641
   upstream-path: skills/gh/SKILL.md
   upstream-sha256: 262301bdc39ea698034c68b0a9b80ce526199c91ab9295a53e348d65eb5304bb
-  upstream-verification: Historical attribution; upstream bytes were not reverified in this rebuild slice.
+  upstream-verification: Historical attribution; upstream bytes were not re-fetched during local adaptation.
 ---
 
 # GitHub CLI

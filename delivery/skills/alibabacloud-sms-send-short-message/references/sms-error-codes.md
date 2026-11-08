@@ -1,17 +1,11 @@
 # SMS Send-Status Error Codes
 
-> Reference for the per-message `ErrCode` field returned by
-> `aliyun dysmsapi query-send-details`. Two layers of codes are combined:
+> Reference for the per-message `ErrCode` field returned by `aliyun dysmsapi query-send-details`. Two layers of codes are combined:
 >
-> 1. **Alibaba platform codes** (`isv.*` / `isp.*`) — surfaced by Alibaba pre-checks
->    or the SMS gateway before the message is handed off to the carrier.
-> 2. **Carrier receipts** (`DELIVERED`, `MOBILE_NOT_ON_SERVICE`, …) — async
->    delivery receipts pushed back by domestic carriers (China Mobile / Unicom /
->    Telecom). Receipt timing varies; absence is possible when
->    `SendStatus = 1` (sent) but not yet `SendStatus = 3` (delivered).
+> 1. **Alibaba platform codes** (`isv.*` / `isp.*`) — surfaced by Alibaba pre-checks or the SMS gateway before the message is handed off to the carrier.
+> 2. **Carrier receipts** (`DELIVERED`, `MOBILE_NOT_ON_SERVICE`, …) — async delivery receipts pushed back by domestic carriers (China Mobile / Unicom / Telecom). Receipt timing varies; absence is possible when `SendStatus = 1` (sent) but not yet `SendStatus = 3` (delivered).
 >
-> Upstream source:
-> [Domestic SMS delivery-receipt error codes (101347)](https://help.aliyun.com/document_detail/101347.html).
+> Upstream source: [Domestic SMS delivery-receipt error codes (101347)](https://help.aliyun.com/document_detail/101347.html).
 
 ---
 
@@ -20,7 +14,7 @@
 `query-send-details` returns `SmsSendDetailDTOs.SmsSendDetailDTO[]`, where each entry carries:
 
 | Field | Meaning |
-| --------------- | ----------------------------------------------------------------- |
+| --- | --- |
 | `PhoneNum` | Recipient mobile number |
 | `SendStatus` | `1` = sent (in flight), `2` = failed, `3` = delivered (success) |
 | `ErrCode` | Receipt code; interpret together with SendStatus |
@@ -29,27 +23,18 @@
 | `ReceiveDate` | Receipt time from carrier (empty when no receipt yet) |
 | `OutId` | External tracking ID, if you supplied `--out-id` on send |
 
-**Important — empty `ErrCode` semantics**:
-
-- `SendStatus = 1` + empty `ErrCode` → in flight, retry the query later (carrier receipt not arrived yet).
-- `SendStatus = 2` + non-empty `ErrCode` → failure, look up the code below.
-- `SendStatus = 3` + `ErrCode = DELIVERED` (or empty) → success.
-
 ---
 
 ## Section 1 — Alibaba platform codes (`isv.*` / `isp.*`)
 
-Apply [failure and recovery](../SKILL.md#failure-and-recovery) before taking
-any suggested action below. Diagnostic suggestions do not authorize a resend,
-permission grant, billing change or service configuration.
+Apply [failure and recovery](../SKILL.md#failure-and-recovery) before taking any suggested action below. Diagnostic suggestions do not authorize a resend, permission grant, billing change or service configuration.
 
-Returned synchronously at send time **and** echoed in the receipt. Most can also
-appear as the response `Code` of `SendSms` / `SendBatchSms`.
+Returned synchronously at send time **and** echoed in the receipt. Most can also appear as the response `Code` of `SendSms` / `SendBatchSms`.
 
 ### 1.1 Account & service-level
 
 | Code | Message | Cause / Resolution |
-| ----------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------- |
+| --- | --- | --- |
 | `isv.ACCOUNT_NOT_EXISTS` | Account not found | Wrong account or AccessKey. Confirm credentials. |
 | `isv.ACCOUNT_ABNORMAL` | Account abnormal | Billing query exception. Open a ticket via the SMS DingTalk group. |
 | `isv.OUT_OF_SERVICE` | Business stopped (insufficient balance) | Top up the SMS quota. |
@@ -61,7 +46,7 @@ appear as the response `Code` of `SendSms` / `SendBatchSms`.
 ### 1.2 Signature / template / content
 
 | Code | Message | Cause / Resolution |
-| -------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------- |
+| --- | --- | --- |
 | `isv.SMS_SIGN_NAME_ILLEGAL` | Signature missing or unapproved | Verify the signature is approved (`SignStatus=1`). |
 | `isv.SMS_SIGNATURE_ILLEGAL` | No matching signature under this account | Check that AK and signature belong to the same account; remove garbled chars. |
 | `isv.SMS_SIGN_ILLEGAL` | Signature forbidden | Apply a compliant signature in the console. |
@@ -77,7 +62,7 @@ appear as the response `Code` of `SendSms` / `SendBatchSms`.
 ### 1.3 Recipient / quota / control
 
 | Code | Message | Cause / Resolution |
-| --------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| --- | --- | --- |
 | `isv.MOBILE_NUMBER_ILLEGAL` | Phone number format error | Use `+86` / `0086` / `86` / bare 11-digit for domestic; international = country-code + number. |
 | `isv.MOBILE_COUNT_OVER_LIMIT` | Too many recipients in one call | `SendSms` ≤ 1000; `SendBatchSms` ≤ 100. |
 | `isv.BUSINESS_LIMIT_CONTROL` | Cloud-communication flow-control hit | Per-recipient frequency cap. Lower send rate or adjust threshold in the console. |
@@ -91,20 +76,18 @@ appear as the response `Code` of `SendSms` / `SendBatchSms`.
 
 ## Section 2 — Carrier delivery error codes
 
-Pushed asynchronously by the carrier after the message reaches the destination
-(or fails to). They populate `ErrCode` only after `SendStatus` transitions to
-`2` (failed) or `3` (delivered).
+Pushed asynchronously by the carrier after the message reaches the destination (or fails to). They populate `ErrCode` only after `SendStatus` transitions to `2` (failed) or `3` (delivered).
 
 ### 2.1 Success
 
 | Code | Meaning |
-| ----------- | -------------------------------------------------------------------------- |
+| --- | --- |
 | `DELIVERED` | Carrier confirmed handset reception. Equivalent to `SendStatus = 3`. |
 
 ### 2.2 Recipient-side failures
 
 | Code | Meaning | Suggested handling |
-| ----------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
+| --- | --- | --- |
 | `MOBILE_NOT_ON_SERVICE` | Number is suspended / out of service / shut down | Stop sending; flag the number invalid in CRM. |
 | `MOBILE_SEND_LIMIT` | Recipient hit the per-day per-number receive limit | Defer; do not retry within 24h. |
 | `MOBILE_ACCOUNT_ABNORMAL` | Carrier account abnormal (arrears, deregistered, …) | Mark inactive; manual confirmation needed. |
@@ -116,7 +99,7 @@ Pushed asynchronously by the carrier after the message reaches the destination
 ### 2.3 Content / route-side failures
 
 | Code | Meaning | Suggested handling |
-| ----------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
+| --- | --- | --- |
 | `CONTENT_KEYWORD` | Carrier content audit hit a forbidden keyword | Revise the template; resubmit for approval. |
 | `CONTENT_ERROR` | Marketing SMS missing opt-out instruction | Append a regulation-compliant unsubscribe tail (e.g. `STOP` / reply-T-to-opt-out). |
 | `EXPIRED` | Submission expired in carrier queue | Report expiry; any new content/send requires a new confirmed plan. |
@@ -125,9 +108,7 @@ Pushed asynchronously by the carrier after the message reaches the destination
 | `SP_UNKNOWN_ERROR` | Carrier returned an opaque error | Preserve the unknown cause; investigate without automatically resending. |
 | `REQUEST_SUCCESS` | Carrier accepted but final receipt not yet received | Treat as in-flight; query again later. |
 
-> The carrier code list above is non-exhaustive — carriers may add or rename
-> codes without notice. Preserve unknown values as unresolved diagnostics;
-> do not infer retryability from an unfamiliar code.
+> The carrier code list above is non-exhaustive — carriers may add or rename codes without notice. Preserve unknown values as unresolved diagnostics; do not infer retryability from an unfamiliar code.
 
 ---
 
@@ -142,22 +123,15 @@ Use this decision tree when investigating a failed message:
 
 2. **Inspect `ErrCode` prefix**:
    - `isv.*` / `isp.*` → look up Section 1.
-     - Account / signature / template issues → report the proposed fix and
-       its required authorization; do not change configuration under query authority.
-     - Throttling (`BUSINESS_LIMIT_CONTROL` / `*_LIMIT_CONTROL`) → exponential
-       back-off for authorized queries; sending and quota changes need separate decisions.
+     - Account / signature / template issues → report the proposed fix and its required authorization; do not change configuration under query authority.
+     - Throttling (`BUSINESS_LIMIT_CONTROL` / `*_LIMIT_CONTROL`) → exponential back-off for authorized queries; sending and quota changes need separate decisions.
    - Otherwise carrier code → look up Section 2.
      - Recipient-side failures → report recipient status; do not mutate an audience or retry blindly.
      - Content / route-side failures → propose corrected content and a new send plan.
 
-3. **No `ErrCode` but `SendStatus = 2`** means a failed receipt with an
-   unavailable cause. Preserve `BizId` and `RequestId`; do not invent the cause.
+3. **No `ErrCode` but `SendStatus = 2`** means a failed receipt with an unavailable cause. Preserve `BizId` and `RequestId`; do not invent the cause.
 
-4. **Aggregate analysis**: if a single date's `RespondedFailCount` is unusually
-   high, run `query-send-statistics` (per signature) to confirm it is not
-   isolated to one signature/template, then, within the authorized read scope, sample up to 20 known failed
-   records using each original phone number, send date and `BizId` with
-   `query-send-details` to identify the dominant `ErrCode`.
+4. **Aggregate analysis**: if a single date's `RespondedFailCount` is unusually high, run `query-send-statistics` (per signature) to confirm it is not isolated to one signature/template, then, within the authorized read scope, sample up to 20 known failed records using each original phone number, send date and `BizId` with `query-send-details` to identify the dominant `ErrCode`.
 
 ---
 
@@ -183,8 +157,7 @@ for k, v in sorted(codes.items(), key=lambda x: -x[1]):
     print(f"status={k[0]} code={k[1]:<35s} count={v}")
 ```
 
-Cross-reference each `ErrCode` against Section 1/2 above to choose the right
-remediation (fix template, revise audience, raise quota, …).
+Cross-reference each `ErrCode` against Section 1/2 above to choose the right remediation (fix template, revise audience, raise quota, …).
 
 ---
 
@@ -192,5 +165,5 @@ remediation (fix template, revise audience, raise quota, …).
 
 - [Domestic SMS delivery-receipt error codes (101347)](https://help.aliyun.com/document_detail/101347.html)
 - [SMS service error codes (101346)](https://help.aliyun.com/document_detail/101346.html)
-- [QuerySendDetails API](https://help.aliyun.com/document_detail/419277.html)
+- [QuerySendDetails API](https://help.aliyun.com/document_detail/102352.html)
 - Local: [failure and recovery](../SKILL.md#failure-and-recovery); [RAM actions](ram-policies.md).

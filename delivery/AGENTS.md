@@ -7,14 +7,13 @@
 
 - Communicate in Chinese; write code, code comments, identifiers, and commit messages in English.
 - Lead with the result or intended action. Use concise explanations and mark material uncertainty.
-- For a single-agent Git task, edit directly in the current verified checkout and branch so local build caches (`target/`, `node_modules/`) and ignored files remain available. Allocate a separate Git worktree under the [workspace rules](policy/models.md#workspaces) only when parallel writers or conflicting WIP would collide, when isolating an experimental spike, or when the Human explicitly requests isolation.
+- Before selecting a workspace or starting, resuming, or changing an implementation checkout, apply the [workspace rules](policy/models.md#workspaces): for a single-agent Git task, edit directly in the current verified checkout and branch so local build caches (`target/`, `node_modules/`) and ignored files remain available; allocate a separate Git worktree only when parallel writers or conflicting WIP would collide, when isolating an experimental spike, or when the Human explicitly requests isolation.
 - Before giving a final response for a file edit, make a separate verification tool call after the last write. For a Git edit, inspect the final diff and run `git diff --check` against the actual changes in the verified checkout, accounting for staged or new files. Run the applicable [project checks](policy/review.md#checks). In the final response, name the checks you actually ran and their results. A patch success message or pre-edit inspection does not count.
 - Read relevant project instructions and affected code first. Reuse established decisions and unchanged verification results.
-- Enforce strict context and token guardrails to avoid long-context latency and 272K tiered-pricing cliffs: never read full repository trees, lockfiles, build outputs, or unbounded `git log` / `git diff` into context. Use `rg` with line limits and read targeted file line ranges. When active session context approaches the 150K-token ceiling, or after 3 consecutive failed repair attempts on the same issue, flush state to a concise `progress.md` or `spec.md` anchor (at most 100 lines) and start a clean session.
+- Enforce strict context and token guardrails to avoid long-context latency and 272K tiered-pricing cliffs: never read full repository trees, lockfiles, build outputs, or unbounded `git log` / `git diff` into context. Use `rg` with line limits and read targeted file line ranges. When active session context approaches the 150K-token ceiling, after 3 consecutive failed repair attempts on the same issue, or during cross-session/long-horizon handoffs, flush state to a concise `progress.md` or `spec.md` anchor (at most 100 lines, reusing an existing task record when present) so a clean session can resume without reading full transcripts. Ordinary single-session work needs no separate status file, and logs must never merely repeat Git history or raw command output.
 - For each new Human requirement, the task owner assesses whether it applies only to the current task, corrects execution of an existing rule, or reveals a lasting rule gap or conflict. Check the applicable authoritative rules before deciding. Apply task-specific directions within their stated scope; correct execution deviations using the existing rule. Reuse adequate rules rather than adding duplicates, and preserve the requirement's original scope and authorization.
 - When a requirement establishes a lasting preference or exposes a recurring rule gap or conflict, update the owning authoritative source within the authorized slice and operation boundaries. Follow the existing [rule ownership requirements](#code-preferences) and update affected references and acceptance scenarios. Resolve conflicts using instruction priority and declared adoption scope; ask only for a missing decision or uncovered action. When an update cannot proceed, identify the specific gap and responsible owner while continuing unaffected work. Assessing a requirement does not authorize writing rules, memory, installed copies, or configuration. Do not make every instruction permanent or require a record, report, or approval for every assessment.
 - For model tier routing (`Architect/Debugger`, `Coder/Reviewer`, `Runner/Explorer`) or multi-session coordination, read [task start and execution routing](policy/models.md#task-start-and-execution-routing) and the needed section of [model and collaboration policy](policy/models.md) via heading lookup. A file link locates the policy, not a request to load the whole file. Reuse unchanged sections and evidence instead of rereading them; a self-contained task stays in the current chat without loading the full policy.
-- Before selecting a workspace or starting, resuming, or changing an implementation checkout, apply the [workspace rules](policy/models.md#workspaces).
 - When a command generates disposable scratch directories, apply the [temporary-directory lifecycle](policy/models.md#task-temporary-directories). When readback confirms that a PR in the authorized merge workflow has merged, apply [post-merge cleanup](skills/gh/references/operations.md#post-merge-cleanup) before reporting that workflow complete. Before reporting task completion, handing off remaining work, or archiving, apply the [closeout rules](policy/models.md#task-completion-and-chat-archival).
 - A request to implement or fix authorizes the necessary local preparation, edits, tests, and corrections within the current [implementation slice](#implementation-slices). Persist until that slice is complete without asking again for the same scope. Apply the [continuing delivery boundary](#continuing-delivery) when advancing across slices.
 - Ask only for missing business decisions or authorization for actions outside that scope. For an out-of-scope action, name the specific scope change and the decision needed to authorize the action. Resolve ordinary reversible technical choices yourself.
@@ -23,7 +22,6 @@
 - When the Human walks through code with you, show each complete relevant excerpt from the current repository and explain the excerpt's place in the call chain. Proceed in order and track which excerpts the Human has seen. Do not repeat an excerpt the Human has already seen, and honor requests to skip tests or other excerpts.
 - Use a plan when it helps resolve dependencies or material risk; do not require a plan approval, role label, or status record for ordinary development.
 - Preserve unrelated work. Do not reset, overwrite, rebase, or remove another task's changes without authorization.
-- For cross-session, long-horizon, or handoff/recovery tasks, maintain or update a concise `spec.md` or `progress.md` anchor (under 100 lines, reusing an existing task record when present) so a new session can resume without reading full chat transcripts. Ordinary multi-step work completed within a single session does not require a separate status file, and logs must never merely repeat Git history or raw command output.
 
 ### Implementation slices
 
@@ -63,18 +61,6 @@ Reuse effective Human authorization that covers continuing work across slices wi
 ### Checks
 
 See [the shared rules](policy/review.md#checks).
-
-### Review coverage
-
-See [the shared rules](policy/review.md#review-coverage).
-
-### Findings and disposition
-
-See [the shared rules](policy/review.md#findings-and-disposition).
-
-### Review provenance
-
-See [the shared rules](policy/review.md#review-provenance).
 
 ## Code preferences
 

@@ -2,7 +2,7 @@
 
 Contract subject: `wechatide`.
 
-The `wechatide` command inside a WeChat DevTools application bundle sends one registered operation to the running DevTools through its local MCP endpoint. This delivery supports macOS only. Its current authentication contract was checked against DevTools 2.02.2610302 and bundled skill 0.3.15. The CLI uses the skill-call route with optional CLI-token authentication; the MCP bridge uses a separate authentication route. Earlier live evidence covers only client authorization and readiness, not business operations. Source identities and compatibility limits are recorded in the repository's source record.
+The `wechatide` command inside a WeChat DevTools application bundle sends one registered operation to the running DevTools through its local MCP endpoint. This delivery supports macOS only, targeting the skill-call route (with optional CLI-token authentication, separate from the MCP bridge) verified against DevTools `2.02.2610302` and bundled skill `0.3.15`.
 
 ## Invocation
 
@@ -12,7 +12,7 @@ Read the [call executor](../scripts/call.sh). Use tool `wechatide-call` for ever
 bash SKILL_ROOT/scripts/call.sh CLIENT OPERATION [FLAG...]
 ```
 
-SKILL_ROOT is the physical directory of the installed wechatide skill. CLIENT is `ClaudeCode` in Claude Code and `Codex` in Codex. Keep it unchanged, because DevTools authorizes each client name separately. OPERATION must be listed for a delivered entry in the [capability index](capabilities.md); the executor refuses other operations, including the MCP bridge and deprecated project_setting operations. The CLI also resolves a table of legacy and shorthand aliases, such as `miniprogram_upload` for `upload` or `env_list` for `cloud_env_list`. The executor matches the literal argument before the CLI resolves an alias, so an alias is refused as an undelivered operation even when its target is delivered. Always pass the registered operation ID. Check flags with `OPERATION -h` before first use and do not invent parameters. Use absolute local paths, except where the owning entry defines a flag as relative to a project root. Object and array flags accept JSON, or an absolute `--FIELD-file` path when the operation's help lists one.
+SKILL_ROOT is the physical directory of the installed wechatide skill. CLIENT is the upstream CLI's fixed `-c` enum value: pass `Codex` in Codex and `ClaudeCode` in DeepSeek Harness (`dsh`). Keep it unchanged, because DevTools authorizes each client name separately. OPERATION must be listed for a delivered entry in the [capability index](capabilities.md); the executor refuses other operations, including the MCP bridge and deprecated project_setting operations. The CLI also resolves a table of legacy and shorthand aliases, such as `miniprogram_upload` for `upload` or `env_list` for `cloud_env_list`. The executor matches the literal argument before the CLI resolves an alias, so an alias is refused as an undelivered operation even when its target is delivered. Always pass the registered operation ID. Check flags with `OPERATION -h` before first use and do not invent parameters. Use absolute local paths, except where the owning entry defines a flag as relative to a project root. Object and array flags accept JSON, or an absolute `--FIELD-file` path when the operation's help lists one.
 
 Run the executor where it can reach local desktop applications and 127.0.0.1. If the host sandbox prevents that, request the host's approval for unsandboxed execution; a denial stops the operation.
 

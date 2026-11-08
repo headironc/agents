@@ -113,7 +113,7 @@
 
 入口负责需求拆分、搜索选择、互补技能和结果交接。[HTTP 参考](../delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md)拥有请求形式。[验证参考](../delivery/skills/alibabacloud-find-skills/references/verification-method.md)拥有响应和分页判据。[安装参考](../delivery/skills/alibabacloud-find-skills/references/installation.md)区分下载、安装与后续使用。[示例](../delivery/skills/alibabacloud-find-skills/references/search-examples.md)仅说明选择方法。来源、原件摘要和退役依据见[来源记录](skill-sources.md#alibabacloud-find-skills)。
 
-该技能的候选与执行证据见独立切片交接。定位方式和缺少位置时的处理见 [README 执行记录](../README.md#执行记录)。独立交接不替换全局 `current_handoff`。本地门禁与[静态场景](../tests/scenarios/rules.md#阿里云技能发现与操作边界)不证明 AgentExplorer 实际兼容。它们也不证明模型行为、当前实现的审查覆盖或安装成功。本片不安装个人配置。
+执行证据定位见 [README 执行记录](../README.md#执行记录)。本地门禁与[静态场景](../tests/scenarios/rules.md#阿里云技能发现与操作边界)仅验证结构与静态预期，不证明 AgentExplorer 线上兼容、模型行为或个人安装已生效。
 
 ## 交付目录
 
@@ -132,7 +132,7 @@
 
 当前成员与产品归属以[清单](../config/personal-skills.txt)为准。旧流程技能只保留历史来源，不继续安装。写作和工具参考属于公共 `policy/` 路径的成员。安装来源与限制见[安装快照过渡](#既有安装快照过渡)。
 
-[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权。先核实[受限的依赖更新豁免](../delivery/policy/review.md#dependency-updates)与[纯原生 Sketch 设计稿豁免](../delivery/policy/review.md#pure-sketch-design-slices)，保留适用检查和合并边界。可信自动化提交的低风险清单／锁文件更新，以及已采用该例外的项目中经机械与本机独立验收核实的纯 `.sketch` 设计稿切片适用例外。人工依赖更新、主版本升级、混入可执行或越界改动的切片及资格未知项走正常审查。仍需 AI 审查时，常规提供方与 Cubic 额度不足时的替代由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。选定方按[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式 `@` 请求。已有有效覆盖或请求时复用；不要依赖 PR 事件自动触发。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)只负责 `headironc` 的身份就绪与认证恢复。`cladiron[bot]` 与其固定 provider 已于 2026-09-18 退役。GitHub App 凭据能力与安装状态见[安装快照过渡](#既有安装快照过渡)。
+[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权。先核实[受限的依赖更新豁免](../delivery/policy/review.md#dependency-updates)与[纯原生 Sketch 设计稿豁免](../delivery/policy/review.md#pure-sketch-design-slices)，保留适用检查和合并边界。可信自动化提交的低风险清单／锁文件更新，以及已采用该例外的项目中经机械与本机独立验收核实的纯 `.sketch` 设计稿切片适用例外。人工依赖更新、主版本升级、混入可执行或越界改动的切片及资格未知项走正常审查。仍需 AI 审查时，常规提供方与 Cubic 额度不足时的替代由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。选定方按[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式 `@` 请求。已有有效覆盖或请求时复用；不要依赖 PR 事件自动触发。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)负责 `headironc` 的身份就绪与认证恢复；历史凭据与安装状态见[安装快照过渡](#既有安装快照过渡)。
 
 ## 规则与技能维护
 
@@ -140,7 +140,7 @@
 
 工具技能按完整单元交付。入口、引用、必要资产、执行器、测试与许可证共同验收。来源记录保留原件身份和采用范围。跨技能调用使用可用安装名。内部引用从物理安装目录解析，保持完整可达。清单决定成员与产品，不授予业务权限。新增入口同步登记、反例与完整门禁。不得删减清单来绕过缺失能力。
 
-合并遵循目标项目的有效合同；agents main 的范围、检查、审查、授权和退出条件由[重建期规则](review-gate.md#重建期交付规则)拥有。其他目标按[通用合并准入规则](../delivery/policy/review.md#merge-admission)核各自已采用的流程及实际保护，不能借用本库例外或擅自降低既定条件。命名工作流的业务授权由 [gh 工作流合同](../delivery/skills/gh/references/workflow-authorization.md)约束。身份就绪与认证恢复由 gh-identity 负责。已采用的上游工具不为统一语言而改写。无实际调用方的历史脚本不自动恢复。实际服务、模型与个人安装分别取得授权并回读。
+合并遵循目标项目的有效合同（本仓库采用[重建期规则](review-gate.md#重建期交付规则)，其他目标按[通用合并准入规则](../delivery/policy/review.md#merge-admission)核对）。已采用的上游工具不为统一语言而改写；无实际调用方的历史脚本不自动恢复；实际服务、模型与个人安装分别取得授权并回读。
 
 ## 任务临时目录与收尾
 
@@ -247,7 +247,7 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 
 Codex 交付八个完整顶层技能包，十七个内容入口参与验证。DeepSeek Harness（`dsh`）接收其中七个共享包、十六个内容入口。`figma-design-workflow` 依赖 Codex 的模型路线与负责人验收，仅交付给 Codex。`sketch-native` 依赖 macOS 原生 Sketch 与 CoreText，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收 `AGENTS.md`、七份政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
 
-Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共六个顶层包及六个入口；其他平台保持五个包。配套依赖为三份公共合同和三个工具，不接收 Codex 规则、模型路线、Figma 设计工作流或配置片段。wechatide 的执行器只接受 `Codex` 与 `ClaudeCode`，本片不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
+Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共六个顶层包及六个入口；其他平台保持五个包。配套依赖为三份公共合同和三个工具，不接收 Codex 规则、模型路线、Figma 设计工作流或配置片段。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
 
 Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。选择 Antigravity CLI 时使用上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
@@ -295,47 +295,13 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 
 ## 验证能说明什么
 
-本节的既有实践来自内容来源的有界观察，不是新仓库实例的配置或验收结果。实际平台证据按[实例与证据边界](review-gate.md#实例与证据边界)重新绑定。
+本节界定本地门禁、无模型加载检查、历史有界演练与真实实例验收之间的证据边界；实际平台保护与运行证据按[实例与证据边界](review-gate.md#实例与证据边界)重新绑定：
 
-2026-10-29 的临时资源演练使用 CLI 0.160.0，请求 `gpt-6.1-sol` 和 high。五个隔离会话读取候选规则与合成 fixture。模型在短任务中先加载临时目录规则，也核对了预建工作树。第二个工作树限制、中断恢复及完成交接也触发了相关规则。五项均观察到预期动作。命令退出时清理结果得到核对。第二个 checkout 未创建，未知原操作未重启。验收原件保留，交接未被冒称完成。
-
-预建目录使用真实 Git worktree 模拟，恢复和交接条件由合成记录提供。演练未验证桌面创建流程、真实进程崩溃或跨会话接任，也不证明所有后续运行必然遵守。请求模型及 effort 已记录，服务端实际身份未独立核实。命令、工具返回、最终回答、材料摘要及 fixture 收尾结果保留在该任务验收记录。个人安装未被这次演练更新。
-
-2026-10-30 的合并后清理演练请求 `gpt-6.1-sol` 和 high。两次重测均在回读合成 PR 后主动进入清理。模型核对 Git 状态，删除了符合条件的合成远端分支。分支头已变化和仍在排队的资源得到保留。验收原件外置后完成字节核验。
-
-首次两次会话受嵌套沙箱启动错误阻挡，未执行命令。重测从正常宿主启动 CLI，仍保留 workspace 沙箱。worktree 移除和部分本地 Git 更新被沙箱拒绝。模型保留受阻资源并报告原因，完整删除路径尚未验证。服务端模型身份也未独立核实。原始失败、重测轨迹及资源回读保留在任务验收记录。本轮 fixture 最后由测试负责人清除，该结果不作为模型自动清理成功的证据。
-
-[设计工作流](../delivery/skills/figma-design-workflow/SKILL.md)从已授权设计实践提炼（早期来源见[技能来源](skill-sources.md#figma-design-workflow)）。当前模型与 effort 由[模型政策](../delivery/policy/models.md#current-defaults)维护。技能绑定材料、目标、可编辑结果与真实像素验收。Figma 按需使用。显式选用 DeepSeek Harness (`dsh`) 或 Design 插件时，再适用对应合同。负责人亲自核对实际预览。请求模型、客户端设置与实际运行身份分别报告。
-
-2026-10-28 的一次合成协调页演练通过官方 OpenCode Go 请求 DeepSeek 和 `max`。实际调用了 Figma 与 Design 技能，生成原生可编辑稿。长标题经真实替换、检查后还原。Terra 与主责读取同版完整画面。辅助发现由主责核实、回交修复，再核对最终节点与持久预览。Design critique 记录为制作模型的自查。
-
-该次演练保留了 MCP 绑定失败与组件技能前置遗漏。后续修复和核验不把早期偏差改写为合规。服务端有效 effort 与 Terra 服务端身份仍缺独立证据。实测仅覆盖一个静态桌面页，不证明交互、跨尺寸、其他业务稿或场景全集。上述历史调用也不验证当前 Codex 设计路线。静态检查与无模型加载不能代替实际行为验证。
-
-[工具门禁](tooling.md#选择检查)会将非忽略的新 Markdown 文件纳入显式检查集合。它检查机器路径、格式、本地链接和锚点。`all` 还运行源码检查、契约绑定、技能成员、工具打包新鲜度、发布形态引用、固定产品验证器、隔离安装回归及无模型 Codex 加载检查。加载检查确认隔离候选的指令和技能目录进入 CLI 输入。它也核对模型政策入口及隔离文件的字节一致性。这不证明模型读取了按需正文、实际切换模型或遵循规则，也不证明个人安装已加载。语义遗漏仍须依据场景和适用审查核对。
-
-技能候选只从仓库清单与源码读取。清单是 [personal-skills.txt](../config/personal-skills.txt)，不从个人 HOME 读取已安装技能。各产品入口数量由当前清单实时推导。每个顶层成员只安装一次，wechatide 的九个嵌套入口随顶层包交付并参与验证。删除清单行、必需引用、执行器或随技能测试均不能绕过完整门禁。共享与专用技能按[技能格式校验合同](tooling.md#技能格式校验)执行对应官方验证器。当前入口数量见[安装目标](#安装目标与接管)。格式校验不代表各客户端加载或模型使用已验证。
-
-本地审查路线没有本仓库交付的执行器，门禁也不启动任何模型。场景只静态核对规则文本。门禁证据不覆盖实际审查者行为。CLI 服务兼容性与评审者资格也不在其中。
-
-官方 DeepSeek Harness（`dsh 0.2.2-rc.1`）的[凭据来源与终态核验](../delivery/policy/deepseek-harness.md#事件采集成功判据与异常恢复)要求同时满足退出码 `0` 与 `final.reason.kind === "completed"`。本机实测中，桌面端 `opencode-go` / `deepseek-v4.1-flash` 通过 `${DSH_HOME:-$HOME/.dsh}/.credentials.yaml` 托管 `OPENCODE_GO_API_KEY` 并返回 `DSH_OK`。由于发布的 `headless` profile 默认关闭 `credentials`、`authorization` 与 `deepseek-account`，用 `--patch` 临时叠加 [`dsh-headless.patch.yml`](../delivery/capability/dsh-headless.patch.yml) 并显式移除启动环境中的 `OPENCODE_GO_API_KEY` 后，`dsh headless` 仍成功复用托管凭据并返回 `DSH_OK`（退出码 `0`）。持久写入 `${DSH_HOME:-$HOME/.dsh}/profiles/headless/cordis.patch.yml` 受宿主审批边界保护时，由使用者手动合并该片段或按单次调用传入 `--patch`。
-
-本机可见任务的派发、跟进和等待已有实际观察。授权范围内的结果报告和协调者读取也已有观察。候选的真实差异与源码身份验收也已使用。已观察到同机、同工作树的新会话接任，当时协作任务均空闲。证据保留在现有会话与任务记录。实际模型与 effort 未独立核实，请求配置不能充当运行身份。
-
-活动写任务交接、跨主机接任及确认缺失后的恢复尚未演练。自主完成、主动回报及接纳通知仍缺完整的模型遵循演练。持续交付分工、完成判定及归档同样保留这一限制。静态场景或普通上下文压缩恢复不能代替这些演练，也不能证明全部模型场景通过。
-
-[本机提醒](#本机协作提醒)已完成配置回读及连续真实定时恢复。主协调在上一轮结束后自动恢复，消费已有结果，并保留仍在运行的原负责人。下一次无变化唤醒只读取状态，安静结束，没有重复派工或催办。这些观察覆盖有未完任务时的接续。全部任务完成后的安静退出尚未验证，待文档交付后单独核实。发送结果丢失、断网、关机与并发竞争尚未实测。
-
-本内容源交付原生 CI 源码，实例配置与验收按[项目约定](review-gate.md#重建期交付规则)执行。旧 App 验收和 PR 记录的访问边界见[历史来源](review-gate.md#历史合同与验收)，不代表新实例已启用保护或审查。以下证据说明继续适用于审查、发现修复和明确审计；内容源独立不等于省略已承接的审查。
-
-审查提供方、覆盖和结束条件由[共享审查规则](../delivery/policy/review.md)拥有。GitHub 请求、结果面读取和发现处置的操作入口见 [gh 操作参考](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)。旧的 Claude PR 工作流已从仓库源码移除；历史运行不证明当前候选受审。
-
-Codex App 有发现时通常发布行内评论；没有发现时没有 finding 行内评论，但可能留下完成摘要或 👍 反应。[官方 Codex Code Review 合同](https://learn.chatgpt.com/docs/third-party/github)以 PR diff 为输入。这是所记录的提供方输入合同；完成摘要与反应的验收按[审查覆盖规则](../delivery/policy/review.md#review-coverage)判断。
-
-已有观察显示，后续提交可能更新原 bot 摘要，而 `latestReviews` 仍列出旧 head 的有发现 review。这个观察解释了为何要读取当前摘要，不能单凭旧 review 判定新 head 未受审；它不证明审查者逐一阅读了哪些文件。具体覆盖与发现处置仍按上述权威规则核对。
-
-pre-commit 源码已提供，现有 `core.hooksPath` 保持原配置。覆盖选择、工具前置和临时仓库测试边界见[提交入口](tooling.md#提交入口)。`pr-review` 不作为独立技能恢复或安装。PR 打开、审查与合并操作由 [gh 操作参考](../delivery/skills/gh/references/operations.md)承担。原已验证候选保留原交接和验证范围。位置见 [README 执行记录](../README.md#执行记录)。
-
-[公共行为场景](../tests/scenarios/rules.md)和[产品场景](../tests/scenarios/adapters.md)从设计和历史契约推导输入与预期。作者静态核对、候选审查和实际模型演练分别记录。模型演练必须有覆盖模型、材料和调用范围的授权。授权复用与范围变化按[模型政策](../delivery/policy/models.md#deepseek-harness-delegation)处理。旧交接修复的五类演练保留原版本范围，不算当前候选的行为证据。安装切换后的结果以实际目标回读为准。
+- **本地门禁与无模型加载检查**（[工具门禁](tooling.md#选择检查)）：`all` 验证类型、构建闭包、打包工具新鲜度、[技能清单](../config/personal-skills.txt)成员、三端[技能格式校验](tooling.md#技能格式校验)、发布形态引用、隔离安装回归及 Codex `debug prompt-input` 加载检查。这些检查确认源码自洽且 CLI 能识别入口，但**不证明**个人环境已安装、客户端已发现技能、模型在运行中读取了按需正文或遵守了行为规则。
+- **静态行为场景**（[公共行为场景](../tests/scenarios/rules.md)与[产品场景](../tests/scenarios/adapters.md)）：从现行规则与工具合同推导输入、预期与失败判据，供静态核对与候选审查使用。真实模型行为验证须另行取得覆盖模型、材料与调用范围的授权（参见[模型政策](../delivery/policy/models.md#deepseek-harness-delegation)）。
+- **工作区、临时资源、合并后清理与协作提醒的有界演练**：历史隔离演练已覆盖 `task-temp` 前台清理、单会话单实施 worktree 限制、PR 合并后远端分支清理、[本机提醒](#本机协作提醒)定时恢复与同机空闲会话接任；但受沙箱拦截的本地 worktree 移除、活动写任务跨主机接任、断网或进程崩溃恢复及服务端实际模型/effort 身份仍需按实际任务环境核实。
+- **设计工作流与原生 Sketch 验证**：[figma-design-workflow](../delivery/skills/figma-design-workflow/SKILL.md) 与 [sketch-native](../delivery/skills/sketch-native/SKILL.md) 绑定可编辑产物、离线结构审计与真实像素验收（早期演练来源见[技能来源](skill-sources.md#figma-design-workflow)）；单页静态演练不替代多状态交互、跨尺寸布局或真实系统输入验收。
+- **DeepSeek Harness (`dsh`) 与外部 PR 审查**：`dsh` 桌面端与叠加 [`dsh-headless.patch.yml`](../delivery/capability/dsh-headless.patch.yml) 的 `headless` 模式已实测托管凭据复用与[事件流终态核验](../delivery/policy/deepseek-harness.md#事件采集成功判据与异常恢复)（退出码 `0` 且 `final.reason.kind === "completed"`）。正式代码与安全审查由外部提供方按[共享审查规则](../delivery/policy/review.md#review-coverage)与 [gh 操作参考](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)执行；候选更新后须核对当前最新摘要与评论，不能单凭旧 head 的 `latestReviews` 或本地绿灯替代独立审查。
 
 ## 阿里云短信
 

@@ -65,8 +65,8 @@ Follow the CLI contract for other failures. After a timeout, an interruption or 
 
 ## Confirmations and pending tasks
 
-An operation that needs a permission inside DevTools, such as a test-account change or real-device debugging, can return `pending` with a `taskId`. Only login and client authorization are polled, so retain the task as [pending tasks](../../references/tasks.md) require, tell the user which confirmation remains, and keep the dependent steps blocked.
+When a permission-gated operation (such as a test-account change or real-device debugging) returns `pending` with a `taskId`, retain the task without polling and block dependent steps as [pending tasks](../../references/tasks.md) require.
 
 ## Return
 
-Return the project type, the steps run with their exact project, page, selector or coordinates, each assertion with the evidence that decided it and a pass or fail summary, what was left changed (page data set, a mock in place, a ticket changed, real-device debugging started, a generated script), any retained pending task, and remaining blockers. Hand off only to delivered entries in the capability index: project windows, login and AppIDs belong to initializer, recompilation and refresh to compiler, console, network, screenshot, wx API and cache evidence to debugger, previews and uploads to previewer, the project list to project-manager, and cloud environments, functions, database, storage and message push to cloudbase-operator, and installation diagnosis to installer.
+Return the project type, the steps run with their exact project, page, selector or coordinates, each assertion with the evidence that decided it and a pass or fail summary, what was left changed (page data set, a mock in place, a ticket changed, real-device debugging started, a generated script), any retained pending task, and remaining blockers. Route any follow-up work to its owning entry in the [capability index](../../references/capabilities.md).

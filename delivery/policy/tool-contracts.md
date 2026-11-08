@@ -68,41 +68,27 @@ Contract subject: `openssh`.
 
 ## gitleaks
 
-本节是 `gitleaks` 的调用说明。主体定义在仓库的 `scripts/check.ts` 头部，不在本页。
+运行 `gitleaks dir <路径> --no-banner --redact --ignore-gitleaks-allow --config <配置>` 扫描工作树。`--redact` 避免命中值进入日志与报告；`--ignore-gitleaks-allow` 忽略源码与讨论中的 `gitleaks:allow` 行内豁免，允许项仅在配置文件中按具体字面值收窄，**禁止使用 `paths` 对整文件豁免**（整文件豁免会掩盖同文件后续新增的真实凭据）。
 
-运行 `gitleaks dir <路径> --no-banner --redact --ignore-gitleaks-allow --config <配置>` 扫描工作树。`--redact` 让命中值不进入日志与报告。忽略源码与讨论中的 `gitleaks:allow` 行内豁免；允许项写在配置里，逐条收窄到具体值。
-
-**不要用 `paths` 给某个文件整体开口子。** 它按整文件豁免，同文件里后来加进去的真实凭据不再上报。本仓库实测过这一点。已豁免文件植入真实形态的 token 后，未被报出。只按值允许。
-
-`target/` 等构建目录可由 `.gitignore` 排除提交候选，安装候选也应排除它们。仓库门禁通过 `scripts/check-secrets.ts` 扫描 Git 已跟踪及未忽略的未跟踪文件。源码枚举固定到传入仓库，不继承调用者的 `GIT_*` 环境与全局 Git 配置。Git 文件名无法按 UTF-8 解码时，门禁失败，不静默跳过该文件。报告路径的忽略检查使用相同 Git 环境。被强制跟踪的构建文件仍在范围内，普通忽略产物不在范围内。不要为缩短扫描给构建目录增加 `paths` 豁免。
-
-本仓库门禁用它扫描 Git 源码候选的临时副本。扫描前逐条核对副本与复制前的源码文件条目。还要复查工作树；任一不一致都使门禁失败。
-
-退出码 0 表示无命中，1 表示有命中。无命中不证明没有密钥。扫描依赖模式，自造形态可能不在规则里。
+`target/` 等未跟踪构建目录由 `.gitignore` 排除，无需通过 `paths` 豁免。扫描范围应覆盖全部 Git 已跟踪文件及未忽略的未跟踪文件，并拒绝无法按 UTF-8 解码的文件名。退出码 `0` 表示无命中，`1` 表示有命中；模式扫描无命中不单独证明绝对不含自造格式的秘密。
 
 ## prose-check
 
-本节是 `prose-check` 的调用说明。主体定义在仓库的 `scripts/check-prose.mjs` 头部，不在本页。
-
-先将 `AGENTS_DELIVERY_ROOT` 设为当前这份合同的物理目录的上级，即本产品的部署根。运行 `node "${AGENTS_DELIVERY_ROOT}/tools/check-prose.mjs" PATH...`。目录会递归，只读 `.md`。保留的历史材料用 `--exclude 前缀` 排除，`--format json` 输出结构化结果，`--version` 打印裸版本号。
+先将 `AGENTS_DELIVERY_ROOT` 设为当前合同所在物理目录的上级（即本产品的部署根），运行 `node "${AGENTS_DELIVERY_ROOT}/tools/check-prose.mjs" PATH...`。目录递归扫描 `.md` 文件；保留的历史材料用 `--exclude 前缀` 排除，`--format json` 输出结构化结果，`--version` 打印裸版本号。
 
 - `--errors-only`：只列阻塞的中西文空格错误；汇总行仍统计句长建议条数（`--format json` 下为 `cautionsNotListed`）。
 - `--changed 文件`：将报告限定在本次改动触及的段落（每行格式为 `路径:起-止` 或 `路径:行`），不与 `--fix` 同用。
 - `--fix`：自动补齐中西文之间的缺失空格并写回原文件，不修改标题、表格、引用、代码块或句长。
 - `grades` 子命令：运行 `node "${AGENTS_DELIVERY_ROOT}/tools/check-prose.mjs" grades PATH...` 列举封闭集之外的分级词候选，仅供作者人工复核，不接入阻断门禁。
 
-退出码 0 表示无空格错误，1 表示有空格错误，2 表示用法错误。30 字及以上的句长提示仅供编辑参考，不影响退出码。
+退出码 `0` 表示无空格错误，`1` 表示有空格错误，`2` 表示用法错误。30 字及以上的句长提示仅供编辑参考，不影响退出码。
 
 ## id-check
 
-本节是 `id-check` 的调用说明。主体定义在仓库的 `scripts/check-ids.mjs` 头部，不在本页。
+运行 `node "${AGENTS_DELIVERY_ROOT}/tools/check-ids.mjs" PATH...`（目录遍历、`--exclude`、`--format` 与 `--version` 同上）。该工具检查表格首列标识符：同一文件内同一前缀的编号必须按出现顺序递增且不重复（允许跳号，禁止回退），不提供 `--changed` 局部扫描以免漏检插入导致的顺序错误。
 
-运行 `node "${AGENTS_DELIVERY_ROOT}/tools/check-ids.mjs" PATH...`。目录遍历、`--exclude`、`--format` 与 `--version` 同上。该工具检查表格首列标识符：同一文件内同一前缀的编号必须按出现顺序递增且不重复（允许跳号，禁止回退），不提供 `--changed` 局部扫描以免漏检插入导致的顺序错误。
-
-默认形状是 `^([A-Za-z][A-Za-z0-9]*)-(\d+)$`，可用 `--pattern` 替换为包含前缀组与数字组的自定义正则。退出码 0 表示无编号错误，1 表示有编号错误，2 表示用法错误。
+默认形状是 `^([A-Za-z][A-Za-z0-9]*)-(\d+)$`，可用 `--pattern` 替换为包含前缀组与数字组的自定义正则。退出码 `0` 表示无编号错误，`1` 表示有编号错误，`2` 表示用法错误。
 
 ## ref-check
 
-本节是 `ref-check` 的调用说明。主体定义在仓库的 `scripts/check-refs.ts` 头部，不在本页。
-
-它只在 agents 仓库内运行：`node scripts/check-refs.ts`。它根据 `scripts/delivery.ts` 的 `publicMembers` 将各产品发布树铺设到临时目录，并调用固定版本的 `lychee`（读取共享 `lychee.toml`）验证所有相对链接、锚点以及是否越出发布根。退出码 0 表示无阻塞发现，1 表示存在断链、越界引用或陈旧豁免项，2 表示用法错误。
+发布形态引用检查将各产品的公开交付成员铺设到隔离临时目录，并调用固定版本的 `lychee` 验证所有相对链接、标题锚点以及是否越出该产品的发布根。退出码 `0` 表示无阻塞发现，`1` 表示存在断链、越界引用或陈旧豁免项，`2` 表示用法错误。
