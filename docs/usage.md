@@ -265,9 +265,9 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | Antigravity CLI 工具 | `$HOME/.gemini/antigravity-cli/tools/<name>.mjs` | 同一份打包工具 |
 | Antigravity CLI 技能 | `$HOME/.gemini/antigravity-cli/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
-Codex 交付八个完整顶层技能包，十七个内容入口参与验证。Claude 接收其中七个共享包、十六个内容入口。`figma-design-workflow` 依赖 Codex 的模型路线与负责人验收，仅交付给 Codex。`sketch-native` 依赖 macOS 原生 Sketch 与 CoreText，仅在 macOS 上向 Codex 与 Claude 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，不要求 Claude 自动发现所有内容入口。Claude 不接收 `CLAUDE.md`、`AGENTS.md`、模型政策、Rust/SQL 偏好或配置片段。推荐配置只交付给 Codex，合并到产品配置由本人完成。
+Codex 交付八个完整顶层技能包，十七个内容入口参与验证。Claude 接收其中七个共享包、十六个内容入口。`figma-design-workflow` 依赖 Codex 的模型路线与负责人验收，仅交付给 Codex。`sketch-native` 依赖 macOS 原生 Sketch 与 CoreText，仅在 macOS 上向 Codex、Claude 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，不要求 Claude 自动发现所有内容入口。Claude 不接收 `CLAUDE.md`、`AGENTS.md`、模型政策、Rust/SQL 偏好或配置片段。推荐配置只交付给 Codex，合并到产品配置由本人完成。
 
-Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`，共五个顶层包及五个入口。它只接收三份公共合同和三个配套工具，不接收 Codex 规则、模型路线、设计工作流或配置片段。wechatide 的执行器只接受 `Codex` 与 `ClaudeCode`，本片不向 Antigravity 发布。清单支持按固定顺序列出 `codex,claude,antigravity` 的子集；历史 `shared` 仅表示 Codex 与 Claude，不自动扩张。
+Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共六个顶层包及六个入口；其他平台保持五个包。配套依赖为三份公共合同和三个工具，不接收 Codex 规则、模型路线、Figma 设计工作流或配置片段。wechatide 的执行器只接受 `Codex` 与 `ClaudeCode`，本片不向 Antigravity 发布。清单支持按固定顺序列出 `codex,claude,antigravity` 的子集；历史 `shared` 仅表示 Codex 与 Claude，不自动扩张。
 
 Codex 与 Claude 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`。选择 Antigravity CLI 时使用上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 

@@ -58,6 +58,7 @@ export const skills = {
     "gh",
     "gh-identity",
     "project-guide",
+    ...(process.platform === "darwin" ? ["sketch-native"] : []),
   ],
 };
 export const policies = [

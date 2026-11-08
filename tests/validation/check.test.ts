@@ -534,7 +534,7 @@ test("repository and all gates register each official product validator", async 
     for (const [product, name] of [
       ["codex", "Codex skill validation: 17 entries"],
       ["claude", "Claude skill validation: 16 entries"],
-      ["antigravity", "Antigravity skill validation: 5 entries"],
+      ["antigravity", "Antigravity skill validation: 6 entries"],
     ]) {
       const selected = specs.filter((spec) => spec.name === name);
       assert.equal(selected.length, 1);
