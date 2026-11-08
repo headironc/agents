@@ -263,6 +263,61 @@ with tempfile.TemporaryDirectory(prefix="sketch-input-contract-") as td:
   assert.equal(res.status, 0, res.stderr);
 });
 
+test("archive readers and audit baselines enforce shared JSON budgets", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import contextlib, io, json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+import sketch_offline_audit as audit
+import sketch_export_manifest as export
+import sketch_mcp_roundtrip as roundtrip
+
+oversized_string = json.dumps({"artboards": [], "metadata": [["x" * 2097153]]}).encode("utf-8")
+for module in (cm, audit, export, roundtrip):
+    try:
+        module._loads_json_bounded(oversized_string, "nested.json")
+    except RuntimeError as exc:
+        assert "string character count" in str(exc), str(exc)
+    else:
+        raise AssertionError(module.__name__ + " accepted unbounded nested strings")
+    budget = module._new_dom_budget()
+    module._loads_json_bounded(json.dumps({"a": "x" * 1048576}).encode("utf-8"), "first.json", budget)
+    try:
+        module._loads_json_bounded(json.dumps({"b": ["x" * 1048576]}).encode("utf-8"), "second.json", budget)
+    except RuntimeError as exc:
+        assert "string character count" in str(exc), str(exc)
+    else:
+        raise AssertionError(module.__name__ + " reset the aggregate JSON budget")
+
+with tempfile.TemporaryDirectory(prefix="sketch-baseline-contract-") as td:
+    root = Path(td)
+    sketch = root / "minimal.sketch"
+    with zipfile.ZipFile(sketch, "w") as z:
+        z.writestr("meta.json", json.dumps({"version": 136}))
+        z.writestr("document.json", json.dumps({"_class": "document", "do_objectID": "doc", "pages": [{"_ref": "pages/p"}]}))
+        z.writestr("pages/p.json", json.dumps({"_class": "page", "do_objectID": "p", "layers": []}))
+    manifest = root / "manifest.json"
+    for raw, error in [(oversized_string, "string character count"), (b"{}" + b" " * 16777215, "exceeds byte limit")]:
+        manifest.write_bytes(raw)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            status = audit.main(["--sketch", str(sketch), "--manifest", str(manifest)])
+        report = json.loads(output.getvalue())
+        assert status != 0 and not report["passed"] and error in report["error"], report
+        assert manifest.read_bytes() == raw
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
 function runPython(scriptPath, args, options = {}) {
   return spawnSync("python3", ["-B", scriptPath, ...args], {
     encoding: "utf8",
@@ -2236,6 +2291,38 @@ out_path.write_bytes(webp)
       "missing_baseline_file",
     );
     assert.equal(fs.existsSync(manifestPath), false);
+
+    const oversizedBaseline = path.join(tmpDir, "oversized-baseline.json");
+    for (const [payload, message] of [
+      [
+        JSON.stringify({ renders: [], metadata: [["x".repeat(2097153)]] }),
+        "string character count",
+      ],
+      ["{}".padEnd(16777217, " "), "exceeds byte limit"],
+    ]) {
+      fs.writeFileSync(oversizedBaseline, payload);
+      for (const flag of ["--manifest", "--renders"]) {
+        const rejectedBaseline = runPython(PY_EXPORT, [
+          "--sketch",
+          cleanSketch,
+          "--output-dir",
+          outDir,
+          "--sketchtool",
+          mockSketchtool,
+          "--no-webp",
+          "--scales",
+          "1",
+          flag,
+          oversizedBaseline,
+          "--verify-only",
+        ]);
+        assert.notEqual(rejectedBaseline.status, 0, rejectedBaseline.stdout);
+        const rejectedReport = JSON.parse(rejectedBaseline.stdout);
+        assert.equal(rejectedReport.passed, false);
+        assert.ok(rejectedReport.error.includes(message), rejectedReport.error);
+        assert.equal(fs.readFileSync(oversizedBaseline, "utf8"), payload);
+      }
+    }
 
     // 2. Verify missing cwebp binary fails explicitly when --webp is active
     const missingCwebpRes = runPython(PY_EXPORT, [

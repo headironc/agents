@@ -43,6 +43,15 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from sketch_json import (
+    MAX_JSON_BYTES,
+    MAX_DOM_DICT_NODES,
+    MAX_DOM_CONTAINER_ITEMS,
+    MAX_DOM_STRING_CHARS,
+    new_budget as _new_dom_budget,
+    parse_json as _loads_json_bounded,
+)
+
 
 DEFAULT_MCP_URL = "http://localhost:31126/mcp"
 DEFAULT_SKETCH_APP = "/Applications/Sketch.app"
@@ -1020,72 +1029,10 @@ def _build_close_copy_by_path_js(
 MAX_ZIP_MEMBERS = 4096
 MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
 MAX_ZIP_JSON_MEMBER_BYTES = 8 * 1024 * 1024
-MAX_ZIP_TOTAL_JSON_BYTES = 16 * 1024 * 1024
+MAX_ZIP_TOTAL_JSON_BYTES = MAX_JSON_BYTES
 MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 MAX_ZIP_COMPRESSION_RATIO = 100.0
 MAX_ARCHIVE_PAGES = 64
-MAX_DOM_DICT_NODES = 30000
-MAX_DOM_CONTAINER_ITEMS = 120000
-MAX_DOM_STRING_CHARS = 2 * 1024 * 1024
-
-
-def _new_dom_budget() -> Dict[str, int]:
-    return {
-        "json_bytes": 0,
-        "pages": 0,
-        "dicts": 0,
-        "items": 0,
-        "chars": 0,
-    }
-
-
-def _loads_json_bounded(
-    raw_bytes: bytes,
-    member_name: str,
-    dom_budget: Optional[Dict[str, int]] = None,
-) -> Any:
-    """Parse JSON member while enforcing aggregate byte, object node, container item, and string character limits."""
-    budget = dom_budget if dom_budget is not None else _new_dom_budget()
-    budget["json_bytes"] += len(raw_bytes)
-    if budget["json_bytes"] > MAX_ZIP_TOTAL_JSON_BYTES:
-        raise RuntimeError(
-            f"Archive JSON total size ({budget['json_bytes']}) exceeds limit ({MAX_ZIP_TOTAL_JSON_BYTES})"
-        )
-    struct_tokens = (
-        raw_bytes.count(b"{") + raw_bytes.count(b"[") + raw_bytes.count(b",")
-    )
-    if struct_tokens > MAX_DOM_CONTAINER_ITEMS:
-        raise RuntimeError(
-            f"JSON member '{member_name}' structural complexity ({struct_tokens}) exceeds DOM item budget ({MAX_DOM_CONTAINER_ITEMS})"
-        )
-
-    def _obj_hook(obj: Dict[str, Any]) -> Dict[str, Any]:
-        budget["dicts"] += 1
-        if budget["dicts"] > MAX_DOM_DICT_NODES:
-            raise RuntimeError(
-                f"Sketch JSON DOM object count ({budget['dicts']}) exceeds limit ({MAX_DOM_DICT_NODES}) in '{member_name}'"
-            )
-        budget["items"] += len(obj)
-        for k, v in obj.items():
-            budget["chars"] += len(k)
-            if isinstance(v, str):
-                budget["chars"] += len(v)
-            elif isinstance(v, list):
-                budget["items"] += len(v)
-                for elem in v:
-                    if isinstance(elem, str):
-                        budget["chars"] += len(elem)
-        if budget["items"] > MAX_DOM_CONTAINER_ITEMS:
-            raise RuntimeError(
-                f"Sketch JSON DOM container item count ({budget['items']}) exceeds limit ({MAX_DOM_CONTAINER_ITEMS}) in '{member_name}'"
-            )
-        if budget["chars"] > MAX_DOM_STRING_CHARS:
-            raise RuntimeError(
-                f"Sketch JSON DOM string character count ({budget['chars']}) exceeds limit ({MAX_DOM_STRING_CHARS}) in '{member_name}'"
-            )
-        return obj
-
-    return json.loads(raw_bytes.decode("utf-8"), object_hook=_obj_hook)
 
 
 def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
