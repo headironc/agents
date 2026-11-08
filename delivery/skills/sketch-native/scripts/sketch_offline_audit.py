@@ -31,6 +31,7 @@ from sketch_archive import (
     MAX_ZIP_JSON_MEMBER_BYTES,
     parse_archive_json as _loads_json_bounded,
 )
+from sketch_layers import is_artboard
 from sketch_json import (
     new_budget as _new_dom_budget,
     read_json,
@@ -1067,17 +1068,19 @@ def run_offline_audit(
     for page_member, page_obj in pages_data.items():
         pid = str(page_obj.get("do_objectID", page_member))
 
-        def pre_walk(node: Dict[str, Any]) -> None:
+        def pre_walk(
+            node: Dict[str, Any], parent: Optional[Dict[str, Any]] = None
+        ) -> None:
             cls = node.get("_class")
             if cls == "symbolMaster" and node.get("symbolID"):
                 symbol_masters[str(node["symbolID"])] = node
-            if cls == "artboard" and node.get("do_objectID"):
+            if is_artboard(node, parent) and node.get("do_objectID"):
                 aid = str(node["do_objectID"])
                 artboards_by_id[aid] = node
                 artboard_page_map[aid] = pid
             for ch in node.get("layers") or []:
                 if isinstance(ch, dict):
-                    pre_walk(ch)
+                    pre_walk(ch, node)
 
         pre_walk(page_obj)
 
@@ -1243,7 +1246,10 @@ def run_offline_audit(
                     artboard_id=(artboard or {}).get("do_objectID"),
                 )
 
-            cur_artboard = node if cls in ("artboard", "symbolMaster") else artboard
+            parent = ancestors[-1] if ancestors else None
+            cur_artboard = (
+                node if is_artboard(node, parent) or cls == "symbolMaster" else artboard
+            )
             aid = str((cur_artboard or {}).get("do_objectID", "")) or None
 
             frame = node.get("frame") or {}
@@ -1252,7 +1258,7 @@ def run_offline_audit(
             nw = float(frame.get("width", 0.0))
             nh = float(frame.get("height", 0.0))
 
-            if cls in ("page", "artboard", "symbolMaster"):
+            if cls == "page" or node is cur_artboard:
                 cur_abs_x = 0.0
                 cur_abs_y = 0.0
             else:
@@ -1488,7 +1494,7 @@ def run_offline_audit(
             # 2px Focus Ring clipping & bounds check
             if _is_focus_ring_layer(node) and cur_artboard is not None:
                 for anc in ancestors:
-                    if anc.get("_class") in ("page", "artboard", "symbolMaster"):
+                    if anc is cur_artboard or anc.get("_class") in ("page", "artboard", "symbolMaster"):
                         continue
                     clip_val = int(anc.get("clippingBehavior", 0) or 0)
                     clips_flag = bool(anc.get("clipsContents", False))
@@ -1605,7 +1611,8 @@ def run_offline_audit(
 
             if (
                 cls == "symbolInstance"
-                and (cur_artboard or {}).get("_class") == "artboard"
+                and cur_artboard is not None
+                and cur_artboard.get("_class") != "symbolMaster"
             ):
                 inst_sym_id = str(node.get("symbolID", ""))
                 inst_master = symbol_masters.get(inst_sym_id)
@@ -1810,9 +1817,9 @@ def run_offline_audit(
 
         # Check Freeform HotSpot alignment against underlying Flex controls on each artboard
         for top_layer in page_obj.get("layers") or []:
-            if not isinstance(top_layer, dict) or top_layer.get("_class") not in (
-                "artboard",
-                "symbolMaster",
+            if not isinstance(top_layer, dict) or not (
+                is_artboard(top_layer, page_obj)
+                or top_layer.get("_class") == "symbolMaster"
             ):
                 continue
             ab_id = str(top_layer.get("do_objectID", ""))

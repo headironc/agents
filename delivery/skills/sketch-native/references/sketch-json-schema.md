@@ -11,7 +11,7 @@ A `.sketch` file is a standard ZIP archive containing:
 - `document.json`: Root `MSImmutableDocumentData` (`do_objectID`, `assets`, `layerStyles`, `layerTextStyles`, `sharedSwatches`, `foreignSymbols`, `foreignLayerStyles`, `foreignTextStyles`, `foreignSwatches`, `pages` references).
 - `meta.json`: `commit`, `version` (Sketch 2026.3 uses document version `164+`), `app` (`com.bohemiancoding.sketch3`), `appVersion` (`2026.3.1`), `build` (`234013`), `pagesAndArtboards` index.
 - `user.json`: Viewport scroll/zoom states per page and UI metadata.
-- `pages/<page-uuid>.json`: `MSImmutablePage` root containing top-level artboards (`artboard` / `symbolMaster` / `MSImmutableFrameGroup` with `frameRole`).
+- `pages/<page-uuid>.json`: `page` root containing legacy `artboard` layers, modern Frame/Graphic `group` layers, symbol masters, and ordinary layers.
 - `images/<sha1-or-id>.<ext>`: Embedded bitmap assets referenced by `MSImageData`.
 - `previews/preview.png`: QuickLook preview image.
 
@@ -19,6 +19,12 @@ Every serialized model object carries:
 
 - `"_class"`: Sketch immutable/archive class name (`"page"`, `"artboard"`, `"symbolMaster"`, `"symbolInstance"`, `"group"`, `"text"`, `"rectangle"`, `"shapePath"`, `"oval"`, `"slice"`, `"MSImmutableHotspotLayer"`).
 - `"do_objectID"`: Globally unique UUID string across the entire `.sketch` archive.
+
+### Frame and Graphic Identity
+
+Modern Frames and Graphics serialize as `_class: "group"` with `groupBehavior: 1` (Frame) or `2` (Graphic); `0` is a regular group. The numeric mapping is defined by `GroupBehavior` in Sketch's bundled `SketchAPI_dom.js`. A Frame or Graphic directly under a `page` is an artboard-equivalent screen root. A nested Frame or Graphic remains part of its enclosing screen and retains its local coordinate offset. `symbolMaster` remains a separate reusable definition.
+
+The [Sketch 2025.1 migration guide](https://developer.sketch.com/plugins/updates/new-in-sketch-20251) explains this distinction: the live API reports top-level Frames and Graphics as `Artboard` for compatibility, while nested containers report `Group`. Do not infer archive class names from live API type names or treat every `groupBehavior` container as a new screen. The offline tools share this rule through [`sketch_layers.py`](../scripts/sketch_layers.py).
 
 ---
 

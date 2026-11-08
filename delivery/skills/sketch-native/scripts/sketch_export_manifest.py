@@ -34,6 +34,7 @@ from sketch_archive import (
     MAX_ZIP_JSON_MEMBER_BYTES,
     parse_archive_json as _loads_json_bounded,
 )
+from sketch_layers import is_artboard
 from sketch_json import (
     new_budget as _new_dom_budget,
     read_json,
@@ -961,7 +962,7 @@ def inspect_sketch_artboards_and_clocks(
             page_name = str(page.get("name", ""))
 
             for top in page.get("layers") or []:
-                if not isinstance(top, dict) or top.get("_class") != "artboard":
+                if not isinstance(top, dict) or not is_artboard(top, page):
                     continue
                 ab_id = _validate_safe_item_id(
                     str(top.get("do_objectID", "")), "artboardID"
@@ -1140,7 +1141,7 @@ def inspect_sketch_artboards_and_clocks(
                 ) -> None:
                     if not bool(node.get("isVisible", True)):
                         return
-                    is_ab = node.get("_class") == "artboard"
+                    is_ab = node is top or node.get("_class") == "artboard"
                     nf = node.get("frame") or {}
                     cur_x = 0.0 if is_ab else ox + float(nf.get("x", 0.0))
                     cur_y = 0.0 if is_ab else oy + float(nf.get("y", 0.0))

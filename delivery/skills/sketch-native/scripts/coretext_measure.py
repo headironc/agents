@@ -29,6 +29,7 @@ from sketch_archive import (
     MAX_ZIP_TOTAL_JSON_BYTES,
     parse_archive_json as _loads_json_bounded,
 )
+from sketch_layers import is_artboard
 from sketch_json import (
     MAX_JSON_BYTES,
     new_budget as _new_dom_budget,
@@ -1056,7 +1057,8 @@ def _reflow_freeform_group(
 
 
 def _collect_artboard_rects(
-    node: Dict[str, Any], offset_x: float = 0.0, offset_y: float = 0.0
+    node: Dict[str, Any], offset_x: float = 0.0, offset_y: float = 0.0,
+    *, root: bool = True,
 ) -> Dict[str, Tuple[float, float, float, float]]:
     rects: Dict[str, Tuple[float, float, float, float]] = {}
     frame = node.get("frame") or {}
@@ -1065,18 +1067,14 @@ def _collect_artboard_rects(
     w = float(frame.get("width", 0.0))
     h = float(frame.get("height", 0.0))
     oid = str(node.get("do_objectID", ""))
-    if oid and node.get("_class") not in (
-        "page",
-        "artboard",
-        "symbolMaster",
-        "MSImmutableHotspotLayer",
-    ):
+    is_origin = root or node.get("_class") in ("page", "artboard", "symbolMaster")
+    if oid and not is_origin and node.get("_class") != "MSImmutableHotspotLayer":
         rects[oid] = (abs_x, abs_y, w, h)
-    next_x = 0.0 if node.get("_class") in ("page", "artboard", "symbolMaster") else abs_x
-    next_y = 0.0 if node.get("_class") in ("page", "artboard", "symbolMaster") else abs_y
+    next_x = 0.0 if is_origin else abs_x
+    next_y = 0.0 if is_origin else abs_y
     for child in node.get("layers") or []:
         if isinstance(child, dict):
-            rects.update(_collect_artboard_rects(child, next_x, next_y))
+            rects.update(_collect_artboard_rects(child, next_x, next_y, root=False))
     return rects
 
 
@@ -1324,7 +1322,8 @@ def _audit_and_rebake_members(
     ) -> None:
         cur_artboard = (
             node
-            if node.get("_class") in ("artboard", "symbolMaster")
+            if is_artboard(node, ancestors[-1] if ancestors else None)
+            or node.get("_class") == "symbolMaster"
             else artboard
         )
         spec = _extract_text_layer_spec(node, shared_text_styles, budget=measurement_budget)
@@ -1618,7 +1617,8 @@ def _audit_and_rebake_members(
             for depth, ancestor in enumerate(meta["ancestors"]):
                 if (
                     (ancestor.get("groupLayout") or {}).get("_class") == "MSImmutableFlexGroupLayout"
-                    or ancestor.get("_class") in ("group", "symbolMaster")
+                    or ancestor.get("_class") == "symbolMaster"
+                    or (ancestor.get("_class") == "group" and ancestor is not artboard)
                 ):
                     groups[id(ancestor)] = (depth, ancestor)
         for _, group in groups.values():

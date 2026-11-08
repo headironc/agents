@@ -96,6 +96,7 @@ export const requiredRepositoryPaths = [
   "delivery/skills/sketch-native/scripts/sketch_text.py",
   "delivery/skills/sketch-native/scripts/sketch_json.py",
   "delivery/skills/sketch-native/scripts/sketch_archive.py",
+  "delivery/skills/sketch-native/scripts/sketch_layers.py",
   "delivery/skills/sketch-native/scripts/sketch_offline_audit.py",
   "delivery/skills/sketch-native/scripts/sketch_mcp_roundtrip.py",
   "delivery/skills/sketch-native/scripts/sketch_export_manifest.py",
