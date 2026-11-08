@@ -20,7 +20,7 @@ Contract subject: `dsh`.
 
 ### 只读辅助
 
-只读分析、代码审查与静态排查使用 `dsh headless --permission-mode read-only --approval-policy never --json -`，通过标准输入传入任务与必要上下文。`read-only` 预设将文件沙箱限制为只读，且 `never` 直接拒绝需要交互审批的越界操作。验证所需的临时写入按[检查规则](review.md#checks)限定命令与输出位置，不授权修改被审查源码。
+对已建立来源信任的输入执行只读分析、代码审查与静态排查时，使用 `dsh headless --permission-mode read-only --approval-policy never --json -`，通过标准输入传入任务与必要上下文。`read-only` 仅限制写入；按官方 `fs-sandbox` 合同，各模式均保留宿主文件读取，`dsh` 还会自动加载目标工作区的 `AGENTS.md` 与 `CLAUDE.md`，且 `--approval-policy never` 不拦截普通文件读取（工具结果亦会进入外部模型会话）。因此 `read-only` 不是机密性沙箱：审查外部贡献或攻击者可写仓库前，必须遵守[不可信输入的执行边界](tool-contracts.md#不可信输入的执行)，不得在存有 `${DSH_HOME:-$HOME/.dsh}/.credentials.yaml`、SSH 或云配置等个人凭据的宿主环境直接将 `dsh` 指向不可信检出；须在仅挂载候选材料、无宿主秘密且仅配最小权限短期凭据的隔离环境（VM、容器或独立账户）或强制读取根限制下运行。验证所需的临时写入按[检查规则](review.md#checks)限定命令与输出位置，不授权修改被审查源码。
 
 ### 有界执行
 
