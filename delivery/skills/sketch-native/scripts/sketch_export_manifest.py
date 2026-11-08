@@ -708,9 +708,73 @@ def convert_png_to_lossless_webp(
 
 MAX_ZIP_MEMBERS = 4096
 MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
-MAX_ZIP_JSON_MEMBER_BYTES = 32 * 1024 * 1024
+MAX_ZIP_JSON_MEMBER_BYTES = 8 * 1024 * 1024
+MAX_ZIP_TOTAL_JSON_BYTES = 16 * 1024 * 1024
 MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 MAX_ZIP_COMPRESSION_RATIO = 100.0
+MAX_ARCHIVE_PAGES = 64
+MAX_DOM_DICT_NODES = 30000
+MAX_DOM_CONTAINER_ITEMS = 120000
+MAX_DOM_STRING_CHARS = 2 * 1024 * 1024
+
+
+def _new_dom_budget() -> Dict[str, int]:
+    return {
+        "json_bytes": 0,
+        "pages": 0,
+        "dicts": 0,
+        "items": 0,
+        "chars": 0,
+    }
+
+
+def _loads_json_bounded(
+    raw_bytes: bytes,
+    member_name: str,
+    dom_budget: Optional[Dict[str, int]] = None,
+) -> Any:
+    """Parse JSON member while enforcing aggregate byte, object node, container item, and string character limits."""
+    budget = dom_budget if dom_budget is not None else _new_dom_budget()
+    budget["json_bytes"] += len(raw_bytes)
+    if budget["json_bytes"] > MAX_ZIP_TOTAL_JSON_BYTES:
+        raise RuntimeError(
+            f"Archive JSON total size ({budget['json_bytes']}) exceeds limit ({MAX_ZIP_TOTAL_JSON_BYTES})"
+        )
+    struct_tokens = (
+        raw_bytes.count(b"{") + raw_bytes.count(b"[") + raw_bytes.count(b",")
+    )
+    if struct_tokens > MAX_DOM_CONTAINER_ITEMS:
+        raise RuntimeError(
+            f"JSON member '{member_name}' structural complexity ({struct_tokens}) exceeds DOM item budget ({MAX_DOM_CONTAINER_ITEMS})"
+        )
+
+    def _obj_hook(obj: Dict[str, Any]) -> Dict[str, Any]:
+        budget["dicts"] += 1
+        if budget["dicts"] > MAX_DOM_DICT_NODES:
+            raise RuntimeError(
+                f"Sketch JSON DOM object count ({budget['dicts']}) exceeds limit ({MAX_DOM_DICT_NODES}) in '{member_name}'"
+            )
+        budget["items"] += len(obj)
+        for k, v in obj.items():
+            budget["chars"] += len(k)
+            if isinstance(v, str):
+                budget["chars"] += len(v)
+            elif isinstance(v, list):
+                budget["items"] += len(v)
+                for elem in v:
+                    if isinstance(elem, str):
+                        budget["chars"] += len(elem)
+        if budget["items"] > MAX_DOM_CONTAINER_ITEMS:
+            raise RuntimeError(
+                f"Sketch JSON DOM container item count ({budget['items']}) exceeds limit ({MAX_DOM_CONTAINER_ITEMS}) in '{member_name}'"
+            )
+        if budget["chars"] > MAX_DOM_STRING_CHARS:
+            raise RuntimeError(
+                f"Sketch JSON DOM string character count ({budget['chars']}) exceeds limit ({MAX_DOM_STRING_CHARS}) in '{member_name}'"
+            )
+        return obj
+
+    return json.loads(raw_bytes.decode("utf-8"), object_hook=_obj_hook)
 
 MAX_EXPORT_ARTBOARDS = 128
 MAX_EXPORT_SCALES = 4
@@ -809,17 +873,30 @@ def _validate_export_render_budget(
 
 
 def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
-    """Validate ZIP member count, per-member size, total uncompressed size, and compression ratio before reading."""
+    """Validate ZIP member count, duplicate entries, per-member size, total uncompressed size, and compression ratio before reading."""
     infolist = zf.infolist()
     if len(infolist) > MAX_ZIP_MEMBERS:
         raise RuntimeError(
             f"Archive exceeds maximum member count ({len(infolist)} > {MAX_ZIP_MEMBERS})"
         )
     total_uncompressed = 0
+    seen_names: set[str] = set()
     for info in infolist:
+        if "\\" in info.filename:
+            raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
         parts = Path(info.filename).parts
         if ".." in parts or info.filename.startswith("/"):
             raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
+        canon_path = "/".join(
+            p for p in info.filename.split("/") if p and p != "."
+        )
+        canon_key = f"{'dir' if info.is_dir() else 'file'}:{canon_path}"
+        if info.filename in seen_names or canon_key in seen_names:
+            raise RuntimeError(
+                f"Sketch archive contains duplicate ZIP member entry: {info.filename}"
+            )
+        seen_names.add(info.filename)
+        seen_names.add(canon_key)
         fsize = int(info.file_size or 0)
         csize = int(info.compress_size or 0)
         if fsize < 0 or fsize > MAX_ZIP_SINGLE_MEMBER_BYTES:
@@ -840,11 +917,16 @@ def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
 
 def _read_zip_member_bounded(
     zf: zipfile.ZipFile,
-    member_name: str,
+    member_or_info: Any,
     max_bytes: int = MAX_ZIP_JSON_MEMBER_BYTES,
 ) -> bytes:
     """Stream-read a ZIP member with strict uncompressed size and compression-ratio enforcement."""
-    info = zf.getinfo(member_name)
+    info = (
+        member_or_info
+        if isinstance(member_or_info, zipfile.ZipInfo)
+        else zf.getinfo(str(member_or_info))
+    )
+    member_name = info.filename
     csize = max(1, int(info.compress_size or 0))
     if int(info.file_size or 0) > max_bytes:
         raise RuntimeError(
@@ -877,13 +959,17 @@ def inspect_sketch_artboards_and_clocks(
     clock_layers: List[Dict[str, Any]] = []
 
     with zipfile.ZipFile(sketch_path, "r") as zf:
-        _validate_zip_archive_budget(zf)
-        namelist = sorted(zf.namelist())
+        infolist = _validate_zip_archive_budget(zf)
+        info_by_name = {info.filename: info for info in infolist}
+        namelist = sorted(info_by_name.keys())
         symbol_masters: Dict[str, Dict[str, Any]] = {}
+        dom_budget = _new_dom_budget()
 
-        if "document.json" in namelist:
-            doc_data = json.loads(
-                _read_zip_member_bounded(zf, "document.json").decode("utf-8")
+        if "document.json" in info_by_name:
+            doc_data = _loads_json_bounded(
+                _read_zip_member_bounded(zf, info_by_name["document.json"]),
+                "document.json",
+                dom_budget=dom_budget,
             )
             for fsym in doc_data.get("foreignSymbols") or []:
                 if not isinstance(fsym, dict):
@@ -898,7 +984,16 @@ def inspect_sketch_artboards_and_clocks(
         for member in namelist:
             if not (member.startswith("pages/") and member.endswith(".json")):
                 continue
-            page = json.loads(_read_zip_member_bounded(zf, member).decode("utf-8"))
+            dom_budget["pages"] += 1
+            if dom_budget["pages"] > MAX_ARCHIVE_PAGES:
+                raise RuntimeError(
+                    f"Archive page count ({dom_budget['pages']}) exceeds limit ({MAX_ARCHIVE_PAGES})"
+                )
+            page = _loads_json_bounded(
+                _read_zip_member_bounded(zf, info_by_name[member]),
+                member,
+                dom_budget=dom_budget,
+            )
             pages_list.append((member, page))
 
             def index_masters(node: Dict[str, Any]) -> None:

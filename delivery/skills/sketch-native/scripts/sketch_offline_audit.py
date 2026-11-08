@@ -270,17 +270,30 @@ def _loads_json_bounded(
 
 
 def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
-    """Validate ZIP member count, per-member size, total uncompressed size, and compression ratio before reading."""
+    """Validate ZIP member count, duplicate entries, per-member size, total uncompressed size, and compression ratio before reading."""
     infolist = zf.infolist()
     if len(infolist) > MAX_ZIP_MEMBERS:
         raise RuntimeError(
             f"Archive exceeds maximum member count ({len(infolist)} > {MAX_ZIP_MEMBERS})"
         )
     total_uncompressed = 0
+    seen_names: Set[str] = set()
     for info in infolist:
+        if "\\" in info.filename:
+            raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
         parts = Path(info.filename).parts
         if ".." in parts or info.filename.startswith("/"):
             raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
+        canon_path = "/".join(
+            p for p in info.filename.split("/") if p and p != "."
+        )
+        canon_key = f"{'dir' if info.is_dir() else 'file'}:{canon_path}"
+        if info.filename in seen_names or canon_key in seen_names:
+            raise RuntimeError(
+                f"Sketch archive contains duplicate ZIP member entry: {info.filename}"
+            )
+        seen_names.add(info.filename)
+        seen_names.add(canon_key)
         fsize = int(info.file_size or 0)
         csize = int(info.compress_size or 0)
         if fsize < 0 or fsize > MAX_ZIP_SINGLE_MEMBER_BYTES:
@@ -301,11 +314,16 @@ def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
 
 def _read_zip_member_bounded(
     zf: zipfile.ZipFile,
-    member_name: str,
+    member_or_info: Any,
     max_bytes: int = MAX_ZIP_JSON_MEMBER_BYTES,
 ) -> bytes:
     """Stream-read a ZIP member with strict uncompressed size and compression-ratio enforcement."""
-    info = zf.getinfo(member_name)
+    info = (
+        member_or_info
+        if isinstance(member_or_info, zipfile.ZipInfo)
+        else zf.getinfo(str(member_or_info))
+    )
+    member_name = info.filename
     csize = max(1, int(info.compress_size or 0))
     if int(info.file_size or 0) > max_bytes:
         raise RuntimeError(

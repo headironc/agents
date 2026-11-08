@@ -3186,6 +3186,127 @@ try:
     assert re_audit["passed"] is True and re_audit["driftCount"] == 0, re_audit
 finally:
     cm.measure_specs = orig_ms2
+
+# 13. Verify _simulate_master_tree_height stops propagating content height upward at Fill (verticalSizing == 2) child containers
+fit_master_with_fill_child = {
+    "_class": "symbolMaster",
+    "do_objectID": "m-fit-fill-child",
+    "symbolID": "sym-fit-fill-child",
+    "frame": {"x": 0, "y": 0, "width": 200, "height": 60},
+    "groupLayout": {
+        "_class": "MSImmutableFlexGroupLayout",
+        "flexDirection": 0,
+        "verticalSizing": 1,
+        "padding": 0,
+    },
+    "layers": [
+        {
+            "_class": "rectangle",
+            "do_objectID": "rect-60",
+            "isVisible": True,
+            "frame": {"x": 0, "y": 0, "width": 60, "height": 60},
+        },
+        {
+            "_class": "group",
+            "do_objectID": "sub-fill-col",
+            "isVisible": True,
+            "frame": {"x": 60, "y": 0, "width": 140, "height": 60},
+            "groupLayout": {
+                "_class": "MSImmutableFlexGroupLayout",
+                "flexDirection": 1,
+                "verticalSizing": 2,
+                "padding": 0,
+            },
+            "layers": [
+                {
+                    "_class": "text",
+                    "do_objectID": "txt-in-fill",
+                    "isVisible": True,
+                    "textBehaviour": 1,
+                    "frame": {"x": 0, "y": 0, "width": 140, "height": 20},
+                }
+            ],
+        },
+    ],
+}
+fill_old, fill_new = cm._simulate_master_tree_height(
+    fit_master_with_fill_child,
+    {"sym-fit-fill-child": fit_master_with_fill_child},
+    [],
+    {"txt-in-fill": 20.0},
+    {"txt-in-fill": 40.0},
+)
+assert fill_old == 60.0 and fill_new == 60.0, (fill_old, fill_new)
+
+# 14. Verify empty _symbolID override hides nested symbolInstance in _simulate_master_tree_height
+master_with_hidable = {
+    "_class": "symbolMaster",
+    "do_objectID": "m-hidable",
+    "symbolID": "sym-hidable",
+    "frame": {"x": 0, "y": 0, "width": 200, "height": 60},
+    "groupLayout": {
+        "_class": "MSImmutableFlexGroupLayout",
+        "flexDirection": 1,
+        "verticalSizing": 1,
+        "padding": 0,
+    },
+    "layers": [
+        {
+            "_class": "text",
+            "do_objectID": "txt-keep",
+            "isVisible": True,
+            "textBehaviour": 1,
+            "frame": {"x": 0, "y": 0, "width": 200, "height": 20},
+        },
+        {
+            "_class": "symbolInstance",
+            "do_objectID": "nested-hide-inst",
+            "symbolID": "sym-sub-40",
+            "isVisible": True,
+            "frame": {"x": 0, "y": 20, "width": 200, "height": 40},
+        },
+    ],
+}
+sub_40 = {
+    "_class": "symbolMaster",
+    "do_objectID": "m-sub-40",
+    "symbolID": "sym-sub-40",
+    "frame": {"x": 0, "y": 0, "width": 200, "height": 40},
+    "layers": [],
+}
+h_old, h_new = cm._simulate_master_tree_height(
+    master_with_hidable,
+    {"sym-hidable": master_with_hidable, "sym-sub-40": sub_40},
+    [{"overrideName": "nested-hide-inst_symbolID", "value": ""}],
+    {"txt-keep": 20.0},
+    {"txt-keep": 20.0},
+)
+assert h_old == 60.0 and h_new == 20.0, (h_old, h_new)
+
+# 15. Verify duplicate ZIP member entries are rejected by _validate_zip_archive_budget across all 4 tools
+dup_zip_path = Path(sys.argv[1]) / "dup-members.sketch"
+with zipfile.ZipFile(dup_zip_path, "w") as zf:
+    zf.writestr("document.json", b'{"_class":"document","do_objectID":"d-dup"}')
+    zf.writestr("pages/p1.json", b'{"_class":"page","do_objectID":"p1","layers":[]}')
+    zf.writestr("pages/p1.json", b'{"_class":"page","do_objectID":"p1","layers":[]}')
+with zipfile.ZipFile(dup_zip_path, "r") as zf:
+    for mod in (soa, cm, sem, rt):
+        try:
+            mod._validate_zip_archive_budget(zf)
+            raise AssertionError(f"Expected {mod.__name__} to reject duplicate ZIP member")
+        except RuntimeError as exc:
+            assert "duplicate ZIP member" in str(exc), exc
+
+# 16. Verify _loads_json_bounded enforces DOM complexity across cm, sem, and rt
+for mod in (cm, sem, rt):
+    try:
+        mod._loads_json_bounded(
+            b"[" + b",".join([b"{}"] * (mod.MAX_DOM_DICT_NODES + 5)) + b"]",
+            "pages/dom-bomb.json",
+        )
+        raise AssertionError(f"Expected {mod.__name__}._loads_json_bounded to reject excessive DOM objects")
+    except RuntimeError as exc:
+        assert "exceeds" in str(exc), exc
 `,
         tmpDir,
       ],

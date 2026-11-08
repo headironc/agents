@@ -529,11 +529,7 @@ def _merge_nested_instance_overrides(
         if not ov_name:
             continue
         merged_by_name[ov_name] = ov
-        if (
-            ov_name.endswith("_symbolID")
-            and isinstance(ov.get("value"), str)
-            and ov.get("value")
-        ):
+        if ov_name.endswith("_symbolID") and isinstance(ov.get("value"), str):
             swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
 
     def walk_master(
@@ -564,10 +560,8 @@ def _merge_nested_instance_overrides(
                         scoped_entry = dict(nested_ov)
                         scoped_entry["overrideName"] = scoped_name
                         merged_by_name[scoped_name] = scoped_entry
-                        if (
-                            scoped_name.endswith("_symbolID")
-                            and isinstance(scoped_entry.get("value"), str)
-                            and scoped_entry.get("value")
+                        if scoped_name.endswith("_symbolID") and isinstance(
+                            scoped_entry.get("value"), str
                         ):
                             swap_map[scoped_name[: -len("_symbolID")]] = str(
                                 scoped_entry["value"]
@@ -691,18 +685,25 @@ def _simulate_master_tree_height(
     base_heights_by_path: Dict[str, float],
     target_heights_by_path: Dict[str, float],
 ) -> Tuple[float, float]:
-    """Recursively evaluate (old_height, simulated_height) across root_master's hierarchy, stopping at fixed-height containers."""
+    """Recursively evaluate (old_height, simulated_height) across root_master's hierarchy, stopping at non-Fit containers."""
     swap_map: Dict[str, str] = {}
     for ov in inst_overrides:
         if not isinstance(ov, dict):
             continue
         ov_name = str(ov.get("overrideName", ""))
-        if (
-            ov_name.endswith("_symbolID")
-            and isinstance(ov.get("value"), str)
-            and ov.get("value")
-        ):
+        if ov_name.endswith("_symbolID") and isinstance(ov.get("value"), str):
             swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
+
+    def is_child_active(ch: Dict[str, Any], prefix: str) -> Tuple[bool, bool]:
+        if ch.get("_class") != "symbolInstance":
+            return True, True
+        ch_id = str(ch.get("do_objectID", ""))
+        ch_path = f"{prefix}/{ch_id}" if (prefix and ch_id) else ch_id
+        orig_sym = str(ch.get("symbolID", ""))
+        eff_sym = swap_map.get(ch_path, orig_sym)
+        old_act = bool(orig_sym) and orig_sym.lower() != "none"
+        sim_act = bool(eff_sym) and eff_sym.lower() != "none"
+        return old_act, sim_act
 
     def eval_node(
         node: Dict[str, Any],
@@ -728,22 +729,24 @@ def _simulate_master_tree_height(
             return node_h, node_h
 
         if cls == "symbolInstance":
-            eff_sym = swap_map.get(node_path, str(node.get("symbolID", "")))
+            orig_sym = str(node.get("symbolID", ""))
+            eff_sym = swap_map.get(node_path, orig_sym)
+            old_h_eff = node_h if (orig_sym and orig_sym.lower() != "none") else 0.0
             if not eff_sym or eff_sym.lower() == "none":
-                return node_h, node_h
+                return old_h_eff, 0.0
             nested_m = symbol_masters.get(eff_sym)
             if nested_m is None or eff_sym in visited:
-                return node_h, node_h
+                return old_h_eff, node_h
             m_old_h, m_sim_h = eval_node(
                 nested_m, node_path, visited | {eff_sym}, is_root=True
             )
-            return node_h, node_h + (m_sim_h - m_old_h)
+            return old_h_eff, node_h + (m_sim_h - m_old_h)
 
         raw_children = node.get("layers") or []
         if raw_children:
             layout = node.get("groupLayout") or {}
             is_flex = layout.get("_class") == "MSImmutableFlexGroupLayout"
-            if is_flex and int(layout.get("verticalSizing", 1)) == 0:
+            if is_flex and int(layout.get("verticalSizing", 1)) != 1:
                 return node_h, node_h
 
             flow_children = [
@@ -756,16 +759,30 @@ def _simulate_master_tree_height(
 
             if is_flex:
                 flex_dir = int(layout.get("flexDirection", 1))
-                child_pairs = [
-                    eval_node(ch, prefix, visited, is_root=False)
+                gap = float(layout.get("allGuttersGap", 0.0) or 0.0)
+                child_evals = [
+                    (
+                        eval_node(ch, prefix, visited, is_root=False),
+                        *is_child_active(ch, prefix),
+                    )
                     for ch in flow_children
                 ]
+                old_list = [p[0] for p, oa, _ in child_evals if oa]
+                sim_list = [p[1] for p, _, sa in child_evals if sa]
                 if flex_dir == 0:
-                    old_c = max(p[0] for p in child_pairs)
-                    sim_c = max(p[1] for p in child_pairs)
+                    old_c = max(old_list, default=0.0)
+                    sim_c = max(sim_list, default=0.0)
                 else:
-                    old_c = sum(p[0] for p in child_pairs)
-                    sim_c = sum(p[1] for p in child_pairs)
+                    old_c = (
+                        sum(old_list) + gap * max(0, len(old_list) - 1)
+                        if old_list
+                        else 0.0
+                    )
+                    sim_c = (
+                        sum(sim_list) + gap * max(0, len(sim_list) - 1)
+                        if sim_list
+                        else 0.0
+                    )
                 return node_h, node_h + (sim_c - old_c)
 
             iv: List[Tuple[float, float, float]] = []
@@ -817,7 +834,7 @@ def _resolve_nested_override_text_target(
         if not isinstance(ov, dict):
             continue
         ov_name = str(ov.get("overrideName", ""))
-        if ov_name.endswith("_symbolID") and isinstance(ov.get("value"), str) and ov.get("value"):
+        if ov_name.endswith("_symbolID") and isinstance(ov.get("value"), str):
             swap_map[ov_name[: -len("_symbolID")]] = str(ov["value"])
 
     cur_master = root_master
@@ -834,7 +851,7 @@ def _resolve_nested_override_text_target(
             if found.get("_class") != "symbolInstance":
                 return None
             prefix = "/".join(segments[: idx + 1])
-            next_sym_id = swap_map.get(prefix) or str(found.get("symbolID", ""))
+            next_sym_id = swap_map.get(prefix, str(found.get("symbolID", "")))
             if not next_sym_id or next_sym_id.lower() == "none":
                 return None
             next_master = symbol_masters.get(next_sym_id)
@@ -1083,23 +1100,100 @@ def _collect_artboard_rects(
 
 MAX_ZIP_MEMBERS = 4096
 MAX_ZIP_SINGLE_MEMBER_BYTES = 64 * 1024 * 1024
-MAX_ZIP_JSON_MEMBER_BYTES = 32 * 1024 * 1024
+MAX_ZIP_JSON_MEMBER_BYTES = 8 * 1024 * 1024
+MAX_ZIP_TOTAL_JSON_BYTES = 16 * 1024 * 1024
 MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 MAX_ZIP_COMPRESSION_RATIO = 100.0
+MAX_ARCHIVE_PAGES = 64
+MAX_DOM_DICT_NODES = 30000
+MAX_DOM_CONTAINER_ITEMS = 120000
+MAX_DOM_STRING_CHARS = 2 * 1024 * 1024
+
+
+def _new_dom_budget() -> Dict[str, int]:
+    return {
+        "json_bytes": 0,
+        "pages": 0,
+        "dicts": 0,
+        "items": 0,
+        "chars": 0,
+    }
+
+
+def _loads_json_bounded(
+    raw_bytes: bytes,
+    member_name: str,
+    dom_budget: Optional[Dict[str, int]] = None,
+) -> Any:
+    """Parse JSON member while enforcing aggregate byte, object node, container item, and string character limits."""
+    budget = dom_budget if dom_budget is not None else _new_dom_budget()
+    budget["json_bytes"] += len(raw_bytes)
+    if budget["json_bytes"] > MAX_ZIP_TOTAL_JSON_BYTES:
+        raise RuntimeError(
+            f"Archive JSON total size ({budget['json_bytes']}) exceeds limit ({MAX_ZIP_TOTAL_JSON_BYTES})"
+        )
+    struct_tokens = (
+        raw_bytes.count(b"{") + raw_bytes.count(b"[") + raw_bytes.count(b",")
+    )
+    if struct_tokens > MAX_DOM_CONTAINER_ITEMS:
+        raise RuntimeError(
+            f"JSON member '{member_name}' structural complexity ({struct_tokens}) exceeds DOM item budget ({MAX_DOM_CONTAINER_ITEMS})"
+        )
+
+    def _obj_hook(obj: Dict[str, Any]) -> Dict[str, Any]:
+        budget["dicts"] += 1
+        if budget["dicts"] > MAX_DOM_DICT_NODES:
+            raise RuntimeError(
+                f"Sketch JSON DOM object count ({budget['dicts']}) exceeds limit ({MAX_DOM_DICT_NODES}) in '{member_name}'"
+            )
+        budget["items"] += len(obj)
+        for k, v in obj.items():
+            budget["chars"] += len(k)
+            if isinstance(v, str):
+                budget["chars"] += len(v)
+            elif isinstance(v, list):
+                budget["items"] += len(v)
+                for elem in v:
+                    if isinstance(elem, str):
+                        budget["chars"] += len(elem)
+        if budget["items"] > MAX_DOM_CONTAINER_ITEMS:
+            raise RuntimeError(
+                f"Sketch JSON DOM container item count ({budget['items']}) exceeds limit ({MAX_DOM_CONTAINER_ITEMS}) in '{member_name}'"
+            )
+        if budget["chars"] > MAX_DOM_STRING_CHARS:
+            raise RuntimeError(
+                f"Sketch JSON DOM string character count ({budget['chars']}) exceeds limit ({MAX_DOM_STRING_CHARS}) in '{member_name}'"
+            )
+        return obj
+
+    return json.loads(raw_bytes.decode("utf-8"), object_hook=_obj_hook)
 
 
 def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
-    """Validate ZIP member count, per-member size, total uncompressed size, and compression ratio before reading."""
+    """Validate ZIP member count, duplicate entries, per-member size, total uncompressed size, and compression ratio before reading."""
     infolist = zf.infolist()
     if len(infolist) > MAX_ZIP_MEMBERS:
         raise RuntimeError(
             f"Archive exceeds maximum member count ({len(infolist)} > {MAX_ZIP_MEMBERS})"
         )
     total_uncompressed = 0
+    seen_names: set[str] = set()
     for info in infolist:
+        if "\\" in info.filename:
+            raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
         parts = Path(info.filename).parts
         if ".." in parts or info.filename.startswith("/"):
             raise RuntimeError(f"Unsafe ZIP member path in archive: {info.filename}")
+        canon_path = "/".join(
+            p for p in info.filename.split("/") if p and p != "."
+        )
+        canon_key = f"{'dir' if info.is_dir() else 'file'}:{canon_path}"
+        if info.filename in seen_names or canon_key in seen_names:
+            raise RuntimeError(
+                f"Sketch archive contains duplicate ZIP member entry: {info.filename}"
+            )
+        seen_names.add(info.filename)
+        seen_names.add(canon_key)
         fsize = int(info.file_size or 0)
         csize = int(info.compress_size or 0)
         if fsize < 0 or fsize > MAX_ZIP_SINGLE_MEMBER_BYTES:
@@ -1120,11 +1214,16 @@ def _validate_zip_archive_budget(zf: zipfile.ZipFile) -> List[zipfile.ZipInfo]:
 
 def _read_zip_member_bounded(
     zf: zipfile.ZipFile,
-    member_name: str,
+    member_or_info: Any,
     max_bytes: int = MAX_ZIP_JSON_MEMBER_BYTES,
 ) -> bytes:
     """Stream-read a ZIP member with strict uncompressed size and compression-ratio enforcement."""
-    info = zf.getinfo(member_name)
+    info = (
+        member_or_info
+        if isinstance(member_or_info, zipfile.ZipInfo)
+        else zf.getinfo(str(member_or_info))
+    )
+    member_name = info.filename
     csize = max(1, int(info.compress_size or 0))
     if int(info.file_size or 0) > max_bytes:
         raise RuntimeError(
@@ -1154,14 +1253,28 @@ def _read_sketch_json_members(zf: zipfile.ZipFile) -> Dict[str, bytes]:
     """Validate archive budget and load only required JSON members (document.json and pages/*.json)."""
     infolist = _validate_zip_archive_budget(zf)
     members: Dict[str, bytes] = {}
+    page_count = 0
+    total_json_bytes = 0
     for info in infolist:
         name = info.filename
         if name == "document.json" or (
             name.startswith("pages/") and name.endswith(".json")
         ):
-            members[name] = _read_zip_member_bounded(
-                zf, name, max_bytes=MAX_ZIP_JSON_MEMBER_BYTES
+            if name.startswith("pages/"):
+                page_count += 1
+                if page_count > MAX_ARCHIVE_PAGES:
+                    raise RuntimeError(
+                        f"Archive page count ({page_count}) exceeds limit ({MAX_ARCHIVE_PAGES})"
+                    )
+            raw = _read_zip_member_bounded(
+                zf, info, max_bytes=MAX_ZIP_JSON_MEMBER_BYTES
             )
+            total_json_bytes += len(raw)
+            if total_json_bytes > MAX_ZIP_TOTAL_JSON_BYTES:
+                raise RuntimeError(
+                    f"Archive JSON total size ({total_json_bytes}) exceeds limit ({MAX_ZIP_TOTAL_JSON_BYTES})"
+                )
+            members[name] = raw
     return members
 
 
@@ -1258,14 +1371,24 @@ def _audit_and_rebake_members(
     sketch_leaf: str = "",
     initial_sketch_stat: Optional[os.stat_result] = None,
 ) -> Dict[str, Any]:
+    dom_budget = _new_dom_budget()
     doc_data: Dict[str, Any] = {}
     if "document.json" in members:
-        doc_data = json.loads(members["document.json"].decode("utf-8"))
+        doc_data = _loads_json_bounded(
+            members["document.json"], "document.json", dom_budget=dom_budget
+        )
 
     pages_data: Dict[str, Dict[str, Any]] = {}
     for name, raw in members.items():
         if name.startswith("pages/") and name.endswith(".json"):
-            pages_data[name] = json.loads(raw.decode("utf-8"))
+            dom_budget["pages"] += 1
+            if dom_budget["pages"] > MAX_ARCHIVE_PAGES:
+                raise RuntimeError(
+                    f"Archive page count ({dom_budget['pages']}) exceeds limit ({MAX_ARCHIVE_PAGES})"
+                )
+            pages_data[name] = _loads_json_bounded(
+                raw, name, dom_budget=dom_budget
+            )
 
     symbol_masters = _index_symbol_masters(pages_data, doc_data)
     shared_text_styles = _index_shared_text_styles(doc_data)
@@ -1387,7 +1510,7 @@ def _audit_and_rebake_members(
                     m_layout = master.get("groupLayout") or {}
                     master_fixed_vert = (
                         m_layout.get("_class") == "MSImmutableFlexGroupLayout"
-                        and int(m_layout.get("verticalSizing", 1)) == 0
+                        and int(m_layout.get("verticalSizing", 1)) != 1
                     )
                     master_fit_vert = (
                         m_layout.get("_class") == "MSImmutableFlexGroupLayout"
