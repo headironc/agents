@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Codex 规则与专业偏好 | [Codex 规则](delivery/AGENTS.md)、[写作规范](delivery/policy/writing.md)、[Rust](delivery/policy/rust.md)、[SQL](delivery/policy/sql.md) | 专业偏好由项目明确采用 |
 | 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 采用快慢三级路由（`Architect/Debugger`、`Coder/Reviewer` 日常 `low` 档位、`Runner/Explorer` 极速 `low` 档位）与 150K Token 上下文护栏；开发设备由 Human 明确选择，普通单会话任务直接完成，多切片任务通过 `progress.md` / `spec.md` 锚点推进；能力与限制见[使用说明](docs/usage.md#mac-与-dev-的结果回传)及[验证边界](docs/usage.md#验证能说明什么) |
-| 总协调启动提示词 | [通用启动模板](docs/prompts/coordinator.md) | 明确启用后，总协调保持极简上下文（目标 `<50K Token`）负责拆分、派发、跟进和精简证据接纳，执行会话默认按 `Sol low` 高速完成编码验证与 PR，实现多切片全自动连续推进；普通文档，不安装 |
+| 总协调启动提示词 | [通用启动模板](docs/prompts/coordinator.md) | 明确启用后，总协调保持极简上下文（目标 `<50K Token`）负责拆分、派发、跟进和精简证据接纳，执行会话默认按 `Coder/Reviewer low` 高速完成编码验证与 PR，实现多切片全自动连续推进；普通文档，不安装 |
 | 本机协作提醒 | [使用与恢复](docs/usage.md#本机协作提醒) | 本机可选配置，独立于源码交付；启用状态与授权按实际环境核对 |
 | DeepSeek Harness (`dsh`) 委派与调用 | [分工与授权](delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](delivery/policy/deepseek-harness.md) | 按任务与能力适配选用（连接本合同定义的 OpenCode Go 或 DeepSeek 官方路由，日常默认 `deepseek-v4.1-flash` 显式 `low` 档位）；提供无密钥 `headless` 凭据与路由片段 [`dsh-headless.patch.yml`](delivery/capability/dsh-headless.patch.yml)；负责人判断与验收；未接入 CI 或审查关卡 |
 | 设计稿与看图验收 | [figma-design-workflow](delivery/skills/figma-design-workflow/SKILL.md)、[sketch-native](delivery/skills/sketch-native/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Figma 工作流为 Codex 专用，Sketch 原生技能限 macOS 安装与运行；保留可编辑结果与真实像素验收；历史实测范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
@@ -81,8 +81,8 @@
 
 ## 执行记录
 
-运行、审查和配置证据按实际仓库 ID、任务及候选绑定。外部 `review-launch-status.json` 的 `current_handoff` 仅导航它实际指向的任务；使用前核对所属实例，不套用旧仓库的交接。源码不交付私人运行记录、安装回执或恢复备份。
+运行、审查和配置证据按实际仓库 ID、任务及候选绑定。外部交接或状态记录仅导航它实际指向的任务；使用前核对所属实例，不套用旧仓库或旧实例的交接。源码不交付私人运行记录、安装回执或恢复备份。
 
-外部记录的实际位置由当前任务或可回查的交接提供。本文不登记私人目录。来源索引中的外部记录子路径，在对应任务提供记录根后按该根解析。各来源章节标注的源码路径仍以其明确的根目录为准。当前实例的位置仍由本次任务核实。需要某项执行证据而缺少定位信息时，报告缺少的任务、实例和记录位置。继续不依赖该证据的工作。不要扫描私人目录寻找同名文件，也不要以其他实例的记录替代。
+外部记录的实际位置由当前任务或可回查的交接提供，本文不登记私人目录。来源索引中的外部记录子路径在对应任务提供记录根后按该根解析，各来源章节标注的源码路径以其明确的根目录为准。缺少某项执行证据的定位信息时，报告缺失的任务、实例和记录位置并继续不依赖该证据的工作，不扫描私人目录寻找同名文件。
 
 必要历史来源与许可由[来源索引](docs/skill-sources.md)维护。私有归档的访问与迁移边界也由该页说明。当前功能和使用合同在本内容源内自足，不依赖读取私有历史。个人配置与安装状态仍按实际目标回读，不从源码推断。

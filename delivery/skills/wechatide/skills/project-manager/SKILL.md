@@ -36,7 +36,7 @@ Check flags with `OPERATION -h` before first use. `project_import` validates the
 
 ## Confirmations and pending tasks
 
-A result with status `pending` and a `taskId` waits for a confirmation inside DevTools. Only login and client authorization are polled, so retain the task as [pending tasks](../../references/tasks.md) require, tell the user which confirmation remains, and keep the dependent work blocked. Before running the same operation again, query the retained `taskId` and follow the status it returns; a pending or successful original is not repeated.
+When an operation returns `pending` with a `taskId`, retain the task without polling, block dependent work, and query the retained `taskId` before considering any repeat as [pending tasks](../../references/tasks.md) require.
 
 ## Failures
 
@@ -50,4 +50,4 @@ A result with status `pending` and a `taskId` waits for a confirmation inside De
 
 ## Return
 
-Return the operations run, the exact project or link, the list entries or returned fields the task needed, the snippet link, the imported `projectPath` with its actual inspection and execution status, any retained pending task with the confirmation that remains, and remaining blockers. State whether code left or entered this machine: a share uploads the project to WeChat, an import writes downloaded code locally, and a removal changes only the list. Hand off only to delivered entries in the capability index: project windows, login and AppIDs belong to initializer, local configuration to project-config, compilation to compiler, console, network and screenshot evidence to debugger, previews and uploads to previewer, page or canvas automation to automator, and cloud environments, functions, database, storage and message push to cloudbase-operator, and installation diagnosis to installer.
+Return the operations run, the exact project or link, the list entries or returned fields the task needed, the snippet link, the imported `projectPath` with its actual inspection and execution status, any retained pending task with the confirmation that remains, and remaining blockers. State whether code left or entered this machine (a share uploads the project to WeChat, an import writes downloaded code locally, and a removal changes only the list). Route any follow-up work to its owning entry in the [capability index](../../references/capabilities.md).

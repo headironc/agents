@@ -23,11 +23,11 @@ id-check 检查表格首列标识符。同一前缀的编号必须按出现顺�
 - 由源码实际加载的入口构建，不是 development 入口
 - 脱离仓库运行时与源码结论一致
 
-两者现在都覆盖本仓库文档，在文档组里各占一项检查。它们读的源码清单与 markdownlint 同一份。prose-check 带 `--errors-only`，只列阻塞的空格错误。汇总行仍计入所有句长提示。旧设计文档已退役，句长提示不再排除任何文件。id-check 不排除任何文件，接入时全仓零错误。调用方式写在[按需工具参考](../delivery/policy/tool-contracts.md)，它随部署发布；本页不发布。
+两者覆盖本仓库文档，在文档组里各占一项检查。它们读的源码清单与 markdownlint 同一份。prose-check 带 `--errors-only`，只列阻塞的空格错误；汇总行仍计入所有句长提示。id-check 不排除任何文件。调用方式写在[按需工具参考](../delivery/policy/tool-contracts.md)，它随部署发布；本页不发布。
 
 两者都能用 `--version` 打印裸版本号。消费者按这个版本号固定工具。prose-check 另有 `--changed`。它只报告本次改动碰到的段落。报告也计数改动之外的发现。id-check 没有这个选项。顺序错误报在下降的那一行，限定范围会藏掉插入造成的缺陷。
 
-gh 拥有通用 CLI/API/stack 调用合同，没有执行器。旧取消执行器已移除。alibabacloud-find-skills 没有执行器。该单元交付 curl/jq 消费绑定和完整资源。它也交付缺失成员、产品选择和私有视图回归。门禁不发起技能搜索、下载或安装。短信 Bash 工具及假 CLI 测试保留在技能目录。统一门禁调用测试、ShellCheck、两端官方技能验证器与完整成员检查。aliyun-sms owner 和消费者进入既有工具登记。不新增真实云服务验证。完整工具身份与调用参考绑定见[绑定规则](#仓库登记维护)。当前交付状态与维护导航见 [README](../README.md#维护导航)。
+gh 拥有通用 CLI/API/stack 调用合同，没有执行器。alibabacloud-find-skills 交付 curl/jq 消费绑定和完整资源，门禁不发起技能搜索、下载或安装。短信 Bash 工具及假 CLI 测试保留在技能目录；统一门禁调用测试、ShellCheck、三端官方技能验证器与完整成员检查，不新增真实云服务验证。完整工具身份与调用参考绑定见[绑定规则](#仓库登记维护)。当前交付状态与维护导航见 [README](../README.md#维护导航)。
 
 任务临时目录入口的源码为 [task-temp.ts](../scripts/task-temp.ts)，打包到 `delivery/tools/task-temp.mjs` 并随各产品工具安装。[调用合同](../delivery/policy/tool-contracts.md#task-temp)约束前台执行、收尾及只读扫描。仓库回归覆盖成功与失败清理、中断保留、Git 与归属保护、链接边界，以及扫描不改写历史内容。无模型加载检查另核对工作区、临时目录、合并后清理和收尾四条入口链接。缺任一链接时失败；它只证明入口存在且进入提示，不证明语义完整或模型按时执行。这些检查也不证明历史目录已经可回收。该入口不安装自动清理配置。
 
@@ -63,7 +63,7 @@ Node 和 Bun 的版本由 [package.json](../package.json) 指定。[tool-version
 
 本地工具、依赖锁、源码检查和安装回归继续维护。[原生工作流](../.github/workflows/check.yml)复用这些入口。真实运行、保护与审查配置按[实例与证据边界](review-gate.md#实例与证据边界)绑定，本地检查不发布 GitHub 准入结论。
 
-成员解析器计算当前清单的产品数量。门禁不依赖本文的历史阶段数量。gh-identity 的固定 provider 已退役。它的构建命令也已退役。`.cache/agents-build/` 只保留安装器产物。
+成员解析器计算当前清单的产品数量。`.cache/agents-build/` 只保留安装器产物。
 
 安装器的构建命令生成 `.cache/agents-build/install.mjs`。它还生成 Zod、js-yaml 许可证 `install-licenses.txt`。工具安装器从同一已核验归档提取 Node 的唯一顶层许可证。它写到 `.cache/agents-tools/licenses/node-LICENSE`。完整门禁绑定这些文件与固定 Node，作为安装运行副本的输入。V7 安装计划在状态根的 `agents/install/<run-id>/` 保存候选和恢复运行副本，仅绑定显式选择的产品。V5/V6 保留 Codex 私有目录的原路径。门禁在临时目录重建并比对，也在脱离依赖的位置运行 bundle。缺失或过期失败。
 
@@ -81,7 +81,7 @@ Node 和 Bun 的版本由 [package.json](../package.json) 指定。[tool-version
 
 Antigravity CLI 的官方校验入口是 `agy plugin validate --strict --json`，见[插件文档](https://antigravity.google/docs/plugins)。固定版本为 1.4.12，由工具准备入口下载到仓库私有缓存。三个支持平台的归档先对照官方安装脚本所指 release manifest 的 SHA-512 核对，再把 SHA-256 固定在工具清单；保留原有全清单核验日期。准备过程只提取二进制并查询版本，不运行官方安装脚本，不修改个人 CLI。校验时把所选技能复制到临时插件目录，以最小 `plugin.json` 调用真实加载器校验。解析 JSON 后核对实际技能数量，并拒绝 error、warning 或不完整覆盖。此临时包装仅用于校验，交付仍是普通 Skills 目录。
 
-三个产品的格式校验均进入统一门禁。Antigravity 回归使用官方二进制验证有效技能、缺失 frontmatter、名称不匹配与空选择。固定工具版本和实际二进制进入源码身份报告。官方插件校验不证明普通全局目录已被发现、模型会按需使用技能或外部服务操作可用。本片不运行个人安装、登录或模型请求；`/skills` 的真实全局发现仍需在获准安装后核对。
+三个产品的格式校验均进入统一门禁。Antigravity 回归使用官方二进制验证有效技能、缺失 frontmatter、名称不匹配与空选择。固定工具版本和实际二进制进入源码身份报告。官方插件校验不证明普通全局目录已被发现、模型会按需使用技能或外部服务操作可用；`/skills` 的真实全局发现仍需在获准安装后核对。
 
 各产品还分别检查完整发布引用。上游工具只校验其固定版本支持的技能格式，不证明完整客户端兼容性、加载或模型行为。新增产品字段时先核对上游支持范围。
 
@@ -139,7 +139,7 @@ bash scripts/check.sh all --report .cache/reports/check.json
 
 原生 [checks](../.github/workflows/check.yml) 监听发往 `main` 的 `pull_request` 和 `main` push。PR 事件包括 opened、synchronize、reopened、ready_for_review 和 edited。草稿及元数据编辑也执行两个平台，没有路径或 job 条件跳过。PR 检查本次平台 merge SHA；push 检查本次 push SHA。checkout 固定为 `github.sha`，Action 使用完整 commit pin，并关闭凭据持久化。
 
-两个结果名称为 `repository (ubuntu-latest)` 和 `repository (macos-latest)`。每个平台完整准备工具、冻结安装依赖、构建安装器，再执行 `all --report .cache/reports/check.json`。每个写入步骤设置 `umask 077`，Bash 使用失败退出和 pipefail。矩阵关闭 fail-fast，一个平台失败不会取消另一个。每 job 超时 30 分钟，首片没有缓存。日志记录实际 runner 系统、架构、checkout SHA 和 PR head/base。
+两个结果名称为 `repository (ubuntu-latest)` 和 `repository (macos-latest)`。每个平台完整准备工具、冻结安装依赖、构建安装器，再执行 `all --report .cache/reports/check.json`。每个写入步骤设置 `umask 077`，Bash 使用失败退出和 pipefail。矩阵关闭 fail-fast，一个平台失败不会取消另一个。每 job 超时 30 分钟，不启用缓存。日志记录实际 runner 系统、架构、checkout SHA 和 PR head/base。
 
 检查工作流只声明 `contents: read`，在 GitHub 托管 runner 执行，不使用 secrets。并发按 workflow、事件和 PR 编号或 ref 分组，新运行取消同组旧运行。main push 按 ref 检查最新状态，不保证被后续 push 替代的历史提交完成检查。被取消的运行保留 cancelled 结论，不计为通过。关闭 PR 不新建源码检查，在途任务可自然结束。取消、失败、超时和等待平台批准均不是成功。合并冲突与 fork 批准等待也不构成已验收结果。
 
@@ -157,17 +157,15 @@ Actions 日志与 job 结论提供托管结果。JSON 报告仅供诊断，不�
 
 | 清单 | 职责 |
 | --- | --- |
-| [inventory](../config/tool-inventory.txt) | 盘点本片已交付的 subject、领域和工具类别 |
+| [inventory](../config/tool-inventory.txt) | 盘点已交付的 subject、领域和工具类别 |
 | [owner 索引](../config/tool-contracts.txt) | 每个 subject 对应唯一手工契约或保留的固定执行器 |
 | [consumer bindings](../config/tool-bindings.txt) | 指明消费者通过读取、直接执行或 wrapper 使用哪个 owner |
 
 三份文件使用各自版本头及固定列数的 TAB 行。未知列、重复项、未知 subject、缺失 owner 均失败。空集合和不一致引用也失败。当前只登记 core，根检查器拒绝 `network/` 路径。网络能力尚未交付，未来接入须有领域验证器。
 
-gh-identity 曾登记三项执行边界。第一项是固定 provider。第二项是只读 inspector。第三项是启动模板。该 bot 路径已退役。相关 subject、契约与绑定已从三份清单移除。当前只保留其对 `gh` 的读取声明。
+绑定完整性覆盖已登记 subject 的可变生产消费者声明，独立预期清单核对当前消费者集合。脚本与可变工作流必须在首个执行语句之前声明约束（先读 owner，再用工具），检查器对声明与绑定做双向核对。已登记的 Markdown 消费文件从候选技能目录独立枚举全部 Markdown 及技能 `scripts/` 中已交付的 Bash、MJS、CJS 执行文件；测试替身不作为生产消费者。
 
-绑定完整性覆盖已登记 subject 的可变生产消费者声明。独立预期清单核对当前消费者集合。脚本与可变工作流必须在首个执行语句之前声明约束。注释列表要求先读 owner，再用工具。检查器对这些声明与绑定做双向核对。已登记的 Markdown 消费文件读取完整正文。声明位于段落或列表项中。检查器从候选技能目录独立枚举全部 Markdown，也枚举技能 `scripts/` 中已交付的 Bash、MJS、CJS 执行文件。测试替身不作为生产消费者。新增执行格式时由所属切片接入实际声明与完整性检查。
-
-声明约束维护及调用前的阅读。它不声称运行时执行了 Markdown。按摘要固定的执行器登记自有 subject 和完整执行能力；内部工具使用由对应摘要与测试覆盖。当前不再登记已删除的工作流或取消控制器。
+声明约束维护及调用前的阅读，不声称运行时执行了 Markdown。按摘要固定的执行器登记自有 subject 和完整执行能力，内部工具使用由对应摘要与测试覆盖。
 
 [gh 技能](../delivery/skills/gh/SKILL.md)拥有 `gh`、`github-api` 与 `gh-stack` 的通用调用合同。检查器自身的 gh 版本探针绑定到 gh 技能。
 
@@ -179,13 +177,13 @@ Markdown owner 使用独立正文段落中的 `Contract subject:` 标记。代�
 
 `read-before-use` 首次使用时，必须先链接 owner。链接位于同一正文段落或列表项中。之后再出现 `Use tool` 与 subject 的明确调用标记。代码块、引用块和 HTML 注释中的使用标记不算声明。非执行示例应在代码块、引用块或 HTML 注释内。不能用普通正文冒充声明。消费者就是 owner 时，定义和本段规则提供直接归属。`enforced-wrapper` 除头部声明外，还必须匹配已交付 wrapper 的执行行。只有注释、打印或示例中的路径无效。新增工作流时再按其实际调用维护相应回归。
 
-[检查器](../scripts/check-tool-contracts.ts)使用固定 markdownlint 的 token API。它检查本仓库的 owner、声明与路由。通用 Markdown 由库解析。实际消费者的独立预期来自验证测试。原 [R2 场景](../tests/scenarios/rules.md#归属与加载-fixture)保留迁移背景。它不再要求公共规则包含旧工作流路由句式。它也不读取个人 HOME。
+[检查器](../scripts/check-tool-contracts.ts)使用固定 markdownlint 的 token API 检查本仓库的 owner、声明与路由，通用 Markdown 由库解析，实际消费者的独立预期来自验证测试。[归属与加载场景](../tests/scenarios/rules.md#归属与加载-fixture)覆盖对应预期，不读取个人 HOME。
 
 结构检查不证明规则语义完整、没有冲突或模型会遵守指令。工具打包产物的新鲜度由构建闭包检查；直接维护的规则源由必需成员检查核对是否存在。语义遗漏仍由行为场景与审查识别。历史旧值保留在原记录中，不因与现值不同而失败。
 
 ## 提交入口
 
-[pre-commit](../.githooks/pre-commit) 只调用仓库固定 Node 与统一检查入口。运行前必须准备上述固定工具和冻结依赖。入口未自动启用，本片不写现有 `core.hooksPath`。
+[pre-commit](../.githooks/pre-commit) 只调用仓库固定 Node 与统一检查入口。运行前必须准备上述固定工具和冻结依赖；入口不自动改写现有 `core.hooksPath`。
 
 可选择 `docs` 的条件有四个：
 

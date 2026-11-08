@@ -10,23 +10,13 @@ CLI 从其专属技能根发现已安装技能。使用者通过 `/skills` 核�
 
 ## 直接使用与账号
 
-先核实际可执行文件、`--version` 和 `--help`。核对本次使用方式、认证类型、实际接收服务、计费账号及有效使用限制。不输出凭据。CLI 名称或模型别名不证明后端身份。
-
-`agy models` 也可能初始化日志、安装标识及语言服务，不按命令名称认定无副作用。遇到宿主写入拒绝时保留拒绝，核本次进程终态，再报告目录未核实；不改 HOME、账号或日志路径绕过。
-
-按[官方 FAQ](https://antigravity.google/docs/faq) 核支持范围。官方 headless 面向直接脚本和 CI；消费计划不支持第三方编码代理或应用嵌套调用 `agy`，也不支持自动轮换账号。安装、登录或持有订阅不证明任意使用方式均受支持。
-
-[认证方式](https://antigravity.google/docs/install?tab=cli)与本次实际 provider 一并核对。存在 API key 不单独证明已选用对应路线。登录、换账号、获取密钥、购买额度及持久配置由使用者决定。
+- 先核实际可执行文件、`--version`、`--help`、[认证方式](https://antigravity.google/docs/install?tab=cli)、实际接收服务、计费账号与有效使用限制（不输出凭据）。`agy models` 可能初始化日志、安装标识及语言服务；遇到宿主写入拒绝时保留拒绝并核进程终态，不改 `HOME`、账号或日志路径绕过。
+- 按[官方 FAQ](https://antigravity.google/docs/faq) 核支持范围：官方 `headless` 面向直接脚本和 CI，消费计划不支持第三方编码代理或应用嵌套调用 `agy`，也不支持自动轮换账号。登录、换账号、获取密钥、购买额度及持久配置由使用者决定。
 
 ## 工作区、材料与参数
 
-直接使用时绑定任务结果、实际工作区、候选、必要材料、允许操作和验收。发布、合并、部署和配置变更沿各自授权执行。
-
-核对[自动发现](https://antigravity.google/docs/customization-discovery/)的规则、技能、插件、hooks、MCP 和额外目录。自动加载的内容也属于材料。排除秘密和无关内容，保留可信 hooks、原有 deny 和宿主限制。
-
-按实际支持选择模型和 effort。[模型说明](https://antigravity.google/docs/models/)和 [effort 说明](https://antigravity.google/docs/cli/commands/effort/)提供核对入口。网页列举、另一个 CLI 的档位或 Codex 模型表不证明本次组合可用。配置、请求参数、返回标识和服务端执行事实分别报告。
-
-`--help` 接受某个 effort 值，不证明所选模型也支持该档位。核对完整模型 ID 的档位后缀与显式 `--effort` 是否一致；使用系列别名时核对实际解析结果。冲突或不支持时保留错误，不假定后缀或参数优先，也不自动降档、换系列或重复失败。
+- 绑定任务结果、实际工作区、候选、必要材料、允许操作和验收；核对[自动发现](https://antigravity.google/docs/customization-discovery/)的规则、技能、插件、hooks、MCP 和额外目录，排除秘密与无关内容，保留可信 hooks、原有 deny 和宿主限制。
+- 按[模型说明](https://antigravity.google/docs/models/)和 [effort 说明](https://antigravity.google/docs/cli/commands/effort/)核对所选模型与显式 `--effort`（及完整模型 ID 的档位后缀或系列别名解析结果）是否一致；冲突或不支持时保留错误，不自动降档或换系列。配置、请求参数、返回标识和服务端执行事实分别报告。
 
 ## 直接脚本与 CI
 

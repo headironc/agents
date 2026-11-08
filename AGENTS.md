@@ -13,11 +13,11 @@
 - For new structured checks and installation logic, use TypeScript with the pinned Node runtime.
 - Keep the tool-download bootstrap in Bash; keep delivered tool bundles reproducible.
 - Preserve pinned upstream Python validators and adopted skill tools instead of rewriting them for language uniformity.
-- Validate shared skills with both pinned official product validators, and product-specific skills with their corresponding validator. Keep complete entrypoint coverage and failures in the unified gate; follow [the skill validation contract](docs/tooling.md#技能格式校验).
+- Validate shared skills with all pinned official product validators, and product-specific skills with their corresponding validator. Keep complete entrypoint coverage and failures in the unified gate; follow [the skill validation contract](docs/tooling.md#技能格式校验).
 - Reuse suitable syntax, link, type, and product-skill validators; write local checks only for repository-specific ownership, target completeness, or permission boundaries.
 - Do not build general Markdown, YAML, TypeScript, or Git parsers.
 - Read [tool prerequisites and validation](docs/tooling.md); prepare tools with `bash scripts/install-tools.sh` and locked dependencies with `.cache/agents-tools/bin/bun install --frozen-lockfile --ignore-scripts`.
-- Run `umask 077` followed by `bash scripts/check.sh all` for final source or executable-configuration validation, including rule behavior changes.
+- Run `umask 077`, `.cache/agents-tools/bin/bun run build:install`, and `bash scripts/check.sh all` for final source or executable-configuration validation, including rule behavior changes.
 - Use `bash scripts/check.sh docs` for documentation-only changes.
 - Keep applicable [behavior scenarios](tests/scenarios/rules.md) in sync with current rules and tools.
 - For this repository's review and merge, follow [the project contract](docs/review-gate.md), including its [rebuild-period override](docs/review-gate.md#重建期交付规则) for agents main. That override does not apply to other repositories or targets. Local implementation does not authorize remote setup, approval writes, or protection changes.

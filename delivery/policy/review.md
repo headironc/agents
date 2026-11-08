@@ -31,7 +31,7 @@ Exempt a pure native Sketch design PR from cloud AI code and security review onl
 - Any removed files are limited to superseded non-executable design previews or ledgers and preserve files still consumed by active or unmigrated scripts or tests. The candidate changes no executable code, scripts, workflows, dependencies, or runtime configuration.
 - Applicable project checks and required local independent native Sketch design verification succeed, and no current-head cloud AI review run or unresolved finding is present.
 
-Apply this eligibility alongside dependency updates before provider selection, review requests, waiting, and recovery. Mixed diffs, unverified candidates, or explicit Human requests for cloud AI review follow the normal review path. Preserve all remaining checks, thread dispositions, approvals, platform protections, and "not required, not passed" reporting above.
+Apply this eligibility alongside [dependency updates](#dependency-updates) before provider selection, review requests, waiting, and recovery, preserving all remaining checks, dispositions, approvals, platform protections, and `not required, not passed` reporting defined there. Mixed diffs, unverified candidates, or explicit Human requests for cloud AI review follow the normal review path.
 
 ## Review provider selection
 

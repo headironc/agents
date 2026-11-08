@@ -152,65 +152,26 @@ Sketch's built-in MCP server (`http://localhost:31126/mcp`) runs inside the sing
 
 ## Companion Script Toolkit
 
-All scripts support `--help`, emit structured JSON output, and exit `0` on pass or non-`0` when blocking findings or errors occur.
-
-### 1. Native CoreText Measurement & Flex Stack Re-Baker
-
-- **Swift CLI**: [`scripts/measure-coretext.swift`](scripts/measure-coretext.swift)
-- **Python CLI & `.sketch` Re-Baker**: [`scripts/coretext_measure.py`](scripts/coretext_measure.py)
-
-Measure a batch of text specs directly:
+Resolve `scripts/` relative to this skill's installed directory. All scripts support `--help`, emit structured JSON output, and exit `0` on pass or non-`0` when blocking findings or errors occur:
 
 ```bash
-python3 delivery/skills/sketch-native/scripts/coretext_measure.py \
-  --input specs.json \
-  --output measured.json
-```
+# 1. Measure text specs or re-bake textBehaviour == 1 layers and Flex Stacks in a .sketch archive
+python3 scripts/coretext_measure.py --input specs.json --output measured.json
+python3 scripts/coretext_measure.py --sketch design.sketch --rebake --output coretext-report.json
 
-Audit all `textBehaviour == 1` text layers and auto-height `SymbolInstance` text overrides in a `.sketch` file and re-bake enclosing `MSImmutableFlexGroupLayout` containers and top-level Freeform `HotSpot` coordinates in place:
+# 2. Run the sub-second offline structural, font, Flex Stack, Focus Ring, and flow auditor
+python3 scripts/sketch_offline_audit.py --sketch design.sketch --output audit-report.json
 
-```bash
-python3 delivery/skills/sketch-native/scripts/coretext_measure.py \
-  --sketch design.sketch \
-  --rebake \
-  --output coretext-report.json
-```
-
-### 2. Sub-Second Offline Structural & Invariant Auditor
-
-- **Script**: [`scripts/sketch_offline_audit.py`](scripts/sketch_offline_audit.py)
-
-Audit ZIP integrity, `do_objectID` uniqueness, reference integrity (`symbolID`, `sharedStyleID`, `swatchID`, `MSImageData`, `overrideValues`), font hygiene (`0` `Noto*`, `0` hardcoded `SFPro*`, `0` `Type/Platform sample/*`, `CTFontRegularUsage` on status bar clocks), `MSImmutableFlexGroupLayout` closure, `2px` Focus Ring `clippingBehavior == 0` and bounds, and prototype `flow` graph rules (including `isFlowHome: true` or in-degree `0` start artboard `"back"` dead-button detection, `>= 44x44` hit targets, and Freeform `HotSpot` alignment):
-
-```bash
-python3 delivery/skills/sketch-native/scripts/sketch_offline_audit.py \
-  --sketch design.sketch \
-  --output audit-report.json
-```
-
-### 3. 5-Second Non-Activating Sketch MCP Roundtrip Verifier
-
-- **Script**: [`scripts/sketch_mcp_roundtrip.py`](scripts/sketch_mcp_roundtrip.py)
-
-Execute the 6-step non-activating roundtrip against a disposable `.sketch` copy while protecting the persistent anchor document:
-
-```bash
-python3 delivery/skills/sketch-native/scripts/sketch_mcp_roundtrip.py \
+# 3. Execute the non-activating Sketch MCP roundtrip against a disposable copy
+python3 scripts/sketch_mcp_roundtrip.py \
   --sketch "$TASK_TEMP_DIR/disposable-copy.sketch" \
   --anchor-id 00000000-0000-0000-0000-000000000001 \
   --edit-spec edit-spec.json \
   --screenshots-dir "$TASK_TEMP_DIR/roundtrip-screenshots" \
   --output "$TASK_TEMP_DIR/roundtrip-report.json"
-```
 
-### 4. Unsandboxed Batch Export & Manifest / PDF Font Verifier
-
-- **Script**: [`scripts/sketch_export_manifest.py`](scripts/sketch_export_manifest.py)
-
-Export `1x`/`2x` PNGs, lossless WebP files, and status-bar clock layer PDFs (verifying `.SFNS-Regular` `/Subtype /TrueType`), compute dimensions and SHA-256 digests, and synchronize or verify `manifest.json` / `renders.json`:
-
-```bash
-python3 delivery/skills/sketch-native/scripts/sketch_export_manifest.py \
+# 4. Batch-export 1x/2x PNGs, lossless WebP, and clock PDFs and synchronize manifest/renders
+python3 scripts/sketch_export_manifest.py \
   --sketch design.sketch \
   --output-dir exports/ \
   --manifest exports/manifest.json \

@@ -10,7 +10,6 @@ These requirements remain applicable when a consuming project has not enabled th
 - During iterative coding and refactoring, run fast incremental checks (`cargo check -p <package>` and targeted `cargo test -p <package> <test_name>`) to avoid workspace-wide feature-unification recompilation thrashing, reusing valid results while inputs remain unchanged.
 - Before publication or when dependency features change, build each workspace package's normal delivered library and binary targets per package and run per-package tests alongside the consuming project's required Clippy, rustdoc, and formatting checks (keeping exact commands, feature selections, warning policies, and toolchain versions in that project). Workspace-wide builds, `--all-targets`, or test builds do not substitute for per-package delivery builds because `dev-dependencies` or other workspace packages can implicitly enable features. Expand validation to affected consumers for shared changes, including delivered binaries and test fixture packages.
 - When a package directly uses a dependency feature, declare that feature in the consuming package's dependency specification. Do not rely on another workspace package to enable it.
-- Keep TLS and certificate cryptography providers ring-only: neither `aws-lc-rs` nor `aws-lc-sys` may enter the dependency graph. This provider restriction does not prohibit separate algorithm libraries such as `sha2` for non-TLS work.
 - Keep test fixtures, test-only embedded databases and other test tools out of application packages' normal and build dependency graphs. Applications consume fixture libraries through `dev-dependencies`; test-only fixture packages may use normal dependencies to implement those libraries. An embedded database used as production storage remains a normal application dependency.
 - Keep deployment and migration dependencies in the packages that own those operations. Check production dependency boundaries through the project's CI and preserve those gates when the scope changes.
 - Before database tests, read the project's database safety and verification requirements for isolation, migrations, runtime identity, fixture lifecycle and host requirements. Apply the [shared validation boundary](../AGENTS.md#checks).
@@ -79,11 +78,9 @@ Within a file, keep a type definition and its associated `impl` blocks together.
 - Reuse the matching standard-library, dependency, or owning SDK type before introducing an application newtype or retaining a primitive representation.
 - Let an SDK own its public value types and intrinsic validation; let the application own input sources, required settings, and deployment pairing rules.
 - Introduce a local newtype for a distinct application meaning or invariant not already represented by an available type, not for every string or number.
-- Name an entity's identifier type `Id` inside its module, as in `user::Id` and `role::Id`.
+- Name an entity's identifier type `Id` inside its owning module (distinguished by module qualification as in `user::Id` and `role::Id`, with variables and parameters named `user_id` or `role_id`); a shared macro may generate a separate `Id` newtype in each owning module.
 - Keep noninterchangeable business values distinct even when their representation is the same string or UUID type. Credentials and identifiers for different protocols or roles may share format validation without sharing a business type.
-- Use the owning module to distinguish otherwise ambiguous `Id` types, as in `user::Id` and `role::Id`. Name variables and parameters `user_id` or `role_id`.
-- A shared macro may generate a separate `Id` newtype in each owning module.
-- Express timeout units through a suitable existing type, such as `Duration` or an SDK unit type. Use a `Millisecond` newtype when the contract needs distinct millisecond semantics or additional invariants.
+- Express timeout and measurement units through a suitable existing type, such as `Duration` or an SDK unit type; introduce a unit-specific newtype only when the contract needs distinct unit semantics or additional invariants.
 
 ## Input and result models
 
@@ -97,7 +94,7 @@ Within a file, keep a type definition and its associated `impl` blocks together.
 ## Settings
 
 - Apply the [shared settings ownership and loading boundary](../AGENTS.md#code-preferences): group settings by consuming capability with private fields and validated constructors, let entrypoint-private Serde input structs own required fields, defaults (applied only when an input is absent, rejecting explicitly empty values), and unknown-field rejection, and convert inputs into domain settings through explicit constructors.
-- Name project-owned aggregate containers `Settings` (module/value `settings`), omit redundant enclosing-group field prefixes (as in `Link { origin, lifetime }`), and preserve official dependency names such as `config::Config`.
+- Name project-owned aggregate containers `Settings` (module/value `settings`), omit redundant enclosing-group field prefixes (as in `Endpoint { host, timeout }`), and preserve official dependency names such as `config::Config`.
 - Load production entrypoints directly from agreed sources using an existing crate; keep explicit input maps or environment injection as internal test entrypoints.
 
 ## Errors and validation
