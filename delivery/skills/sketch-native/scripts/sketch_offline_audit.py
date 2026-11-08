@@ -27,6 +27,8 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from sketch_text import encoded_attributes, font_attributes, index_shared_text_styles, resolve_text_style
+
 
 CLOCK_TEXT_RE = re.compile(r"^\d{1,2}:\d{2}$")
 STATUSBAR_CONTEXT_HINTS = (
@@ -872,9 +874,19 @@ def run_offline_audit(
     upstream_style_ids: Set[str] = set()
     upstream_layer_style_ids: Set[str] = set()
     upstream_text_style_ids: Set[str] = set()
-    shared_text_style_font_descs: Dict[str, Dict[str, Any]] = {}
+    shared_text_styles: Dict[str, Dict[str, Any]] = {}
     upstream_swatch_ids: Set[str] = set()
-    if source_sketch_path and source_sketch_path.exists() and zipfile.is_zipfile(source_sketch_path):
+    if source_sketch_path is not None and (
+        not source_sketch_path.is_file() or not zipfile.is_zipfile(source_sketch_path)
+    ):
+        findings.append(
+            _new_finding(
+                "archive_and_ids",
+                "SOURCE-ARCHIVE-UNAVAILABLE",
+                f"Requested source archive is unavailable or invalid: {source_sketch_path}",
+            )
+        )
+    elif source_sketch_path is not None:
         with zipfile.ZipFile(source_sketch_path, "r") as uzf:
             _validate_zip_archive_budget(uzf)
             up_dom_budget = _new_dom_budget()
@@ -895,14 +907,7 @@ def run_offline_audit(
                         sid_u = str(s["do_objectID"])
                         upstream_style_ids.add(sid_u)
                         upstream_text_style_ids.add(sid_u)
-                        u_f_desc = (
-                            ((s.get("value") or {}).get("textStyle") or {}).get(
-                                "encodedAttributes"
-                            )
-                            or {}
-                        ).get("MSAttributedStringFontAttribute")
-                        if isinstance(u_f_desc, dict):
-                            shared_text_style_font_descs[sid_u] = u_f_desc
+                shared_text_styles.update(index_shared_text_styles(udoc))
                 for sw in (udoc.get("sharedSwatches") or {}).get("objects") or []:
                     if sw.get("do_objectID"):
                         upstream_swatch_ids.add(str(sw["do_objectID"]))
@@ -923,6 +928,8 @@ def run_offline_audit(
 
                     _walk_up(upage)
 
+    shared_text_styles.update(index_shared_text_styles(doc_data))
+
     # 1. Collect shared objects from document.json
     shared_style_ids: Set[str] = set(upstream_style_ids)
     swatch_ids: Set[str] = set(upstream_swatch_ids)
@@ -941,7 +948,7 @@ def run_offline_audit(
         artboard_id: Optional[str] = None,
         layer_id: Optional[str] = None,
     ) -> None:
-        attrs = font_desc.get("attributes") or {}
+        attrs = font_attributes(font_desc)
         fname = str(attrs.get("name", "") or "")
         if fname.lower().startswith("noto"):
             noto_hits.append(
@@ -1041,13 +1048,11 @@ def run_offline_audit(
                     f"Forbidden sample shared style '{sname}' ({sid})",
                 )
             )
-        val = st.get("value") or {}
-        t_style = (val.get("textStyle") or {}).get("encodedAttributes") or {}
-        f_desc = t_style.get("MSAttributedStringFontAttribute")
-        if isinstance(f_desc, dict):
-            inspect_font_descriptor(f_desc, f"{label_prefix}:{sname}")
-            if sid and is_text_style:
-                shared_text_style_font_descs[str(sid)] = f_desc
+        attrs = encoded_attributes(st)
+        for key in ("MSAttributedStringFontAttribute", "fontDescriptor"):
+            desc = attrs.get(key)
+            if isinstance(desc, dict):
+                inspect_font_descriptor(desc, f"{label_prefix}:{sname}")
         collected_shared_styles.append((st, label_prefix))
 
     for style_group_key, is_txt in (
@@ -1484,107 +1489,48 @@ def run_offline_audit(
                 is_clock = _is_statusbar_clock_layer(
                     txt_content, lname, ancestor_names, cur_abs_y
                 )
-                inline_enc = (
-                    ((node.get("style") or {}).get("textStyle") or {}).get(
-                        "encodedAttributes"
-                    )
-                    or {}
+                # Hygiene examines stored descriptors, including values shadowed by a run.
+                attribute_sources = [encoded_attributes(node.get("style") or {})]
+                attribute_sources.extend(
+                    seg.get("attributes") or {}
+                    for seg in attr_str.get("attributes") or []
+                    if isinstance(seg, dict)
                 )
-                inline_f_desc = inline_enc.get("MSAttributedStringFontAttribute")
-                if isinstance(inline_f_desc, dict):
-                    inspect_font_descriptor(
-                        inline_f_desc, f"text.style:{lname}", page_id, aid, oid
-                    )
-                check_color_obj(
-                    inline_enc.get("MSAttributedStringColorAttribute"),
-                    page_id,
-                    aid,
-                    oid,
-                )
-                clock_checked_in_runs = False
-                for seg in attr_str.get("attributes") or []:
-                    if not isinstance(seg, dict):
-                        continue
-                    s_attrs = seg.get("attributes") or {}
-                    f_desc = s_attrs.get("MSAttributedStringFontAttribute")
-                    if isinstance(f_desc, dict):
-                        inspect_font_descriptor(
-                            f_desc, f"text:{lname}", page_id, aid, oid
-                        )
-                        if is_clock and CLOCK_TEXT_RE.match(txt_content):
-                            clock_checked_in_runs = True
-                            f_attrs = f_desc.get("attributes") or {}
-                            ui_usage = f_attrs.get("NSCTFontUIUsageAttribute")
-                            hard_name = f_attrs.get("name")
-                            clock_ok = (
-                                ui_usage == "CTFontRegularUsage" and not hard_name
-                            )
-                            clock_font_Checks.append(
-                                {
-                                    "layerID": oid,
-                                    "name": lname,
-                                    "text": txt_content,
-                                    "uiUsage": ui_usage,
-                                    "fontName": hard_name,
-                                    "valid": clock_ok,
-                                }
-                            )
-                            if not clock_ok:
-                                findings.append(
-                                    _new_finding(
-                                        "font_hygiene",
-                                        "CLOCK-MISSING-CTFONT-REGULAR-USAGE",
-                                        f"Status bar clock '{txt_content}' ({oid}) must use NSCTFontUIUsageAttribute='CTFontRegularUsage' without hardcoded font name",
-                                        page_id=page_id,
-                                        artboard_id=aid,
-                                        layer_id=oid,
-                                    )
-                                )
+                for attrs in attribute_sources:
+                    for key in ("MSAttributedStringFontAttribute", "fontDescriptor"):
+                        desc = attrs.get(key)
+                        if isinstance(desc, dict):
+                            inspect_font_descriptor(desc, f"text:{lname}", page_id, aid, oid)
                     check_color_obj(
-                        s_attrs.get("MSAttributedStringColorAttribute"),
-                        page_id,
-                        aid,
-                        oid,
+                        attrs.get("MSAttributedStringColorAttribute"), page_id, aid, oid
                     )
-                if (
-                    is_clock
-                    and CLOCK_TEXT_RE.match(txt_content)
-                    and not clock_checked_in_runs
-                ):
-                    eff_f_desc: Dict[str, Any] = {}
-                    if isinstance(inline_f_desc, dict):
-                        eff_f_desc = inline_f_desc
-                    elif node.get("sharedStyleID"):
-                        eff_f_desc = shared_text_style_font_descs.get(
-                            str(node.get("sharedStyleID", "")), {}
+                if is_clock:
+                    effective = resolve_text_style(node, shared_text_styles)
+                    for font in [effective, *effective.get("runs", [])]:
+                        ui_usage = font.get("uiUsage")
+                        hard_name = font.get("fontName")
+                        clock_ok = ui_usage == "CTFontRegularUsage" and not hard_name
+                        clock_font_Checks.append(
+                            {
+                                "layerID": oid,
+                                "name": lname,
+                                "text": txt_content,
+                                "uiUsage": ui_usage,
+                                "fontName": hard_name,
+                                "valid": clock_ok,
+                            }
                         )
-                    f_attrs = eff_f_desc.get("attributes") or {}
-                    ui_usage = f_attrs.get("NSCTFontUIUsageAttribute")
-                    hard_name = f_attrs.get("name")
-                    clock_ok = (
-                        ui_usage == "CTFontRegularUsage" and not hard_name
-                    )
-                    clock_font_Checks.append(
-                        {
-                            "layerID": oid,
-                            "name": lname,
-                            "text": txt_content,
-                            "uiUsage": ui_usage,
-                            "fontName": hard_name,
-                            "valid": clock_ok,
-                        }
-                    )
-                    if not clock_ok:
-                        findings.append(
-                            _new_finding(
-                                "font_hygiene",
-                                "CLOCK-MISSING-CTFONT-REGULAR-USAGE",
-                                f"Status bar clock '{txt_content}' ({oid}) must use NSCTFontUIUsageAttribute='CTFontRegularUsage' without hardcoded font name",
-                                page_id=page_id,
-                                artboard_id=aid,
-                                layer_id=oid,
+                        if not clock_ok:
+                            findings.append(
+                                _new_finding(
+                                    "font_hygiene",
+                                    "CLOCK-MISSING-CTFONT-REGULAR-USAGE",
+                                    f"Status bar clock '{txt_content}' ({oid}) must use NSCTFontUIUsageAttribute='CTFontRegularUsage' without hardcoded font name",
+                                    page_id=page_id,
+                                    artboard_id=aid,
+                                    layer_id=oid,
+                                )
                             )
-                        )
 
             # Flex Stack closure check
             if (node.get("groupLayout") or {}).get(
@@ -1758,6 +1704,10 @@ def run_offline_audit(
                             ch_id = str(ch.get("do_objectID", ""))
                             ch_name = str(ch.get("name", ""))
                             rel_path = f"{prefix}/{ch_id}" if prefix else ch_id
+                            sub_sid = ""
+                            if ch.get("_class") == "symbolInstance":
+                                sub_sid = cur_swap_map.get(rel_path, str(ch.get("symbolID", "")))
+                                ch_vis = ch_vis and bool(sub_sid) and sub_sid.lower() != "none"
                             ch_flow = ch.get("flow")
                             eff_dest = ""
                             maintains = False
@@ -1820,9 +1770,6 @@ def run_offline_audit(
                                         }
                                     )
                             if ch.get("_class") == "symbolInstance":
-                                sub_sid = cur_swap_map.get(
-                                    rel_path, str(ch.get("symbolID", ""))
-                                )
                                 if (
                                     sub_sid
                                     and sub_sid.lower() != "none"
@@ -2061,7 +2008,15 @@ def run_offline_audit(
             )
 
     # Optional manifest check
-    if manifest_path and manifest_path.exists():
+    if manifest_path is not None and not manifest_path.is_file():
+        findings.append(
+            _new_finding(
+                "archive_and_ids",
+                "MANIFEST-UNAVAILABLE",
+                f"Requested manifest is not a readable file: {manifest_path}",
+            )
+        )
+    elif manifest_path is not None:
         manifest_obj = json.loads(manifest_path.read_text(encoding="utf-8"))
         expected_artboards = manifest_obj.get("artboards") or []
         for exp in expected_artboards:

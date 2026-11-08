@@ -27,6 +27,14 @@ Activate this skill whenever a task involves any of the following:
 
 ## Architecture and Concurrency Model
 
+The measurement and font-audit commands share [text-style resolution](scripts/sketch_text.py). This module owns local and imported text-style indexing, supported descriptor forms, and inheritance from shared styles through inline attributes, attributed runs, and explicit style overrides. Font hygiene inspects stored descriptors even when another value overrides them. Clock validation consumes the resolved font used by measurement.
+
+The CoreText wrapper owns the measurement workload budget. It checks expanded text and rich-text work before constructing per-instance runs, then bounds JSON storage before serialization or native execution. A batch allows at most 8,192 specs, 131,072 UTF-16 text units, 16,384 runs, 8,388,608 text-unit/run comparisons, and a conservative 16 MiB JSON-size estimate. Swift independently checks its input and limits the batch to 32,768 generated lines, including empty paragraphs and wrapped lines. These independent bounds limit line records, rich-text comparisons, and memory even when many instances share one small master. Over-budget inputs fail before archive writeback; deduplication does not waive the budget. Native results must cover every unique measurement exactly once. Swift omits line details by default; pass `--include-lines` directly to the Swift helper when bounded per-line diagnostics are needed.
+
+Offline re-baking computes a layout candidate. Native save/readback and the offline archive comparison establish whether that candidate has zero unexpected drift. Offline tests use synthetic archives and simulated MCP/export services; they do not establish fidelity for an arbitrary live Sketch document.
+
+Layout simulation and writeback share the Freeform overlap-band calculation. Writeback applies all measured target heights against one geometry snapshot, reflows affected groups from children to parents once, and synchronizes HotSpots against the final geometry. Explicit audit baselines (`--manifest` and `--source-sketch`) must be available; a missing baseline blocks acceptance.
+
 Separate all `.sketch` work into two strictly decoupled execution tiers:
 
 ### Tier 1: Offline High-Concurrency Pipeline (Multi-Agent Parallel)

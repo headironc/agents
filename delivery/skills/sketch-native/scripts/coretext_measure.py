@@ -24,11 +24,71 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from sketch_text import (
+    index_shared_text_styles as _index_shared_text_styles,
+    resolve_text_style,
+)
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SWIFT_SOURCE = SCRIPT_DIR / "measure-coretext.swift"
 MAX_MEASURE_SPECS = 8192
 MAX_SYMBOL_EXPANSION_STEPS = 50000
+# A one-unit line can produce one result record. Bound total result cardinality,
+# rich-text line/run comparisons, and JSON storage independently of DOM size.
+MAX_MEASURE_TEXT_UNITS = 128 * 1024
+MAX_MEASURE_RUNS = 16384
+MAX_MEASURE_STYLE_WORK = 8 * 1024 * 1024
+MAX_MEASURE_JSON_BYTES = 16 * 1024 * 1024
+MAX_MEASURE_LINES = 32768
+
+
+class MeasurementBudget:
+    def __init__(self) -> None:
+        self.specs = 0
+        self.text_units = 0
+        self.runs = 0
+        self.style_work = 0
+        self.json_bytes = 0
+        self.minimum_lines = 0
+
+    def reserve(self, text: str, run_count: int) -> None:
+        # Check before encoding or constructing per-instance rich-text runs.
+        if len(text) > MAX_MEASURE_TEXT_UNITS:
+            raise RuntimeError("CoreText measurement text exceeds UTF-16 unit budget")
+        units = len(text.encode("utf-16-le")) // 2
+        self.specs += 1
+        self.text_units += units
+        self.runs += run_count
+        self.minimum_lines += text.count("\n") + 1
+        self.style_work += max(1, units) * max(1, run_count)
+        if self.specs > MAX_MEASURE_SPECS:
+            raise RuntimeError("CoreText measurement spec count exceeds limit")
+        if self.text_units > MAX_MEASURE_TEXT_UNITS:
+            raise RuntimeError("CoreText measurement text exceeds UTF-16 unit budget")
+        if self.runs > MAX_MEASURE_RUNS:
+            raise RuntimeError("CoreText measurement rich-text run count exceeds limit")
+        if self.minimum_lines > MAX_MEASURE_LINES:
+            raise RuntimeError("CoreText measurement line count exceeds limit")
+        if self.style_work > MAX_MEASURE_STYLE_WORK:
+            raise RuntimeError("CoreText measurement line/run workload exceeds limit")
+
+    def reserve_json(self, spec: Dict[str, Any]) -> None:
+        # A JSON character needs at most six escaped bytes. Account for repeated
+        # references each time they will be serialized; never use identity dedup.
+        pending: List[Any] = [spec]
+        while pending:
+            value = pending.pop()
+            self.json_bytes += 64
+            if isinstance(value, str):
+                self.json_bytes += 6 * len(value)
+            elif isinstance(value, dict):
+                pending.extend(value.keys())
+                pending.extend(value.values())
+            elif isinstance(value, list):
+                pending.extend(value)
+            if self.json_bytes > MAX_MEASURE_JSON_BYTES:
+                raise RuntimeError("CoreText measurement JSON payload exceeds byte budget")
 
 
 def _charge_expansion_step(
@@ -275,7 +335,10 @@ def measure_specs(
     unique_items: List[Dict[str, Any]] = []
     key_to_canon_id: Dict[str, str] = {}
     item_id_to_canon_id: List[Tuple[str, str]] = []
+    budget = MeasurementBudget()
     for idx, spec in enumerate(items):
+        budget.reserve(str(spec.get("text", "")), len(spec.get("runs") or []))
+        budget.reserve_json(spec)
         spec_id = str(spec.get("id", f"item-{idx}"))
         dedup_payload = {
             "text": spec.get("text", ""),
@@ -326,6 +389,13 @@ def measure_specs(
         for res in parsed["results"]
         if isinstance(res, dict)
     }
+    expected_ids = {str(item["id"]) for item in unique_items}
+    if (
+        set(canon_by_id) != expected_ids
+        or len(parsed["results"]) != len(expected_ids)
+        or parsed.get("count") != len(expected_ids)
+    ):
+        raise RuntimeError("Native macOS CoreText returned incomplete or duplicate measurements.")
     expanded_results: List[Dict[str, Any]] = []
     for spec_id, canon_id in item_id_to_canon_id:
         canon_res = canon_by_id.get(canon_id)
@@ -338,196 +408,35 @@ def measure_specs(
     return parsed
 
 
-def _extract_style_encoded_attrs(style_container: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract encodedAttributes dict from a sharedStyle, style, or textStyle dict."""
-    if not isinstance(style_container, dict):
-        return {}
-    val = style_container.get("value")
-    if isinstance(val, dict):
-        ts = val.get("textStyle")
-        if isinstance(ts, dict) and isinstance(ts.get("encodedAttributes"), dict):
-            return ts["encodedAttributes"]
-        if isinstance(val.get("encodedAttributes"), dict):
-            return val["encodedAttributes"]
-        attr_str = val.get("attributedString")
-        if isinstance(attr_str, dict) and isinstance(attr_str.get("attributes"), list) and attr_str["attributes"]:
-            first = attr_str["attributes"][0]
-            if isinstance(first, dict) and isinstance(first.get("attributes"), dict):
-                return first["attributes"]
-    ts = style_container.get("textStyle")
-    if isinstance(ts, dict) and isinstance(ts.get("encodedAttributes"), dict):
-        return ts["encodedAttributes"]
-    if isinstance(style_container.get("encodedAttributes"), dict):
-        return style_container["encodedAttributes"]
-    return {}
-
-
-def _index_shared_text_styles(
-    doc_data: Optional[Dict[str, Any]],
-) -> Dict[str, Dict[str, Any]]:
-    styles: Dict[str, Dict[str, Any]] = {}
-    if not isinstance(doc_data, dict):
-        return styles
-    for obj in (doc_data.get("layerTextStyles") or {}).get("objects") or []:
-        if isinstance(obj, dict) and obj.get("do_objectID"):
-            styles[str(obj["do_objectID"])] = _extract_style_encoded_attrs(obj)
-    for fts in doc_data.get("foreignTextStyles") or []:
-        if not isinstance(fts, dict):
-            continue
-        local_ss = fts.get("localSharedStyle")
-        if isinstance(local_ss, dict) and local_ss.get("do_objectID"):
-            styles[str(local_ss["do_objectID"])] = _extract_style_encoded_attrs(local_ss)
-        if fts.get("do_objectID") and str(fts["do_objectID"]) not in styles:
-            styles[str(fts["do_objectID"])] = _extract_style_encoded_attrs(
-                local_ss if isinstance(local_ss, dict) else fts
-            )
-    return styles
-
-
-def _extract_font_and_para_from_attrs(
-    attr_dict: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[float]]:
-    if not isinstance(attr_dict, dict):
-        return {}, {}, None
-    raw_font = (
-        attr_dict.get("MSAttributedStringFontAttribute")
-        or attr_dict.get("fontDescriptor")
-        or {}
-    )
-    if isinstance(raw_font, dict) and isinstance(raw_font.get("attributes"), dict):
-        f_desc = dict(raw_font["attributes"])
-    elif isinstance(raw_font, dict):
-        f_desc = dict(raw_font)
-    else:
-        f_desc = {}
-    p_style = (
-        dict(attr_dict["paragraphStyle"])
-        if isinstance(attr_dict.get("paragraphStyle"), dict)
-        else {}
-    )
-    kern = (
-        float(attr_dict["kerning"])
-        if attr_dict.get("kerning") is not None
-        else None
-    )
-    return f_desc, p_style, kern
-
-
 def _extract_text_layer_spec(
     layer: Dict[str, Any],
     shared_text_styles: Optional[Dict[str, Dict[str, Any]]] = None,
     override_style_id: Optional[str] = None,
+    text_override: Optional[str] = None,
+    budget: Optional[MeasurementBudget] = None,
 ) -> Optional[Dict[str, Any]]:
-    if layer.get("_class") != "text":
-        return None
-    if int(layer.get("textBehaviour", 0)) != 1:
+    if layer.get("_class") != "text" or int(layer.get("textBehaviour", 0)) != 1:
         return None
     frame = layer.get("frame") or {}
     width = float(frame.get("width", 0.0))
     if width <= 0:
         return None
-
     attr_str = layer.get("attributedString") or {}
-    text = str(attr_str.get("string", ""))
-    attrs_list = attr_str.get("attributes") or []
-    first_attr = (attrs_list[0].get("attributes") if attrs_list else {}) or {}
-
-    style_encoded = _extract_style_encoded_attrs(layer.get("style") or {})
-    shared_sid = str(layer.get("sharedStyleID", "") or "")
-    shared_encoded = (
-        (shared_text_styles or {}).get(shared_sid, {}) if shared_sid else {}
-    )
-    override_encoded = (
-        (shared_text_styles or {}).get(str(override_style_id), {})
-        if override_style_id
-        else {}
-    )
-
-    font_desc: Dict[str, Any] = {}
-    para_style: Dict[str, Any] = {}
-    kerning_val: float = 0.0
-    # Priority: sharedStyle default -> inline layer.style -> attributedString[0] -> override_style_id
-    for candidate_attrs in (shared_encoded, style_encoded, first_attr, override_encoded):
-        if not candidate_attrs:
-            continue
-        fd, ps, kn = _extract_font_and_para_from_attrs(candidate_attrs)
-        if fd:
-            if fd.get("name") and not fd.get("NSCTFontUIUsageAttribute"):
-                font_desc.pop("NSCTFontUIUsageAttribute", None)
-            elif fd.get("NSCTFontUIUsageAttribute") and not fd.get("name"):
-                font_desc.pop("name", None)
-            font_desc.update({k: v for k, v in fd.items() if v is not None})
-        if ps:
-            para_style.update({k: v for k, v in ps.items() if v is not None})
-        if kn is not None:
-            kerning_val = kn
-
-    font_name = font_desc.get("name")
-    ui_usage = font_desc.get("NSCTFontUIUsageAttribute")
-    font_size = float(font_desc.get("size", 14.0))
-    line_height = para_style.get("maximumLineHeight") or para_style.get(
-        "minimumLineHeight"
-    )
-    para_spacing = float(para_style.get("paragraphSpacing", 0.0) or 0.0)
-    kerning = kerning_val
-
-    runs: List[Dict[str, Any]] = []
-    if not override_encoded:
-        for attr_entry in attrs_list:
-            if not isinstance(attr_entry, dict):
-                continue
-            loc = int(attr_entry.get("location", 0) or 0)
-            length = int(attr_entry.get("length", 0) or 0)
-            if length <= 0:
-                continue
-            sub_attrs = attr_entry.get("attributes") or {}
-            sub_font, sub_para, sub_kern = _extract_font_and_para_from_attrs(sub_attrs)
-            sub_lh = sub_para.get("maximumLineHeight") or sub_para.get(
-                "minimumLineHeight"
-            )
-            sub_has_name = bool(sub_font.get("name"))
-            sub_has_usage = bool(sub_font.get("NSCTFontUIUsageAttribute"))
-            if sub_has_name or sub_has_usage:
-                run_font_name = sub_font.get("name")
-                run_ui_usage = sub_font.get("NSCTFontUIUsageAttribute")
-            else:
-                run_font_name = font_name
-                run_ui_usage = ui_usage
-            runs.append(
-                {
-                    "location": loc,
-                    "length": length,
-                    "fontName": run_font_name,
-                    "uiUsage": run_ui_usage,
-                    "fontSize": float(sub_font.get("size", font_size)),
-                    "lineHeight": (
-                        float(sub_lh)
-                        if sub_lh is not None
-                        else (float(line_height) if line_height is not None else None)
-                    ),
-                    "paragraphSpacing": float(
-                        sub_para.get("paragraphSpacing", para_spacing) or 0.0
-                    ),
-                    "kerning": float(sub_kern if sub_kern is not None else kerning),
-                }
-            )
-
-    spec_out: Dict[str, Any] = {
+    text = str(attr_str.get("string", "")) if text_override is None else text_override
+    include_runs = text_override is None and not override_style_id
+    if budget is not None:
+        budget.reserve(text, len(attr_str.get("attributes") or []) if include_runs else 0)
+    spec = {
         "id": str(layer.get("do_objectID", "")),
         "name": str(layer.get("name", "")),
         "text": text,
-        "fontName": font_name,
-        "uiUsage": ui_usage,
-        "fontSize": font_size,
-        "lineHeight": float(line_height) if line_height is not None else None,
         "width": width,
-        "paragraphSpacing": para_spacing,
-        "kerning": kerning,
         "currentHeight": float(frame.get("height", 0.0)),
+        **resolve_text_style(layer, shared_text_styles, override_style_id, include_runs),
     }
-    if runs:
-        spec_out["runs"] = runs
-    return spec_out
+    if budget is not None:
+        budget.reserve_json(spec)
+    return spec
 
 
 def _index_symbol_masters(
@@ -870,22 +779,7 @@ def _simulate_master_tree_height(
                 ch_y = float((ch.get("frame") or {}).get("y", 0.0))
                 c_old, c_sim = eval_node(ch, prefix, visited, is_root=False)
                 iv.append((ch_y, c_old, c_sim))
-            sorted_iv = sorted(iv, key=lambda t: (t[0], -(t[0] + t[1])))
-            bands: List[List[Tuple[float, float, float]]] = []
-            for y0, old_h, new_h in sorted_iv:
-                if not bands:
-                    bands.append([(y0, old_h, new_h)])
-                    continue
-                prev_old_bottom = max(py + p_old for py, p_old, _ in bands[-1])
-                if y0 < prev_old_bottom - 0.5:
-                    bands[-1].append((y0, old_h, new_h))
-                else:
-                    bands.append([(y0, old_h, new_h)])
-            delta_free = 0.0
-            for band in bands:
-                old_b = max(py + p_old for py, p_old, _ in band)
-                new_b = max(py + p_new for py, _, p_new in band)
-                delta_free += new_b - old_b
+            _, delta_free = _freeform_offsets(iv)
             return node_h, node_h + delta_free
 
         return node_h, node_h
@@ -1100,65 +994,54 @@ def _reflow_vertical_flex_group(group: Dict[str, Any]) -> float:
     return 0.0
 
 
-def _reflow_freeform_group_for_child(
-    group: Dict[str, Any],
-    target_child: Dict[str, Any],
-    old_child_h: float,
-    new_child_h: float,
-) -> Tuple[float, float]:
-    """Update a non-Flex group's child vertical coordinates and bounding height to match _simulate_master_tree_height."""
-    g_frame = group.get("frame")
-    if not isinstance(g_frame, dict):
-        return 0.0, 0.0
-    old_group_h = float(g_frame.get("height", 0.0))
-    if abs(new_child_h - old_child_h) <= 0.01:
-        return old_group_h, old_group_h
+def _freeform_offsets(
+    intervals: List[Tuple[float, float, float]],
+) -> Tuple[List[float], float]:
+    """Compute shifts from original overlap bands, independent of edit order."""
+    bands: List[List[int]] = []
+    band_bottom = float("-inf")
+    for idx in sorted(range(len(intervals)), key=lambda i: (intervals[i][0], -(intervals[i][0] + intervals[i][1]))):
+        y, old_height, _ = intervals[idx]
+        if bands and y < band_bottom - 0.5:
+            bands[-1].append(idx)
+            band_bottom = max(band_bottom, y + old_height)
+        else:
+            bands.append([idx])
+            band_bottom = y + old_height
+    shifts = [0.0] * len(intervals)
+    delta = 0.0
+    for band in bands:
+        for idx in band:
+            shifts[idx] = delta
+        old_bottom = max(intervals[i][0] + intervals[i][1] for i in band)
+        new_bottom = max(intervals[i][0] + intervals[i][2] for i in band)
+        delta += new_bottom - old_bottom
+    return shifts, delta
 
-    flow_children = [
-        ch
-        for ch in (group.get("layers") or [])
+
+def _reflow_freeform_group(
+    group: Dict[str, Any],
+    original_frames: Dict[int, Dict[str, Any]],
+) -> None:
+    children = [
+        ch for ch in group.get("layers") or []
         if isinstance(ch, dict) and _participates_in_flex_flow(ch)
     ]
-    if not flow_children:
-        return old_group_h, old_group_h
-
-    iv: List[Tuple[Dict[str, Any], float, float, float]] = []
-    for ch in flow_children:
-        cf = ch.get("frame") or {}
-        cy = float(cf.get("y", 0.0))
-        if ch is target_child:
-            iv.append((ch, cy, old_child_h, new_child_h))
-        else:
-            ch_h = float(cf.get("height", 0.0))
-            iv.append((ch, cy, ch_h, ch_h))
-
-    sorted_iv = sorted(iv, key=lambda t: (t[1], -(t[1] + t[2])))
-    bands: List[List[Tuple[Dict[str, Any], float, float, float]]] = []
-    for item in sorted_iv:
-        _, y0, old_h, _ = item
-        if not bands:
-            bands.append([item])
-            continue
-        prev_old_bottom = max(py + p_old for _, py, p_old, _ in bands[-1])
-        if y0 < prev_old_bottom - 0.5:
-            bands[-1].append(item)
-        else:
-            bands.append([item])
-
-    accum_shift = 0.0
-    for band in bands:
-        if abs(accum_shift) > 0.01:
-            for ch, _, _, _ in band:
-                cf = ch.get("frame")
-                if isinstance(cf, dict):
-                    cf["y"] = round(float(cf.get("y", 0.0)) + accum_shift, 2)
-        old_b = max(py + p_old for _, py, p_old, _ in band)
-        new_b = max(py + p_new for _, py, _, p_new in band)
-        accum_shift += new_b - old_b
-
-    new_group_h = round(max(1.0, old_group_h + accum_shift), 2)
-    g_frame["height"] = new_group_h
-    return old_group_h, new_group_h
+    intervals = [
+        (
+            float(original_frames[id(ch)].get("y", 0.0)),
+            float(original_frames[id(ch)].get("height", 0.0)),
+            float((ch.get("frame") or {}).get("height", 0.0)),
+        )
+        for ch in children
+    ]
+    shifts, delta = _freeform_offsets(intervals)
+    for child, (y, _, _), shift in zip(children, intervals, shifts):
+        if isinstance(child.get("frame"), dict):
+            child["frame"]["y"] = round(y + shift, 2)
+    frame = group.get("frame")
+    if isinstance(frame, dict):
+        frame["height"] = round(max(1.0, float(original_frames[id(group)].get("height", 0.0)) + delta), 2)
 
 
 def _collect_artboard_rects(
@@ -1484,6 +1367,7 @@ def _audit_and_rebake_members(
     measure_queue: List[Dict[str, Any]] = []
     targets_meta: List[Dict[str, Any]] = []
     expansion_budget: Dict[str, int] = {"steps": 0}
+    measurement_budget = MeasurementBudget()
 
     def scan_node(
         page_file: str,
@@ -1496,7 +1380,7 @@ def _audit_and_rebake_members(
             if node.get("_class") in ("artboard", "symbolMaster")
             else artboard
         )
-        spec = _extract_text_layer_spec(node, shared_text_styles)
+        spec = _extract_text_layer_spec(node, shared_text_styles, budget=measurement_budget)
         if spec is not None:
             if len(measure_queue) >= MAX_MEASURE_SPECS:
                 raise RuntimeError(
@@ -1573,6 +1457,8 @@ def _audit_and_rebake_members(
                         master_text,
                         shared_text_styles,
                         override_style_id=ov_info.get("textStyleID"),
+                        text_override=ov_info.get("stringValue"),
+                        budget=measurement_budget,
                     )
                     if m_spec is None:
                         continue
@@ -1586,6 +1472,9 @@ def _audit_and_rebake_members(
                         - eff_text_w_in_master
                     )
                     ov_name = str(ov_info["primaryOverrideName"])
+                    measurement_budget.reserve_json(
+                        {"instanceID": str(node.get("do_objectID", "")), "overrideName": ov_name}
+                    )
                     ov_id = f"{node.get('do_objectID')}::{ov_name}"
                     ov_spec = dict(m_spec)
                     if "stringValue" in ov_info or "textStyleID" in ov_info:
@@ -1770,87 +1659,81 @@ def _audit_and_rebake_members(
             drifts.append(drift_record)
             pending_rebakes.append((meta, drift_record, expected_h))
 
-    # Phase 2: Apply rebake mutations after all heights have been simulated
+    # Phase 2: Apply one plan against the same original geometry used by simulation.
     if rebake:
-        for meta, drift_record, expected_h in pending_rebakes:
-            node = meta["node"]
-            frame = node.get("frame") or {}
-            old_node_h = float(frame.get("height", 0.0))
+        groups: Dict[int, Tuple[int, Dict[str, Any]]] = {}
+        artboards: Dict[int, Tuple[Dict[str, Any], Dict[str, Tuple[float, float, float, float]]]] = {}
+        original_frames: Dict[int, Dict[str, Any]] = {}
+        for meta, _, _ in pending_rebakes:
             artboard = meta["artboard"]
-            before_rects = (
-                _collect_artboard_rects(artboard) if artboard is not None else {}
-            )
-            frame["height"] = expected_h
-            cur_child = node
-            cur_old_h = old_node_h
-            cur_new_h = expected_h
-            for anc in reversed(meta["ancestors"]):
-                anc_layout = anc.get("groupLayout") or {}
-                if anc_layout.get("_class") == "MSImmutableFlexGroupLayout":
-                    anc_frame = anc.get("frame") or {}
-                    old_anc_h = float(anc_frame.get("height", 0.0))
-                    _reflow_vertical_flex_group(anc)
-                    new_anc_h = float(anc_frame.get("height", old_anc_h))
-                    cur_child = anc
-                    cur_old_h = old_anc_h
-                    cur_new_h = new_anc_h
-                elif anc.get("_class") == "group":
-                    old_anc_h, new_anc_h = _reflow_freeform_group_for_child(
-                        anc, cur_child, cur_old_h, cur_new_h
-                    )
-                    cur_child = anc
-                    cur_old_h = old_anc_h
-                    cur_new_h = new_anc_h
-            if artboard is not None:
-                after_rects = _collect_artboard_rects(artboard)
-                for top_child in artboard.get("layers") or []:
-                    if (
-                        isinstance(top_child, dict)
-                        and top_child.get("_class") == "MSImmutableHotspotLayer"
-                    ):
-                        hs_frame = top_child.get("frame") or {}
-                        hx = float(hs_frame.get("x", 0.0))
-                        hy = float(hs_frame.get("y", 0.0))
-                        hw = float(hs_frame.get("width", 0.0))
-                        hh = float(hs_frame.get("height", 0.0))
-                        explicit_tid = str(
-                            top_child.get("targetLayerID")
-                            or top_child.get("boundLayerID")
-                            or ""
-                        ).strip()
-                        if explicit_tid:
-                            if explicit_tid in before_rects:
-                                bx, by, bw, bh = before_rects[explicit_tid]
+            if artboard is not None and id(artboard) not in artboards:
+                artboards[id(artboard)] = (artboard, _collect_artboard_rects(artboard))
+            for depth, ancestor in enumerate(meta["ancestors"]):
+                if (
+                    (ancestor.get("groupLayout") or {}).get("_class") == "MSImmutableFlexGroupLayout"
+                    or ancestor.get("_class") in ("group", "symbolMaster")
+                ):
+                    groups[id(ancestor)] = (depth, ancestor)
+        for _, group in groups.values():
+            for node in [group, *(group.get("layers") or [])]:
+                if isinstance(node, dict):
+                    original_frames[id(node)] = dict(node.get("frame") or {})
+        for meta, drift_record, expected_h in pending_rebakes:
+            meta["node"].setdefault("frame", {})["height"] = expected_h
+            dirty_pages.add(meta["pageFile"])
+            rebaked_layers.append(drift_record)
+        for _, group in sorted(groups.values(), key=lambda entry: entry[0], reverse=True):
+            if (group.get("groupLayout") or {}).get("_class") == "MSImmutableFlexGroupLayout":
+                _reflow_vertical_flex_group(group)
+            else:
+                _reflow_freeform_group(group, original_frames)
+        for artboard, before_rects in artboards.values():
+            after_rects = _collect_artboard_rects(artboard)
+            for top_child in artboard.get("layers") or []:
+                if (
+                    isinstance(top_child, dict)
+                    and top_child.get("_class") == "MSImmutableHotspotLayer"
+                ):
+                    hs_frame = top_child.get("frame") or {}
+                    hx = float(hs_frame.get("x", 0.0))
+                    hy = float(hs_frame.get("y", 0.0))
+                    hw = float(hs_frame.get("width", 0.0))
+                    hh = float(hs_frame.get("height", 0.0))
+                    explicit_tid = str(
+                        top_child.get("targetLayerID")
+                        or top_child.get("boundLayerID")
+                        or ""
+                    ).strip()
+                    if explicit_tid:
+                        if explicit_tid in before_rects:
+                            bx, by, bw, bh = before_rects[explicit_tid]
+                            ax, ay, aw, ah = after_rects.get(
+                                explicit_tid, (bx, by, bw, bh)
+                            )
+                            hs_frame["x"] = round(ax + (hx - bx), 2)
+                            hs_frame["y"] = round(ay + (hy - by), 2)
+                            hs_frame["width"] = round(aw + (hw - bw), 2)
+                            hs_frame["height"] = round(ah + (hh - bh), 2)
+                    else:
+                        for oid, (bx, by, bw, bh) in reversed(
+                            list(before_rects.items())
+                        ):
+                            if oid == top_child.get("do_objectID"):
+                                continue
+                            if (
+                                abs(hx - bx) <= 2.0
+                                and abs(hy - by) <= 2.0
+                                and abs(hw - bw) <= 2.0
+                                and abs(hh - bh) <= 2.0
+                            ):
                                 ax, ay, aw, ah = after_rects.get(
-                                    explicit_tid, (bx, by, bw, bh)
+                                    oid, (bx, by, bw, bh)
                                 )
                                 hs_frame["x"] = round(ax + (hx - bx), 2)
                                 hs_frame["y"] = round(ay + (hy - by), 2)
                                 hs_frame["width"] = round(aw + (hw - bw), 2)
                                 hs_frame["height"] = round(ah + (hh - bh), 2)
-                        else:
-                            for oid, (bx, by, bw, bh) in reversed(
-                                list(before_rects.items())
-                            ):
-                                if oid == top_child.get("do_objectID"):
-                                    continue
-                                if (
-                                    abs(hx - bx) <= 2.0
-                                    and abs(hy - by) <= 2.0
-                                    and abs(hw - bw) <= 2.0
-                                    and abs(hh - bh) <= 2.0
-                                ):
-                                    ax, ay, aw, ah = after_rects.get(
-                                        oid, (bx, by, bw, bh)
-                                    )
-                                    hs_frame["x"] = round(ax + (hx - bx), 2)
-                                    hs_frame["y"] = round(ay + (hy - by), 2)
-                                    hs_frame["width"] = round(aw + (hw - bw), 2)
-                                    hs_frame["height"] = round(ah + (hh - bh), 2)
-                                    break
-
-            dirty_pages.add(meta["pageFile"])
-            rebaked_layers.append(drift_record)
+                                break
 
     if rebake and dirty_pages and rebake_dir_fd is not None:
         for page_file in dirty_pages:

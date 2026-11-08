@@ -22,6 +22,149 @@ const PY_ENV = {
   PYTHONDONTWRITEBYTECODE: "1",
 };
 
+test("text measurement and font audit share style inheritance and descriptor forms", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import copy, json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+import sketch_offline_audit as audit
+
+system = {"MSAttributedStringFontAttribute": {"attributes": {"NSCTFontUIUsageAttribute": "CTFontRegularUsage", "size": 14}}}
+layer = {"_class": "text", "do_objectID": "clock", "name": "StatusBar/Time", "textBehaviour": 1,
+         "frame": {"x": 20, "y": 10, "width": 54, "height": 20}, "sharedStyleID": "style",
+         "style": {"textStyle": {"encodedAttributes": {"MSAttributedStringFontAttribute": {"attributes": {"size": 16}}}}},
+         "attributedString": {"string": "9:41", "attributes": []}}
+doc = {"_class": "document", "do_objectID": "doc", "pages": [{"_ref": "pages/p"}],
+       "layerTextStyles": {"objects": [{"do_objectID": "style", "name": "Clock", "value": {"textStyle": {"encodedAttributes": system}}}]},
+       "layerStyles": {"objects": []}, "sharedSwatches": {"objects": []}}
+
+def check(root, name, text_layer, document):
+    p = root / (name + ".sketch")
+    page = {"_class": "page", "do_objectID": "p", "layers": [{"_class": "artboard", "do_objectID": "ab", "name": "Home",
+            "frame": {"x": 0, "y": 0, "width": 375, "height": 812}, "layers": [text_layer]}]}
+    with zipfile.ZipFile(p, "w") as z:
+        for member, data in [("meta.json", {"app": "com.bohemiancoding.sketch3", "version": 136}), ("document.json", document), ("pages/p.json", page)]:
+            z.writestr(member, json.dumps(data))
+    report = audit.run_offline_audit(p)
+    spec = cm._extract_text_layer_spec(text_layer, cm._index_shared_text_styles(document))
+    return spec, {f["code"] for f in report["findings"] if f["category"] == "font_hygiene"}
+
+with tempfile.TemporaryDirectory(prefix="sketch-text-contract-") as td:
+    root = Path(td)
+    spec, codes = check(root, "inherited", layer, doc)
+    assert (spec["fontName"], spec["uiUsage"], spec["fontSize"]) == (None, "CTFontRegularUsage", 16), spec
+    assert not codes, codes
+
+    foreign_doc = copy.deepcopy(doc)
+    shared = foreign_doc["layerTextStyles"]["objects"].pop()
+    foreign_doc["foreignTextStyles"] = [{"do_objectID": "foreign-alias", "localSharedStyle": shared}]
+    foreign_layer = copy.deepcopy(layer)
+    foreign_layer["sharedStyleID"] = "foreign-alias"
+    spec, codes = check(root, "foreign", foreign_layer, foreign_doc)
+    assert spec["uiUsage"] == "CTFontRegularUsage" and not codes, (spec, codes)
+
+    for key in ("fontDescriptor", "MSAttributedStringFontAttribute"):
+        for wrapped in (False, True):
+            forbidden = copy.deepcopy(layer)
+            font = {"name": "NotoSans-Regular", "size": 14}
+            forbidden["style"]["textStyle"]["encodedAttributes"] = {key: {"attributes": font} if wrapped else font}
+            spec, codes = check(root, key + str(wrapped), forbidden, doc)
+            assert spec["fontName"] == "NotoSans-Regular" and spec["uiUsage"] is None, spec
+            assert {"FONT-FORBIDDEN-NOTO", "CLOCK-MISSING-CTFONT-REGULAR-USAGE"} <= codes, codes
+
+    partial = copy.deepcopy(layer)
+    partial["attributedString"]["attributes"] = [{"location": 0, "length": 4, "attributes": {"MSAttributedStringFontAttribute": {"attributes": {"size": 18}}}}]
+    spec, codes = check(root, "partial-run", partial, doc)
+    assert spec["runs"][0]["uiUsage"] == "CTFontRegularUsage" and not codes, (spec, codes)
+
+    # Raw hygiene still sees a forbidden descriptor shadowed by an effective run.
+    shadowed = copy.deepcopy(layer)
+    shadowed["style"]["textStyle"]["encodedAttributes"] = {"fontDescriptor": {"name": "NotoSans-Regular"}}
+    shadowed["attributedString"]["attributes"] = [{"location": 0, "length": 4, "attributes": system}]
+    spec, codes = check(root, "shadowed", shadowed, doc)
+    assert spec["uiUsage"] == "CTFontRegularUsage", spec
+    assert "FONT-FORBIDDEN-NOTO" in codes and "CLOCK-MISSING-CTFONT-REGULAR-USAGE" not in codes, codes
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("measurement rejects derived work before native execution or archive writes", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import copy, json, sys, tempfile, zipfile
+from pathlib import Path
+from types import SimpleNamespace
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+cm.platform.system = lambda: "Darwin"
+
+def forbidden_native(*args, **kwargs):
+    raise AssertionError("native execution must not start for over-budget input")
+cm.subprocess.run = forbidden_native
+
+def rejected(call, message):
+    try:
+        call()
+    except RuntimeError as exc:
+        assert message in str(exc), str(exc)
+    else:
+        raise AssertionError("Expected a workload rejection")
+
+base = {"id": "text", "text": "a" * 1024, "fontSize": 14, "width": 100}
+rejected(lambda: cm.measure_specs([dict(base, id=str(i), width=i+100) for i in range(129)]), "UTF-16")
+rich = dict(base, runs=[{"location": 0, "length": 1024}] * 8193)
+rejected(lambda: cm.measure_specs([rich]), "line/run")
+large_name = dict(base, fontName="F" * (3 * 1024 * 1024))
+rejected(lambda: cm.measure_specs([large_name]), "JSON payload")
+
+# A small source stays within ZIP and DOM limits, but instance expansion must stop.
+text = {"_class": "text", "do_objectID": "text", "textBehaviour": 1, "frame": {"width": 100, "height": 20},
+        "attributedString": {"string": "a" * 1024, "attributes": []}}
+master = {"_class": "symbolMaster", "do_objectID": "master", "symbolID": "symbol", "frame": {"width": 100, "height": 20}, "layers": [text]}
+instances = [{"_class": "symbolInstance", "do_objectID": "i-" + str(i), "symbolID": "symbol", "frame": {"width": 101+i, "height": 20}} for i in range(129)]
+page = {"_class": "page", "do_objectID": "p", "layers": [master, {"_class": "artboard", "do_objectID": "ab", "layers": instances}]}
+with tempfile.TemporaryDirectory(prefix="sketch-budget-contract-") as td:
+    p = Path(td) / "fanout.sketch"
+    with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_STORED) as z:
+        z.writestr("document.json", "{}")
+        z.writestr("pages/p.json", json.dumps(page))
+    original = p.read_bytes()
+    rejected(lambda: cm.audit_and_rebake_sketch(p, rebake=True), "UTF-16")
+    assert p.read_bytes() == original, "Rejected rebake changed the source archive"
+
+# Equal layouts share one native item, while source IDs and widths remain distinct.
+requests = []
+def native(cmd, **kwargs):
+    items = json.loads(kwargs["input"])
+    requests.append(items)
+    return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"count": len(items), "results": [{"id": item["id"], "bakedHeight": 20} for item in items]}))
+cm.subprocess.run = native
+rows = [dict(base, id="first"), dict(base, id="same"), dict(base, id="wide", width=200)]
+report = cm.measure_specs(rows, swift_bin="unused-test-helper")
+assert len(requests[0]) == 2, requests
+assert [r["id"] for r in report["results"]] == ["first", "same", "wide"], report
+cm.subprocess.run = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout='{"count":0,"results":[]}')
+rejected(lambda: cm.measure_specs([base], swift_bin="unused-test-helper"), "incomplete")
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
 function runPython(scriptPath, args, options = {}) {
   return spawnSync("python3", ["-B", scriptPath, ...args], {
     encoding: "utf8",
@@ -69,10 +212,14 @@ with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         else:
             zf.writestr(member, content.encode("latin-1"))
 `;
-  const res = spawnSync("python3", ["-B", "-c", pyCode, builderPath, sketchPath], {
-    encoding: "utf8",
-    env: PY_ENV,
-  });
+  const res = spawnSync(
+    "python3",
+    ["-B", "-c", pyCode, builderPath, sketchPath],
+    {
+      encoding: "utf8",
+      env: PY_ENV,
+    },
+  );
   assert.equal(res.status, 0, res.stderr);
 }
 
@@ -347,6 +494,118 @@ function createCleanSketchSpec({ textHeight = 44, hotspotY = 76 } = {}) {
   };
 }
 
+test("rebake uses original overlap bands and audit requires requested baselines", () => {
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import copy, json, sys, tempfile, zipfile
+from pathlib import Path
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+import sketch_offline_audit as audit
+cm.measure_specs = lambda items, swift_bin=None: {"engine": "test", "results": [
+    {"id": s["id"], "bakedHeight": 20, "lineCount": 1, "resolvedPostScriptName": "test"} for s in items]}
+def text(oid, y, h):
+    return {"_class": "text", "do_objectID": oid, "textBehaviour": 1, "frame": {"x": 0, "y": y, "width": 100, "height": h},
+            "attributedString": {"string": oid, "attributes": []}}
+doc = {"_class": "document", "do_objectID": "doc", "pages": [{"_ref": "pages/p"}]}
+group = {"_class": "group", "do_objectID": "group", "frame": {"x": 0, "y": 0, "width": 100, "height": 60},
+         "layers": [text("t1", 0, 60), text("t2", 20, 10),
+                    {"_class": "rectangle", "do_objectID": "rect", "frame": {"x": 0, "y": 50, "width": 100, "height": 10}}]}
+master = {"_class": "symbolMaster", "do_objectID": "master", "symbolID": "symbol", "frame": {"width": 100, "height": 60},
+          "groupLayout": {"_class": "MSImmutableFlexGroupLayout", "flexDirection": 1, "verticalSizing": 1}, "layers": [group]}
+board = {"_class": "artboard", "do_objectID": "ab", "name": "Home", "frame": {"width": 375, "height": 812},
+         "layers": [{"_class": "symbolInstance", "do_objectID": "instance", "symbolID": "symbol", "frame": {"width": 100, "height": 60}}]}
+
+def write_archive(p, layers):
+    with zipfile.ZipFile(p, "w") as z:
+        for name, data in [("document.json", doc), ("meta.json", {"version": 136}), ("pages/p.json", {"_class": "page", "do_objectID": "p", "layers": layers})]:
+            z.writestr(name, json.dumps(data))
+
+with tempfile.TemporaryDirectory(prefix="sketch-batch-rebake-") as td:
+    root = Path(td)
+    for reverse in (False, True):
+        m = copy.deepcopy(master)
+        if reverse:
+            m["layers"][0]["layers"].reverse()
+        p = root / (str(reverse) + ".sketch")
+        write_archive(p, [m, board])
+        cm.audit_and_rebake_sketch(p, rebake=True)
+        with zipfile.ZipFile(p) as z:
+            layers = json.loads(z.read("pages/p.json"))["layers"]
+        result_group = layers[0]["layers"][0]
+        children = {n["do_objectID"]: n for n in result_group["layers"]}
+        assert children["rect"]["frame"]["y"] == 50, children
+        assert children["t1"]["frame"]["height"] == children["t2"]["frame"]["height"] == 20, children
+        assert result_group["frame"]["height"] == layers[0]["frame"]["height"] == layers[1]["layers"][0]["frame"]["height"] == 60, layers
+        assert cm.audit_and_rebake_sketch(p)["driftCount"] == 0
+    missing = root / "missing.json"
+    assert "MANIFEST-UNAVAILABLE" in {f["code"] for f in audit.run_offline_audit(p, manifest_path=missing)["findings"]}
+    assert "SOURCE-ARCHIVE-UNAVAILABLE" in {f["code"] for f in audit.run_offline_audit(p, source_sketch_path=missing)["findings"]}
+
+    # Hidden nested instances retain reference checks but contribute no reachability.
+    nested = {"_class": "symbolMaster", "do_objectID": "nested-master", "symbolID": "nested", "layers": []}
+    outer = {"_class": "symbolMaster", "do_objectID": "outer-master", "symbolID": "outer",
+             "layers": [{"_class": "symbolInstance", "do_objectID": "N", "symbolID": "nested", "frame": {"width": 44, "height": 44},
+                         "flow": {"destinationArtboardID": "B"}}]}
+    a = {"_class": "artboard", "do_objectID": "A", "layers": [{"_class": "symbolInstance", "do_objectID": "outer-instance", "symbolID": "outer",
+         "overrideValues": [{"overrideName": "N_symbolID", "value": ""}]}]}
+    b = {"_class": "artboard", "do_objectID": "B", "layers": [{"_class": "rectangle", "do_objectID": "back", "frame": {"width": 44, "height": 44},
+         "flow": {"destinationArtboardID": "back"}}]}
+    p = root / "hidden-flow.sketch"
+    for hidden in ("", "none"):
+        a["layers"][0]["overrideValues"][0]["value"] = hidden
+        write_archive(p, [nested, outer, a, b])
+        codes = {f["code"] for f in audit.run_offline_audit(p)["findings"]}
+        assert "FLOW-START-ARTBOARD-BACK-TRAP" in codes, codes
+    outer["layers"][0]["flow"]["destinationArtboardID"] = "missing-board"
+    write_archive(p, [nested, outer, a, b])
+    assert "FLOW-DANGLING-DESTINATION" in {f["code"] for f in audit.run_offline_audit(p)["findings"]}
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("native measurement enforces line budgets and opts into line details", () => {
+  if (process.platform !== "darwin") return;
+  const res = spawnSync(
+    "python3",
+    [
+      "-B",
+      "-c",
+      `
+import json, subprocess, sys
+sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})
+import coretext_measure as cm
+binary = cm._get_or_compile_swift_binary()
+assert binary is not None, "Swift helper must compile"
+base = {"id": "text", "text": "a", "fontSize": 14, "width": 100}
+def run(items, *flags):
+    return subprocess.run([str(binary), "--input", "-", *flags], input=json.dumps(items), text=True, capture_output=True, timeout=30)
+normal = run([dict(base, text="a\\nb")])
+detailed = run([dict(base, text="a\\nb")], "--include-lines")
+assert normal.returncode == detailed.returncode == 0, (normal.stderr, detailed.stderr)
+n = json.loads(normal.stdout)["results"][0]
+d = json.loads(detailed.stdout)["results"][0]
+assert n["lineCount"] == d["lineCount"] == 2 and n["bakedHeight"] == d["bakedHeight"], (n, d)
+assert n["lines"] == [] and len(d["lines"]) == 2, (n, d)
+newlines = run([dict(base, text="\\n" * 32768)])
+assert newlines.returncode != 0 and "budget exceeded" in newlines.stderr, newlines
+# No explicit newlines: the hard guard must also stop line wrapping.
+wrapped = run([dict(base, text="W" * 32769, width=1)])
+assert wrapped.returncode != 0 and "generated line count" in wrapped.stderr, wrapped
+`,
+    ],
+    { encoding: "utf8", env: PY_ENV, timeout: 60000 },
+  );
+  assert.equal(res.status, 0, res.stderr);
+});
+
 test("all sketch-native scripts support --help and exit 0", () => {
   for (const script of [PY_MEASURE, PY_AUDIT, PY_ROUNDTRIP, PY_EXPORT]) {
     const res = runPython(script, ["--help"]);
@@ -474,8 +733,7 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
         isVisible: true,
         textBehaviour: 1,
         frame: { _class: "rect", x: 16, y: 12, width: 180, height: 22 },
-        attributedString:
-          symMaster.layers[0].attributedString,
+        attributedString: symMaster.layers[0].attributedString,
       },
       {
         _class: "text",
@@ -484,8 +742,7 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
         isVisible: true,
         textBehaviour: 1,
         frame: { _class: "rect", x: 16, y: 42, width: 180, height: 22 },
-        attributedString:
-          symMaster.layers[0].attributedString,
+        attributedString: symMaster.layers[0].attributedString,
       },
     ];
     const homeAb = page.layers[1];
@@ -531,7 +788,10 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
     assert.equal(multiAudit.status, 0, multiAudit.stdout);
 
     // Multi-run attributedString measurement: Run 1 is 14pt/20px, Run 2 is 36pt/52px on a single line
-    const multiRunSpec = createCleanSketchSpec({ textHeight: 44, hotspotY: 76 });
+    const multiRunSpec = createCleanSketchSpec({
+      textHeight: 44,
+      hotspotY: 76,
+    });
     const mrPage =
       multiRunSpec["pages/20000000-0000-4000-8000-000000000001.json"];
     const mrTextLayer = mrPage.layers[1].layers[1].layers[1];
@@ -586,7 +846,10 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
     assert.equal(mrReport.drifts[0].bakedHeight, 52);
 
     // Foreign symbolMaster in document.json.foreignSymbols + hidden sibling with preserveSpaceWhenHidden: true
-    const foreignSpec = createCleanSketchSpec({ textHeight: 44, hotspotY: 112 });
+    const foreignSpec = createCleanSketchSpec({
+      textHeight: 44,
+      hotspotY: 112,
+    });
     const fPage =
       foreignSpec["pages/20000000-0000-4000-8000-000000000001.json"];
     const movedMaster = fPage.layers.shift(); // Remove symbolMaster from page
@@ -640,8 +903,7 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
 
     // Side-by-side (Row) SymbolInstance overrides take max height (not sum), and horizontal Row Fit Stack reflows inside Column Stack
     const rowSpec = createCleanSketchSpec({ textHeight: 22, hotspotY: 54 });
-    const rPage =
-      rowSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const rPage = rowSpec["pages/20000000-0000-4000-8000-000000000001.json"];
     const rMaster = rPage.layers[0];
     rMaster.frame.height = 22;
     rMaster.layers = [
@@ -756,8 +1018,7 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
         },
       },
     ];
-    const tsPage =
-      tsSpec["pages/20000000-0000-4000-8000-000000000001.json"];
+    const tsPage = tsSpec["pages/20000000-0000-4000-8000-000000000001.json"];
     tsPage.layers[0].layers[0].textBehaviour = 1;
     const tsInst = tsPage.layers[1].layers[1].layers[0];
     tsInst.overrideValues = [
@@ -810,8 +1071,7 @@ test("coretext_measure.py measures specs and re-bakes textBehaviour == 1 + Flex 
           overrideValues: [
             {
               _class: "overrideValue",
-              overrideName:
-                "30000000-0000-4000-8000-000000000002_stringValue",
+              overrideName: "30000000-0000-4000-8000-000000000002_stringValue",
               value:
                 "这是一段在嵌套母版实例上默认配置的双行长按钮文案用于验证外层实例自动继承",
             },
@@ -1627,19 +1887,22 @@ except RuntimeError as exc:
         .layers[2];
     detailAb.layers.reverse(); // Reordering child layers changes childIDs on detailAb
     // Also mutate SymbolInstance.symbolID on SubmitButtonFocus and style.fills on StatusBar group
-    driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"].layers[1].layers[1].layers[0].symbolID =
+    driftedDocSpec[
+      "pages/20000000-0000-4000-8000-000000000001.json"
+    ].layers[1].layers[1].layers[0].symbolID =
       "81000000-0000-4000-8000-000000000003";
-    driftedDocSpec["pages/20000000-0000-4000-8000-000000000001.json"].layers[1].layers[0].style =
-      {
-        _class: "style",
-        fills: [
-          {
-            _class: "fill",
-            isEnabled: true,
-            color: { _class: "color", alpha: 1, red: 0, green: 0, blue: 1 },
-          },
-        ],
-      };
+    driftedDocSpec[
+      "pages/20000000-0000-4000-8000-000000000001.json"
+    ].layers[1].layers[0].style = {
+      _class: "style",
+      fills: [
+        {
+          _class: "fill",
+          isEnabled: true,
+          color: { _class: "color", alpha: 1, red: 0, green: 0, blue: 1 },
+        },
+      ],
+    };
     const driftedDocSpecPath = path.join(tmpDir, "drifted-doc-spec.json");
     fs.writeFileSync(driftedDocSpecPath, JSON.stringify(driftedDocSpec));
     buildSyntheticSketch(driftedDocSketch, driftedDocSpecPath);
@@ -1659,7 +1922,8 @@ except RuntimeError as exc:
     const diffOut = JSON.parse(diffCheck.stdout);
     assert.ok(
       diffOut.unexpectedDrifts.some(
-        (d) => d.layerID === "sharedTextStyle:60000000-0000-4000-8000-000000000001",
+        (d) =>
+          d.layerID === "sharedTextStyle:60000000-0000-4000-8000-000000000001",
       ),
     );
     assert.ok(
@@ -1669,12 +1933,17 @@ except RuntimeError as exc:
     );
     assert.ok(
       diffOut.unexpectedDrifts.some(
-        (d) => d.layerID === "40000000-0000-4000-8000-000000000005" && d.after.symbolID === "81000000-0000-4000-8000-000000000003",
+        (d) =>
+          d.layerID === "40000000-0000-4000-8000-000000000005" &&
+          d.after.symbolID === "81000000-0000-4000-8000-000000000003",
       ),
     );
     assert.ok(
       diffOut.unexpectedDrifts.some(
-        (d) => d.layerID === "40000000-0000-4000-8000-000000000002" && Array.isArray(d.after.fills) && d.after.fills.length === 1,
+        (d) =>
+          d.layerID === "40000000-0000-4000-8000-000000000002" &&
+          Array.isArray(d.after.fills) &&
+          d.after.fills.length === 1,
       ),
     );
     assert.ok(
@@ -2023,10 +2292,7 @@ assert res2["accessible"] is True, res2
     fs.writeFileSync(victimPng, "secret");
     fs.symlinkSync(
       victimPng,
-      path.join(
-        poisonedScale1,
-        "40000000-0000-4000-8000-000000000001!.png",
-      ),
+      path.join(poisonedScale1, "40000000-0000-4000-8000-000000000001!.png"),
     );
     const poisonedRes = runPython(PY_EXPORT, [
       "--sketch",
@@ -2045,7 +2311,8 @@ assert res2["accessible"] is True, res2
     // 8. Verify status-bar clock inside a SymbolInstance (including foreignSymbols + _stringValue override) is collected and PDF-verified
     const compClockSpec = createCleanSketchSpec(44);
     const compAb =
-      compClockSpec["pages/20000000-0000-4000-8000-000000000001.json"].layers[1];
+      compClockSpec["pages/20000000-0000-4000-8000-000000000001.json"]
+        .layers[1];
     // Replace direct StatusBar group with a SymbolInstance referencing a foreign StatusBar symbolMaster
     compClockSpec["document.json"].foreignSymbols = [
       {

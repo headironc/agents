@@ -63,9 +63,47 @@ struct MeasureBatchReport: Codable {
     let results: [MeasureOutputItem]
 }
 
+struct MeasurementBudget {
+    static let maxLines = 32768
+    private var lines = 0
+
+    static func validate(_ items: [MeasureInputItem]) throws {
+        var units = 0
+        var runs = 0
+        var work = 0
+        var minimumLines = 0
+        guard items.count <= 8192 else { throw failure("spec count") }
+        for item in items {
+            let count = item.text.utf16.count
+            units += count
+            let runCount = item.runs?.count ?? 0
+            runs += runCount
+            guard units <= 131072, runs <= 16384 else { throw failure("text/run count") }
+            minimumLines += item.text.utf16.reduce(1) { $0 + ($1 == 10 ? 1 : 0) }
+            work += max(1, count) * max(1, runCount)
+            guard minimumLines <= maxLines, work <= 8388608 else { throw failure("line/run workload") }
+            for run in item.runs ?? [] {
+                guard run.location >= 0, run.location <= count,
+                      run.length >= 0, run.length <= count - run.location else {
+                    throw failure("invalid UTF-16 run range")
+                }
+            }
+        }
+    }
+
+    mutating func reserveLine() throws {
+        guard lines < Self.maxLines else { throw Self.failure("generated line count") }
+        lines += 1
+    }
+
+    static func failure(_ subject: String) -> NSError {
+        NSError(domain: "measure-coretext", code: 2, userInfo: [NSLocalizedDescriptionKey: "CoreText measurement budget exceeded: \(subject)"])
+    }
+}
+
 func printHelp() {
     let help = """
-    Usage: measure-coretext.swift [--input <specs.json|->] [--output <out.json>] [--pretty]
+    Usage: measure-coretext.swift [--input <specs.json|->] [--output <out.json>] [--pretty] [--include-lines]
 
     Measures exact macOS CoreText line breaks (CTTypesetterSuggestLineBreak / CTFramesetter)
     and baked text heights for Sketch text layers (textBehaviour == 1) and SymbolInstance overrides.
@@ -88,6 +126,9 @@ func printHelp() {
     System UI font support:
       Set "uiUsage": "CTFontRegularUsage" or "fontName": "CTFontRegularUsage" / ".SFNS-Regular" / "system"
       to resolve via CTFontCreateUIFontForLanguage(.system, size, nil).
+
+    Line details are omitted by default. --include-lines retains bounded line records.
+    The batch allows at most 32768 generated lines, including empty paragraphs.
     """
     print(help)
 }
@@ -181,7 +222,7 @@ func makeParagraphStyle(lineHeight: Double, paragraphSpacing: Double) -> CTParag
     }
 }
 
-func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
+func measureItem(_ item: MeasureInputItem, budget: inout MeasurementBudget, includeLines: Bool) throws -> MeasureOutputItem {
     let size = CGFloat(max(1.0, item.fontSize))
     let (ctFont, usedSystemUI) = createResolvedFont(
         fontName: item.fontName,
@@ -235,6 +276,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
 
     let nsText = item.text as NSString
     if nsText.length == 0 {
+        try budget.reserveLine()
         return MeasureOutputItem(
             id: item.id,
             text: item.text,
@@ -246,7 +288,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
             width: constrainedWidth,
             paragraphSpacing: paraSpacing,
             lineCount: 1,
-            lines: [
+            lines: includeLines ? [
                 MeasuredLine(
                     index: 0,
                     location: 0,
@@ -255,7 +297,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
                     width: 0.0,
                     lineHeight: maxRunLineH
                 )
-            ],
+            ] : [],
             bakedHeight: round(maxRunLineH)
         )
     }
@@ -265,6 +307,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
     var globalUTF16Cursor = 0
     var lineIndex = 0
     var totalParagraphSpacing = 0.0
+    var sumLineHeights = 0.0
 
     for (pIdx, pText) in rawParagraphs.enumerated() {
         let pNS = pText as NSString
@@ -303,16 +346,20 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
                     }
                 }
             }
-            measuredLines.append(
-                MeasuredLine(
-                    index: lineIndex,
-                    location: globalUTF16Cursor,
-                    length: 0,
-                    text: "",
-                    width: 0.0,
-                    lineHeight: emptyLineH
+            try budget.reserveLine()
+            sumLineHeights += emptyLineH
+            if includeLines {
+                measuredLines.append(
+                    MeasuredLine(
+                        index: lineIndex,
+                        location: globalUTF16Cursor,
+                        length: 0,
+                        text: "",
+                        width: 0.0,
+                        lineHeight: emptyLineH
+                    )
                 )
-            )
+            }
             lineIndex += 1
             globalUTF16Cursor += 1
             continue
@@ -367,23 +414,26 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
                     effectiveLineH = m
                 }
             }
-            measuredLines.append(
-                MeasuredLine(
-                    index: lineIndex,
-                    location: absLineStart,
-                    length: range.length,
-                    text: sliceText,
-                    width: (lineWidth * 100.0).rounded() / 100.0,
-                    lineHeight: effectiveLineH
+            try budget.reserveLine()
+            sumLineHeights += effectiveLineH
+            if includeLines {
+                measuredLines.append(
+                    MeasuredLine(
+                        index: lineIndex,
+                        location: absLineStart,
+                        length: range.length,
+                        text: sliceText,
+                        width: (lineWidth * 100.0).rounded() / 100.0,
+                        lineHeight: effectiveLineH
+                    )
                 )
-            )
+            }
             lineIndex += 1
             start += range.length
         }
         globalUTF16Cursor += pLen + 1
     }
 
-    let sumLineHeights = measuredLines.reduce(0.0) { $0 + $1.lineHeight }
     let totalHeight = sumLineHeights + totalParagraphSpacing
     return MeasureOutputItem(
         id: item.id,
@@ -395,7 +445,7 @@ func measureItem(_ item: MeasureInputItem) -> MeasureOutputItem {
         singleLineHeight: maxRunLineH,
         width: constrainedWidth,
         paragraphSpacing: paraSpacing,
-        lineCount: measuredLines.count,
+        lineCount: lineIndex,
         lines: measuredLines,
         bakedHeight: round(totalHeight)
     )
@@ -409,6 +459,7 @@ struct WrappedInput: Codable {
 var inputPath = "-"
 var outputPath: String? = nil
 var pretty = true
+var includeLines = false
 
 let args = Array(CommandLine.arguments.dropFirst())
 var idx = 0
@@ -438,6 +489,9 @@ while idx < args.count {
     case "--compact":
         pretty = false
         idx += 1
+    case "--include-lines":
+        includeLines = true
+        idx += 1
     default:
         if !arg.hasPrefix("-") && inputPath == "-" {
             inputPath = arg
@@ -450,15 +504,20 @@ while idx < args.count {
 }
 
 let inputData: Data
-if inputPath == "-" {
-    inputData = FileHandle.standardInput.readDataToEndOfFile()
-} else {
-    let url = URL(fileURLWithPath: inputPath)
-    guard let data = try? Data(contentsOf: url) else {
-        fputs("Error: unable to read input file at \(inputPath)\n", stderr)
-        exit(2)
+do {
+    let handle = inputPath == "-" ? FileHandle.standardInput : try FileHandle(forReadingFrom: URL(fileURLWithPath: inputPath))
+    defer { if inputPath != "-" { try? handle.close() } }
+    var data = Data()
+    while let chunk = try handle.read(upToCount: 65536), !chunk.isEmpty {
+        guard data.count + chunk.count <= 16 * 1024 * 1024 else {
+            throw MeasurementBudget.failure("input JSON bytes")
+        }
+        data.append(chunk)
     }
     inputData = data
+} catch {
+    fputs("Error: \(error.localizedDescription)\n", stderr)
+    exit(2)
 }
 
 let decoder = JSONDecoder()
@@ -473,7 +532,17 @@ if let direct = try? decoder.decode([MeasureInputItem].self, from: inputData) {
 }
 
 #if canImport(CoreFoundation) && canImport(CoreGraphics) && canImport(CoreText)
-let results = items.map { measureItem($0) }
+var results: [MeasureOutputItem] = []
+do {
+    try MeasurementBudget.validate(items)
+    var budget = MeasurementBudget()
+    for item in items {
+        results.append(try measureItem(item, budget: &budget, includeLines: includeLines))
+    }
+} catch {
+    fputs("Error: \(error.localizedDescription)\n", stderr)
+    exit(2)
+}
 #else
 fputs("Error: measure-coretext.swift requires macOS CoreText.\n", stderr)
 exit(2)
