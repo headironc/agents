@@ -32,6 +32,7 @@ import {
   writeFileSync,
   writeSync,
 } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
@@ -438,10 +439,17 @@ export async function verifyTools(
 async function runChecks(specs: CheckSpec[]): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   let interrupted = false;
-  for (const spec of specs) {
-    console.log(`\n[${spec.name}]`);
+  const runOne = (
+    spec: CheckSpec,
+    buffered: boolean,
+  ): Promise<{
+    result: CheckResult;
+    chunks: { stream: NodeJS.WriteStream; chunk: Buffer }[];
+  }> => {
+    if (!buffered) console.log(`\n[${spec.name}]`);
     const started = performance.now();
-    const result = await new Promise<CheckResult>((resolve) => {
+    const chunks: { stream: NodeJS.WriteStream; chunk: Buffer }[] = [];
+    return new Promise((resolve) => {
       const child = spawn(spec.argv[0], spec.argv.slice(1), {
         cwd: spec.cwd,
         detached: true,
@@ -484,7 +492,8 @@ async function runChecks(specs: CheckSpec[]): Promise<CheckResult[]> {
           return;
         }
         diagnostic = (diagnostic + chunk.toString("utf8")).slice(-2000);
-        stream.write(chunk);
+        if (buffered) chunks.push({ stream, chunk });
+        else stream.write(chunk);
       };
       child.stdout.on("data", (chunk) => capture(chunk, process.stdout));
       child.stderr.on("data", (chunk) => capture(chunk, process.stderr));
@@ -496,17 +505,101 @@ async function runChecks(specs: CheckSpec[]): Promise<CheckResult[]> {
         process.removeListener("SIGINT", interrupt);
         process.removeListener("SIGTERM", interrupt);
         resolve({
-          name: spec.name,
-          exitCode,
-          signal,
-          durationMs: performance.now() - started,
-          diagnostic: failure || diagnostic,
-          passed: exitCode === 0 && signal === null && !failure,
+          result: {
+            name: spec.name,
+            exitCode,
+            signal,
+            durationMs: performance.now() - started,
+            diagnostic: failure || diagnostic,
+            passed: exitCode === 0 && signal === null && !failure,
+          },
+          chunks,
         });
       });
     });
-    results.push(result);
-    console.log(`[${spec.name}] ${result.passed ? "passed" : "failed"}`);
+  };
+  const heavySuites = new Set([
+    "Repository regression: tests/installation/apply.test.ts",
+    "Repository regression: tests/validation/check.test.ts",
+    "Repository regression: tests/installation/plan.test.ts",
+    "Repository regression: tests/validation/pre-commit.test.ts",
+    "Repository regression: tests/validation/tool-contracts.test.ts",
+    "Repository regression: delivery/skills/alibabacloud-sms-send-short-message/tests/send-sms.test.mjs",
+    "Repository regression: delivery/skills/wechatide/tests/call.test.mjs",
+    "Repository regression: tests/check-prose.test.mjs",
+  ]);
+  for (let index = 0; index < specs.length; ) {
+    if (
+      specs[0]?.name === "TypeScript" ||
+      specs[index]!.name.startsWith("Repository regression: ")
+    ) {
+      let end = index;
+      if (specs[0]?.name === "TypeScript") end = specs.length;
+      else
+        while (
+          end < specs.length &&
+          specs[end]!.name.startsWith("Repository regression: ")
+        )
+          end++;
+      const batch = specs.slice(index, end);
+      const order = batch
+        .map((_, offset) => offset)
+        .sort(
+          (left, right) =>
+            Number(heavySuites.has(batch[right]!.name)) -
+            Number(heavySuites.has(batch[left]!.name)),
+        );
+      const completed = new Array<
+        | {
+            result: CheckResult;
+            chunks: { stream: NodeJS.WriteStream; chunk: Buffer }[];
+          }
+        | undefined
+      >(batch.length);
+      let nextToFlush = 0;
+      const flushCompleted = () => {
+        while (
+          nextToFlush < batch.length &&
+          completed[nextToFlush] !== undefined
+        ) {
+          const spec = batch[nextToFlush]!;
+          const { result, chunks } = completed[nextToFlush]!;
+          console.log(`\n[${spec.name}]`);
+          for (const { stream, chunk } of chunks) stream.write(chunk);
+          results.push(result);
+          console.log(`[${spec.name}] ${result.passed ? "passed" : "failed"}`);
+          nextToFlush++;
+        }
+      };
+      let cursor = 0;
+      const concurrency = Math.min(os.availableParallelism(), 8, batch.length);
+      await Promise.all(
+        Array.from({ length: concurrency }, async () => {
+          while (!interrupted && cursor < order.length) {
+            const slot = order[cursor++]!;
+            completed[slot] = await runOne(batch[slot]!, true);
+            flushCompleted();
+          }
+        }),
+      );
+      for (let slot = nextToFlush; slot < batch.length; slot++) {
+        const entry = completed[slot];
+        if (!entry) continue;
+        const spec = batch[slot]!;
+        console.log(`\n[${spec.name}]`);
+        for (const { stream, chunk } of entry.chunks) stream.write(chunk);
+        results.push(entry.result);
+        console.log(
+          `[${spec.name}] ${entry.result.passed ? "passed" : "failed"}`,
+        );
+      }
+      index = end;
+    } else {
+      const spec = specs[index++]!;
+      const { result } = await runOne(spec, false);
+      results.push(result);
+      console.log(`[${spec.name}] ${result.passed ? "passed" : "failed"}`);
+    }
     if (interrupted) break;
   }
   return results;

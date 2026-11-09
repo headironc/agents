@@ -14,4 +14,4 @@
 
 - **任务路由、模型档位与跨端协作**：[任务起点](policy/models.md#task-start-and-execution-routing)衔接[默认三级模型表](policy/models.md#current-defaults)、[开发设备选择](policy/models.md#local-development)、[工作区规则](policy/models.md#workspaces)、[委派与验收](policy/models.md#delegation-and-acceptance)及[官方跨设备协作](policy/models.md#official-codex-coordination-across-devices)，并通过 150K Token 上下文护栏与 `progress.md` / `spec.md` 锚点管理长任务交接。
 - **外部 CLI 与产品支持**：[DeepSeek Harness 委派](policy/models.md#deepseek-harness-delegation)与[调用合同](policy/deepseek-harness.md)定义 `dsh` 的只读分析、有界执行及 [`dsh-headless.patch.yml`](capability/dsh-headless.patch.yml) 凭据复用；[Antigravity 使用支持](policy/antigravity.md)说明 Antigravity CLI 的技能安装与发现边界。
-- **项目导航与设计交付**：[project-guide](skills/project-guide/SKILL.md) 按需发现项目版本、权威规范与原生检查；[figma-design-workflow](skills/figma-design-workflow/SKILL.md) 与 [sketch-native](skills/sketch-native/SKILL.md) 支持可编辑设计稿生成、离线结构审计与真实像素验收。
+- **项目导航与设计交付**：[project-guide](skills/project-guide/SKILL.md) 按需发现项目版本、权威规范与原生检查；[figma-design-workflow](skills/figma-design-workflow/SKILL.md) 与 [sketch-native](skills/sketch-native/SKILL.md) 支持可编辑设计稿生成、原生组件复用与真实像素验收。
