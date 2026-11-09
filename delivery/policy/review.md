@@ -44,7 +44,7 @@ First apply [dependency-update](#dependency-updates) and [pure Sketch design](#p
 ## Asynchronous observation
 
 - **Single observer per result surface**: Observe required CI checks, review findings, review completion, and merge admission concurrently, preferring native CLI waits where supported and keeping one observer per surface without duplicate polling or repeated reads of unchanged logs.
-- **Event-driven return**: When using a bounded read-only observer, return to the model only on completion, a new finding or failure, candidate or baseline drift, queue removal, a material admission change, a real read error/timeout, or a needed decision. Do not use model turns as a polling timer.
+- **Event-driven return**: When using a bounded read-only observer, return to the model only on completion, a new finding or failure, candidate or baseline drift, queue removal, a material admission change, a real read error/timeout, or a needed decision. Do not use model turns or Goal wakeups as a 20-second polling timer: when calling `wait_threads` or observing a running check from an execution script, loop within that single tool call until the observed turn leaves `inProgress` (or a multi-minute observation bound expires) and never patch `progress.md` merely to log intermediate `timedOut` polls.
 - **No blind retries on observation expiry**: Distinguish an observation window ending from the underlying operation failing. Before replacing an observer, establish its terminal state; observation timeout or failure never authorizes restarting or re-triggering the underlying mutation.
 
 ### Missing automatic review
