@@ -513,6 +513,7 @@ function writeNewFile(
   bytes: Buffer,
   mode: number,
   created: () => void,
+  sync = false,
 ): void {
   const descriptor = openSync(
     file,
@@ -525,7 +526,7 @@ function writeNewFile(
   created();
   try {
     writeFileSync(descriptor, bytes);
-    fsyncSync(descriptor);
+    if (sync) fsyncSync(descriptor);
   } finally {
     closeSync(descriptor);
   }
@@ -897,12 +898,18 @@ export function planInstallation(
       sha256: canonicalDigest(body),
     });
     const bytes = Buffer.from(JSON.stringify(plan, null, 2) + "\n");
-    writeNewFile(run.plan, bytes, 0o400, () => {});
+    writeNewFile(run.plan, bytes, 0o400, () => {}, true);
     if (!readFileSync(run.plan).equals(bytes))
       throw new Error("Persistent plan readback failed");
-    writeNewFile(args.output, bytes, 0o600, () => {
-      reviewCreated = true;
-    });
+    writeNewFile(
+      args.output,
+      bytes,
+      0o600,
+      () => {
+        reviewCreated = true;
+      },
+      true,
+    );
     if (!readFileSync(args.output).equals(bytes))
       throw new Error("Review plan readback failed");
     const count = (action: InstallTarget["action"]) =>

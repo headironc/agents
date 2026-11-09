@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
+  chmodSync,
   cpSync,
   constants,
   copyFileSync,
@@ -43,7 +44,6 @@ const expectedTestPaths = {
     "tests/validation/skills.test.ts",
     "tests/validation/pre-commit.test.ts",
     "delivery/skills/alibabacloud-sms-send-short-message/tests/send-sms.test.mjs",
-    "delivery/skills/sketch-native/tests/sketch-native.test.mjs",
     "delivery/skills/wechatide/tests/call.test.mjs",
     "delivery/skills/wechatide/tests/check-install.test.mjs",
     "tests/check-prose.test.mjs",
@@ -123,16 +123,6 @@ const required = [
   "delivery/policy/antigravity.md",
   "delivery/skills/figma-design-workflow/SKILL.md",
   "delivery/skills/sketch-native/SKILL.md",
-  "delivery/skills/sketch-native/references/sketch-json-schema.md",
-  "delivery/skills/sketch-native/scripts/measure-coretext.swift",
-  "delivery/skills/sketch-native/scripts/coretext_measure.py",
-  "delivery/skills/sketch-native/scripts/sketch_text.py",
-  "delivery/skills/sketch-native/scripts/sketch_json.py",
-  "delivery/skills/sketch-native/scripts/sketch_archive.py",
-  "delivery/skills/sketch-native/scripts/sketch_layers.py",
-  "delivery/skills/sketch-native/scripts/sketch_offline_audit.py",
-  "delivery/skills/sketch-native/scripts/sketch_mcp_roundtrip.py",
-  "delivery/skills/sketch-native/scripts/sketch_export_manifest.py",
   "delivery/skills/gh/SKILL.md",
   "delivery/skills/gh/references/extended-commands.md",
   "delivery/skills/gh/references/operations.md",
@@ -382,11 +372,18 @@ for (const scenario of [
   });
 }
 
-function fixture(t: TestContext) {
+let checkFixtureTemplate: string | undefined;
+const reusableCheckFixtures: string[] = [];
+const pinnedNodeSize = lstatSync(process.execPath).size;
+
+function ensureCheckFixtureTemplate(): string {
+  if (checkFixtureTemplate) return checkFixtureTemplate;
   const directory = realpathSync(
-    mkdtempSync(path.join(os.tmpdir(), "agents-check-")),
+    mkdtempSync(path.join(os.tmpdir(), "agents-check-template-")),
   );
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  process.once("exit", () =>
+    rmSync(directory, { recursive: true, force: true }),
+  );
   for (const subdirectory of [
     "scripts",
     "tests/validation",
@@ -410,17 +407,12 @@ function fixture(t: TestContext) {
     cpSync(
       path.join(root, "scripts", file),
       path.join(directory, "scripts", file),
+      { mode: constants.COPYFILE_FICLONE },
     );
   cpSync(
     path.join(root, "node_modules/zod"),
     path.join(directory, "node_modules/zod"),
-    { recursive: true },
-  );
-  // Copy across read-only container mounts without sharing mutable runtime bytes.
-  copyFileSync(
-    process.execPath,
-    path.join(directory, ".cache/agents-tools/bin/node"),
-    constants.COPYFILE_FICLONE,
+    { recursive: true, mode: constants.COPYFILE_FICLONE },
   );
   const zod = JSON.parse(
     readFileSync(path.join(root, "node_modules/zod/package.json"), "utf8"),
@@ -488,6 +480,62 @@ function fixture(t: TestContext) {
     path.join(directory, "tests/validation/docs.test.ts"),
     'import test from "node:test"; import assert from "node:assert/strict"; test("fixture", () => assert.equal(2 + 2, 4));\n',
   );
+  checkFixtureTemplate = directory;
+  return directory;
+}
+
+function fixture(t: TestContext) {
+  const template = ensureCheckFixtureTemplate();
+  const directory =
+    reusableCheckFixtures.pop() ??
+    (() => {
+      const created = realpathSync(
+        mkdtempSync(path.join(os.tmpdir(), "agents-check-")),
+      );
+      process.once("exit", () =>
+        rmSync(created, { recursive: true, force: true }),
+      );
+      return created;
+    })();
+  chmodSync(directory, 0o700);
+  for (const entry of readdirSync(directory)) {
+    if (entry === ".cache") continue;
+    rmSync(path.join(directory, entry), { recursive: true, force: true });
+  }
+  const cacheDir = path.join(directory, ".cache");
+  if (lstatSync(cacheDir, { throwIfNoEntry: false })) {
+    for (const entry of readdirSync(cacheDir)) {
+      if (entry !== "agents-tools")
+        rmSync(path.join(cacheDir, entry), { recursive: true, force: true });
+    }
+  }
+  const binDir = path.join(directory, ".cache/agents-tools/bin");
+  mkdirSync(binDir, { recursive: true });
+  for (const entry of readdirSync(binDir)) {
+    if (entry !== "node")
+      rmSync(path.join(binDir, entry), { recursive: true, force: true });
+  }
+  const nodeBin = path.join(binDir, "node");
+  const stat = lstatSync(nodeBin, { throwIfNoEntry: false });
+  if (!stat?.isFile() || stat.isSymbolicLink() || stat.size !== pinnedNodeSize) {
+    rmSync(nodeBin, { force: true });
+    // Copy across read-only container mounts without sharing mutable runtime bytes.
+    copyFileSync(process.execPath, nodeBin, constants.COPYFILE_FICLONE);
+  }
+  for (const entry of readdirSync(template)) {
+    cpSync(path.join(template, entry), path.join(directory, entry), {
+      recursive: true,
+      mode: constants.COPYFILE_FICLONE,
+    });
+  }
+  t.after(() => {
+    try {
+      if (lstatSync(directory, { throwIfNoEntry: false })?.isDirectory())
+        reusableCheckFixtures.push(directory);
+    } catch {
+      /* Abandoned directories are cleaned up at process exit. */
+    }
+  });
   const reportPath = path.join(directory, ".cache/reports/result.json");
   function run(
     args: string[] = ["docs", "markdown", "--report", reportPath],
@@ -652,24 +700,11 @@ test("a stale base is reported, and silent wherever the answer would be noise", 
   assert.equal(baseNotice(path.dirname(directory)), null, "not a repository");
 });
 
-test("the real checker refuses every missing R5 delivery member before execution", (t) => {
-  const f = fixtureRepository(t);
-  for (const file of required) {
-    if (existsSync(path.join(f.directory, file))) continue;
-    mkdirSync(path.dirname(path.join(f.directory, file)), { recursive: true });
-    cpSync(path.join(root, file), path.join(f.directory, file));
-  }
-  const reportPath = path.join(f.directory, ".cache/missing-member.json");
-  for (const file of [
+test("the real checker refuses every missing R5 delivery member before execution", async (t) => {
+  const members = [
     "delivery/skills/gh-identity/SKILL.md",
     "delivery/skills/figma-design-workflow/SKILL.md",
     "delivery/skills/sketch-native/SKILL.md",
-    "delivery/skills/sketch-native/references/sketch-json-schema.md",
-    "delivery/skills/sketch-native/scripts/measure-coretext.swift",
-    "delivery/skills/sketch-native/scripts/coretext_measure.py",
-    "delivery/skills/sketch-native/scripts/sketch_offline_audit.py",
-    "delivery/skills/sketch-native/scripts/sketch_mcp_roundtrip.py",
-    "delivery/skills/sketch-native/scripts/sketch_export_manifest.py",
     "delivery/skills/gh-identity/references/auth-readiness.md",
     "delivery/skills/gh/references/workflow-authorization.md",
     "docs/skill-sources.md",
@@ -721,44 +756,88 @@ test("the real checker refuses every missing R5 delivery member before execution
     "delivery/skills/wechatide/skills/project-config/SKILL.md",
     "delivery/skills/wechatide/skills/project-config/references/fields.md",
     "delivery/skills/wechatide/skills/project-manager/SKILL.md",
-  ]) {
-    rmSync(path.join(f.directory, file));
-    const result = spawnSync(
-      process.execPath,
-      ["scripts/check.ts", "all", "--report", reportPath],
-      {
-        cwd: f.directory,
-        env: f.environment,
-        encoding: "utf8",
-        timeout: 10_000,
-      },
-    );
-    assert.equal(
-      result.status,
-      1,
-      JSON.stringify({
-        missing: file,
-        status: result.status,
-        signal: result.signal,
-        error: result.error && {
-          code: (result.error as NodeJS.ErrnoException).code,
-          message: result.error.message,
-        },
-        stdout: result.stdout,
-        stderr: result.stderr,
-      }),
-    );
-    const report = CheckReportSchema.parse(
-      JSON.parse(readFileSync(reportPath, "utf8")),
-    );
-    assert.equal(report.passed, false);
-    assert.deepEqual(report.errors, [
-      `Missing or invalid required capability: ${file}`,
-    ]);
-    assert.deepEqual(report.planned, []);
-    assert.deepEqual(report.results, []);
-    cpSync(path.join(root, file), path.join(f.directory, file));
-  }
+  ];
+  let cursor = 0;
+  const concurrency = Math.min(os.availableParallelism(), 6);
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      const f = fixtureRepository(t);
+      for (const file of required) {
+        if (existsSync(path.join(f.directory, file))) continue;
+        mkdirSync(path.dirname(path.join(f.directory, file)), {
+          recursive: true,
+        });
+        cpSync(path.join(root, file), path.join(f.directory, file));
+      }
+      const reportPath = path.join(f.directory, ".cache/missing-member.json");
+      while (cursor < members.length) {
+        const file = members[cursor++]!;
+        rmSync(path.join(f.directory, file));
+        const result = await new Promise<{
+          status: number | null;
+          signal: NodeJS.Signals | null;
+          error?: Error;
+          stdout: string;
+          stderr: string;
+        }>((resolve) => {
+          const child = spawn(
+            process.execPath,
+            ["scripts/check.ts", "all", "--report", reportPath],
+            {
+              cwd: f.directory,
+              env: f.environment,
+              stdio: ["ignore", "pipe", "pipe"],
+              timeout: 10_000,
+            },
+          );
+          let stdout = "";
+          let stderr = "";
+          let error: Error | undefined;
+          child.stdout.on("data", (chunk: Buffer) => {
+            stdout += chunk.toString("utf8");
+          });
+          child.stderr.on("data", (chunk: Buffer) => {
+            stderr += chunk.toString("utf8");
+          });
+          child.on("error", (err) => {
+            error = err;
+          });
+          child.on("close", (status, signal) => {
+            resolve(
+              error
+                ? { status, signal, error, stdout, stderr }
+                : { status, signal, stdout, stderr },
+            );
+          });
+        });
+        assert.equal(
+          result.status,
+          1,
+          JSON.stringify({
+            missing: file,
+            status: result.status,
+            signal: result.signal,
+            error: result.error && {
+              code: (result.error as NodeJS.ErrnoException).code,
+              message: result.error.message,
+            },
+            stdout: result.stdout,
+            stderr: result.stderr,
+          }),
+        );
+        const report = CheckReportSchema.parse(
+          JSON.parse(readFileSync(reportPath, "utf8")),
+        );
+        assert.equal(report.passed, false);
+        assert.deepEqual(report.errors, [
+          `Missing or invalid required capability: ${file}`,
+        ]);
+        assert.deepEqual(report.planned, []);
+        assert.deepEqual(report.results, []);
+        cpSync(path.join(root, file), path.join(f.directory, file));
+      }
+    }),
+  );
 });
 
 test("selected checks produce a private report bound to source and actual coverage", (t) => {

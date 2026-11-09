@@ -288,7 +288,13 @@ function fixtureTemplate(realRuntime: boolean): {
   } else {
     put(
       ".cache/agents-tools/bin/node",
-      `#!/bin/sh\nexec '${process.execPath.replaceAll("'", "'\\''")}' "$@"\n`,
+      [
+        "#!/bin/sh",
+        `if [ "$#" = 1 ] && [ "$1" = "--version" ]; then echo 'v${process.versions.node}'; exit 0; fi`,
+        'if [ "$#" = 1 ] && [ -f "$1" ] && [ "$(cat "$1")" = \'console.error("usage"); process.exitCode = 2;\' ]; then echo usage >&2; exit 2; fi',
+        `exec '${process.execPath.replaceAll("'", "'\\''")}' "$@"`,
+        "",
+      ].join("\n"),
       0o755,
     );
     put(

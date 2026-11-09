@@ -444,7 +444,12 @@ function acquireLock(plan: InstallPlan, command: string): () => void {
   };
 }
 
-function writeNewFile(file: string, bytes: Buffer, mode: number): void {
+function writeNewFile(
+  file: string,
+  bytes: Buffer,
+  mode: number,
+  sync = false,
+): void {
   const descriptor = openSync(
     file,
     constants.O_WRONLY |
@@ -456,7 +461,7 @@ function writeNewFile(file: string, bytes: Buffer, mode: number): void {
   try {
     try {
       writeFileSync(descriptor, bytes);
-      fsyncSync(descriptor);
+      if (sync) fsyncSync(descriptor);
     } finally {
       closeSync(descriptor);
     }
@@ -472,7 +477,11 @@ function writeNewFile(file: string, bytes: Buffer, mode: number): void {
   }
 }
 
-function writeReceipt(file: string, receipt: InstallReceipt): void {
+function writeReceipt(
+  file: string,
+  receipt: InstallReceipt,
+  sync = false,
+): void {
   receipt.updatedAt = new Date().toISOString();
   const bytes = Buffer.from(
     JSON.stringify(InstallReceiptSchema.parse(receipt), null, 2) + "\n",
@@ -482,7 +491,7 @@ function writeReceipt(file: string, receipt: InstallReceipt): void {
     path.dirname(file),
     `.deployment-receipt-${randomUUID()}.tmp`,
   );
-  writeNewFile(temporary, bytes, 0o600);
+  writeNewFile(temporary, bytes, 0o600, sync);
   try {
     renameSync(temporary, file);
   } catch (error) {
@@ -840,9 +849,10 @@ export function applyInstallPlan(
       steps: [],
       errors: [],
     };
-    const record = () => writeReceipt(plan.run.receipt, receipt);
+    const record = (sync = false) =>
+      writeReceipt(plan.run.receipt, receipt, sync);
     // Without a written receipt nothing may change.
-    record();
+    record(true);
     try {
       for (const directory of plan.newDirectories) {
         const entry: InstallReceipt["directories"][number] = {
@@ -892,7 +902,7 @@ export function applyInstallPlan(
           `Installed readback failed: ${installed.map((problem) => problem.path ?? problem.code).join(", ")}`,
         );
       receipt.status = "installed";
-      record();
+      record(true);
     } catch (error) {
       receipt.errors.push(message(error));
       restoreChanges(plan, receipt, record);
@@ -900,7 +910,7 @@ export function applyInstallPlan(
         ? "failed-incomplete"
         : "failed-rolled-back";
       try {
-        record();
+        record(true);
       } catch (recordError) {
         receipt.errors.push(
           `Final receipt write failed: ${message(recordError)}`,
@@ -973,15 +983,16 @@ export function rollbackInstallation(
     const problems: Gap[] = [];
     checkHost(plan, environment, problems);
     if (problems.length) throw new InstallRefused(problems);
-    const record = () => writeReceipt(plan.run.receipt, receipt);
+    const record = (sync = false) =>
+      writeReceipt(plan.run.receipt, receipt, sync);
     receipt.status = "rolling-back";
-    record();
+    record(true);
     restoreChanges(plan, receipt, record);
     receipt.status = recoveryIncomplete(plan, receipt)
       ? "rollback-incomplete"
       : "rolled-back";
     try {
-      record();
+      record(true);
     } catch (recordError) {
       receipt.errors.push(
         `Final receipt write failed: ${message(recordError)}`,
