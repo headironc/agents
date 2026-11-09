@@ -38,7 +38,7 @@
 
 委派机制不可用时，先核实已有负责人能否继续承担任务；若无可用执行者，报告具体缺口并暂停受阻执行，不要改由总协调亲自写代码而污染协调上下文。
 
-启动时先读工作区 `AGENTS.md`、项目导航与 `progress.md` / `spec.md`，核对当前 host/server、路径、分支、基线、候选及未提交改动，保护无关改动后再绑定本片写区。本模板是任务指令，不是 Goal 或附加审批策略正文；需要构造这些正文时，按[内容归属与动作绑定](../../delivery/policy/models.md#goal-and-authorization-content)提取稳定结果和有效限制，将运行事实留在执行材料。持续总协调按[检查与接任规则](../../delivery/policy/models.md#lead-succession)在活动上下文逼近 150K Token 或发生负责人交接时，通过精简锚点文件（`progress.md` / `spec.md`，100 行以内，原位更新状态表而非追加轮询流水账）完成责任转移：必须通过 `list_projects` 在当前仓库项目内创建继任协调会话（`target: { type: "project", projectId, environment: { type: "local" } }`，严禁使用 `projectless`），由接收方核实并接受完整目标、候选、余责与在途句柄（即使启动回合中途收到插话也须在回合结束前完成 `create_goal` 与 `get_goal` 非空回读确认），原协调在接收方确认接责与 Goal 回读后再停止派发并归档自身。观察执行会话（`wait_threads`）或外部检查时，必须在单次脚本调用内循环等待至目标回合离开 `inProgress`，禁止每 20 秒超时就结束模型回合靠 Goal 唤醒刷屏。
+启动时先读工作区 `AGENTS.md`、项目导航与 `progress.md` / `spec.md`，核对当前 host/server、路径、分支、基线、候选及未提交改动，保护无关改动后再绑定本片写区。本模板是任务指令，不是 Goal 或附加审批策略正文；需要构造这些正文时，按[内容归属与动作绑定](../../delivery/policy/models.md#goal-and-authorization-content)提取稳定结果和有效限制，将运行事实留在执行材料。持续总协调按[检查与接任规则](../../delivery/policy/models.md#lead-succession)在活动上下文逼近 150K Token 或发生负责人交接时，通过精简锚点文件（`progress.md` / `spec.md`，100 行以内，原位更新状态表而非追加轮询流水账）完成责任转移：必须通过 `list_projects` 在当前仓库项目内创建继任协调会话（`target: { type: "project", projectId, environment: { type: "local" } }`，严禁使用 `projectless`），由接收方核实并接受完整目标、候选、余责与在途句柄（在原始 Goal 创建授权覆盖继任会话时，即使启动回合中途收到插话也须在回合结束前完成 `create_goal` 与 `get_goal` 非空回读确认），原协调在接收方确认接责（及适用的 Goal 回读）后再停止派发并归档自身。观察执行会话（`wait_threads`）或外部检查时，必须在单次脚本调用内循环等待至目标回合离开 `inProgress`，禁止每 20 秒超时就结束模型回合靠 Goal 唤醒刷屏。
 
 ### 负责人、模型与协作
 
