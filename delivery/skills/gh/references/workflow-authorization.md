@@ -27,7 +27,7 @@ Read this contract before preparing a named GitHub workflow or making its first 
 
 ## Automatic review and waiting
 
-- Check [dependency-update](../../../policy/review.md#dependency-updates) and [pure Sketch design](../../../policy/review.md#pure-sketch-design-slices) eligibility first. Within the [targets and authorized effects](#targets-and-authorized-effects) scope, follow the [shared review coverage rules](../../../policy/review.md#review-coverage), [operation contract](operations.md#automatic-review-and-feedback), [Merge](operations.md#merge), [provider selection](../../../policy/review.md#review-provider-selection), [missing automatic review](../../../policy/review.md#missing-automatic-review), and [stalled review recovery](../../../policy/review.md#stalled-review-recovery).
+- Check [dependency-update](../../../policy/review.md#dependency-updates) eligibility first. Within the [targets and authorized effects](#targets-and-authorized-effects) scope, follow the [shared review coverage rules](../../../policy/review.md#review-coverage), [operation contract](operations.md#automatic-review-and-feedback), [Merge](operations.md#merge), [provider selection](../../../policy/review.md#review-provider-selection), [missing automatic review](../../../policy/review.md#missing-automatic-review), and [stalled review recovery](../../../policy/review.md#stalled-review-recovery).
 - Follow the [asynchronous observation rules](../../../policy/review.md#asynchronous-observation) for concurrent waiting and result-surface verification, stopping waits on cancellation, target drift, or completion without resubmitting mutations.
 
 ## Workflow scope and host permissions
