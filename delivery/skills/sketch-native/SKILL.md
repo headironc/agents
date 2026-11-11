@@ -1,6 +1,6 @@
 ---
 name: sketch-native
-description: Create, edit, inspect, prototype, and visually verify macOS native .sketch documents in Sketch 2026.3 and later through Sketch's built-in MCP server, library components, Stacks, Color Variables, and screenshot-verified critique. Use when designing, updating, or reviewing .sketch files or Sketch MCP workflows.
+description: MUST load before any .sketch inspection, diagnosis, creation, editing, or review on macOS. Routes all .sketch work through Sketch 2026.3+ MCP tools and sketchtool CLI; strictly forbids offline Python/ZIP archive synthesis.
 metadata:
   short-description: Native Sketch 2026.3+ MCP workflow with libraries, Stacks, symbols, and visual verification
 ---
@@ -9,42 +9,109 @@ metadata:
 
 This shared macOS skill routes `.sketch` design work through Sketch 2026.3+ and its built-in MCP server. The same skill directory is delivered to Codex, DeepSeek Harness, and Antigravity CLI on macOS; other platforms skip installation. Installing this skill does not register MCP servers or modify Sketch preferences.
 
-## Load Sketch's Built-In MCP Guides First
-
-Sketch 2026.3+ ships authoritative operational and API documentation inside the application bundle and exposes it through the `get_guide` MCP tool. Do not copy API handbooks into the repository or synthesize `.sketch` ZIP/JSON archives offline by hand.
-
-1. Before calling any Sketch MCP tool, call `get_guide` with `topic: "mcp"`.
-2. Before inspecting, creating, styling, laying out, exporting, or wiring prototypes in a document, call `get_guide` with `topic: "use"`.
-3. Load specialized subtopics on demand through `get_guide`:
-   - `topic: "layout"` for `Group.Frame`, `StackLayout` (`Direction`, `JustifyContent`, `AlignItems`, `gap`, `padding`, reversed child-index packing), `FlexSizing` (`Fixed`, `Fit`, `Fill`, `Relative`), `preservesSpaceWhenHidden`, and constraints.
-   - `topic: "styling"` for `document.processPendingChanges()`, Color Variables (`Swatch`), Shared Layer/Text Styles, `Oklab`/`Oklch` gradients, per-side borders (`border.sides`), smooth and concentric corners (`CornerStyle.Smooth`, `corners.concentric`), `Glass` and progressive blurs, `Fade` (`progressiveAlpha`), and container `tint`.
-   - `topic: "symbols"` for `SymbolMaster`, `SymbolInstance`, `get_symbol_overrides`, `commonOverrideIDPrefix`, `overridesForExpandedLayer`, `swatchValue`, image resize behavior, and `flowDestination`.
-   - `topic: "prototyping"` for `layer.flow`, `sketch.Flow.BackTarget` (`targetId: 'back'`), `flow.isValidConnection()`, `flowStartPoint`, and `sketch.HotSpot`.
-   - `topic: "assets"` for `sketch.export`, SVG import (`sketch.createLayerFromData`), and `sketch.Image`.
-   - `topic: "troubleshooting"` before retrying any failed `run_code`, bridge call, or screenshot capture.
-
-## Bind the Task and Module File Organization
-
-Read project instructions, authoritative requirements, approved references, and the target `.sketch` document before editing. Organize `.sketch` deliverables by cohesive functional module (`design/current/<domain>/<module>.sketch`) rather than splitting individual actions or dialogs into micro-files. Inside each module document, organize related sub-flows across Sketch Pages and keep all reusable Symbol Sources on the dedicated `Symbols` page (`sketch.Page.getSymbolsPage(document)`).
-
 When the task runs under Codex model routing, use `gpt-6.1-sol` at `medium` effort (`high` only for complex multi-state layout constraints) for initial page, component, and Stack hierarchy composition, `gpt-6.1-sol` or `gpt-6-luna` at `low` effort for incremental `run_code` property or override refinements, and `gpt-6.1-terra` at `low` effort for pixel-based screenshot inspection.
 
-## Reuse Libraries, Components, Tokens, and Stacks
+## 0. Required Official and Project Library Preflight
 
-Follow Sketch's native design-system hierarchy rather than drawing ad hoc rectangles and manual coordinates:
+Before starting any `.sketch` design or review work, inspect installed and enabled Libraries through `get_libraries` or `run_code` (`sketch.Library.getLibraries()`) and verify that local Sketch (`~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/`) has the following Libraries installed and enabled:
 
-1. **Discover Libraries and Assets First**: Call `get_libraries` and `get_design_assets` (`symbol`, `swatch`, `textStyle`, `layerStyle`, `frameTemplate`, `graphicTemplate`) before creating new UI structures. Import and assign library references on the same statement as instructed by `get_guide`.
-2. **Use `Group.Frame` and `StackLayout`**: Model screens, cards, lists, form groups, toolbars, and dialogs as `sketch.Group.Frame` containers with `stackLayout` (`Column` or `Row`) and `FlexSizing` (`Fill` / `Fit` / `Fixed`). Remember Sketch's stack packing order (`parent.layers` highest index is placed first at the top or left) and call `stackLayout.apply()` after structural edits.
-3. **Use Native Borders, Corners, and Color Variables**: Use `border.sides` (such as `{ top: 0, right: 0, bottom: 1, left: 0 }`) instead of 1 px divider rectangles. Use `CornerStyle.Smooth` or `corners.concentric = true` for nested containers. Link fills, borders, text (`textSwatch`), and container `tint` to `Swatch` Color Variables and Shared Styles, then call `document.processPendingChanges()`.
-4. **Factor Repeated UI into Symbols**: When a structure repeats across two or more states or screens (navigation bars, tab bars, list rows, key-value rows, buttons, session cards, dialogs), create or reuse a `SymbolMaster` (`sketch.SymbolMaster.fromFrame(frame)`) on the `Symbols` page, place `SymbolInstance` layers on working pages, and populate values via `get_symbol_overrides` and `commonOverrideIDPrefix`.
-5. **Wire Clean Prototypes**: Set `flowStartPoint = true` on primary entry frames, connect interactive components or `HotSpot` layers with `layer.flow` (`44x44` pt minimum hit target), use `sketch.Flow.BackTarget` (`'back'`) for back buttons and dialog cancellation, and verify links with `flow.isValidConnection()`.
+1. **Project Design-System Library** (such as `bencao.sketch`): If the library is not registered or enabled, call `sketch.Library.getLibraryForDocumentAtPath('/abs/path/to/bencao.sketch')` in `run_code` to register and enable it automatically.
+2. **`Apple iOS 27 UI Kit`**: Required for iOS and Mini Program status bars, Home Indicator safe areas, and native system controls.
+3. **Sketch Official `Default Templates` and `Inspire UI Kit`**: If present under `~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/` but not enabled, mount them through `sketch.Library.getLibraryForDocumentAtPath(...)`.
 
-## Execute Incremental Edits and Visual Acceptance
+If any required Library is missing from the host machine, report the environment gap immediately before proceeding with dependent design work.
 
-Follow the `mcp` guide's Golden Rule: one `run_code` call performs one small, observable action using only the public `require('sketch')` JavaScript API, ending with a single-line `console.log(JSON.stringify({ ok: true, ... }))`. Never call Objective-C internals, `sketchObject`, undocumented bridges, or offline ZIP/JSON archive mutators.
+## 1. Sketch MCP 8 Tools and Standard Invocation Sequence
 
-After every appearance-changing batch, capture the affected frame or layer with `get_screenshot` and inspect the actual pixels at reading scale:
+Sketch 2026.3+ ships authoritative operational and API documentation inside the application bundle and exposes eight MCP tools (`get_guide`, `get_document_info`, `get_layer_tree_summary`, `get_libraries`, `get_design_assets`, `get_symbol_overrides`, `run_code`, and `get_screenshot`). Follow the invocation sequence below rather than copying API handbooks into the repository.
 
-- Verify visual hierarchy, alignment, spacing rhythm, unclipped typography, and enclosed dialog/card boundaries.
-- Confirm that Light and Dark variants and required device widths share the same structural shell, persona data, and component tokens.
-- If a screenshot reveals a visual or layout defect, apply a targeted `run_code` fix and re-capture `get_screenshot` before reporting completion.
+### Preload Built-In MCP Guides (`get_guide`)
+
+1. Before calling any Sketch MCP tool for the first time, call `get_guide({ topic: "mcp" })`.
+2. Before reading, creating, laying out, styling, exporting, or modifying prototypes in a document, call `get_guide({ topic: "use" })`.
+3. Load specialized guides on demand through `get_guide`:
+   - `layout`: `StackLayout`, `FlexSizing`, and Pin constraints.
+   - `styling`: `Swatch` Color Variables, `SharedStyle`, per-side borders, concentric corners, blurs, and `Tint`.
+   - `symbols`: `SymbolMaster`, `SymbolInstance`, and nested or image overrides.
+   - `assets`: `sketch.export` and SVG import (`sketch.createLayerFromData`).
+   - `prototyping`: `flow`, `flowStartPoint`, and `HotSpot`.
+   - `troubleshooting`: `run_code` error diagnosis before retrying any failed script or bridge call.
+
+### Document Open, Resolve, and Save Lifecycle (`No current Sketch document`)
+
+- `get_document_info`, `get_layer_tree_summary`, `get_libraries`, `get_design_assets`, `get_symbol_overrides`, and `get_screenshot` all require the `targetDocumentID` of an open Sketch document.
+- When Sketch does not currently have the target document open, do not call `get_document_info` directly and never fall back to Python or other offline scripts to parse the `.sketch` ZIP archive. First call `run_code` to inspect open documents with `sketch.Document.getDocuments()` or open the target file with `sketch.Document.open('/abs/path/to/file.sketch', (err, doc) => { ... })` and output `doc.id`.
+- After completing edits and visual acceptance, save the document natively with `doc.save()` (and call `doc.close()` on non-active working documents when needed to release memory).
+
+### Read-Only Inspection First
+
+- Call `get_document_info({ targetDocumentID })` to retrieve the document ID, Page list, layer counts, and frame coordinates and dimensions.
+- Call `get_layer_tree_summary({ targetDocumentID, layerID, depth: 1..10 })` to inspect subtree hierarchy, text summaries, Stack hints, and override counts instead of writing custom recursive traversal scripts.
+- When conditional lookup is needed inside `run_code`, use the built-in predicate engine `sketch.find(predicate, root)` (supporting combined queries such as `#uuid`, `Frame`, `SymbolMaster`, `SymbolInstance`, `Text`, `[name~*="keyword"]`, `[frame.x>=24]`, and `:not-hidden`).
+
+### Library and Asset Discovery (`get_libraries` + `get_design_assets` + `get_symbol_overrides`)
+
+- Call `get_libraries({ targetDocumentID })` to list enabled Libraries (such as a design-system library like `bencao` or a platform library like `Apple iOS 27 UI Kit`).
+- Call `get_design_assets({ targetDocumentID, kind, nameContains, sourceLibraryID })` to search for `symbol`, `swatch`, `textStyle`, `layerStyle`, `frameTemplate`, and `graphicTemplate` assets.
+- Complete cross-library import and assignment within the same statement (such as `var inst = ref.import().createNewInstance()` or `override.swatchValue = swatchRef.import()`); splitting import and assignment across statements can drop the reference.
+- Before modifying a component instance, call `get_symbol_overrides({ targetDocumentID, layerID })` to retrieve `commonOverrideIDPrefix`.
+
+### `run_code` Execution Rules (Preventing `llm-script.js` Parser Error)
+
+- Start every `run_code` script with `const sketch = require('sketch')` and use only the public JavaScript API. Never call `sketchObject`, Objective-C selectors, or Node `fs`.
+- Never write comments (`//` or `/* */`) inside the submitted `script`, never minify code into a single line, and never redeclare a `function` with the same name in the same scope.
+- Perform one atomic action per `run_code` call, re-resolve `doc` and target layer IDs in each call, and return results exclusively through a single final `console.log(JSON.stringify({ ok: true, ... }))` line (do not rely on `return` or `sketch.UI.message`).
+
+### Pixel-Level Visual Acceptance and Asset Export (`get_screenshot` vs `sketch.export`)
+
+- After every appearance or layout change, call `get_screenshot({ targetDocumentID, layerID })` to inspect the rendered pixels for hierarchy, alignment, spacing rhythm, unclipped typography, and enclosed container boundaries.
+- When exporting disk slices or temporary preview images, call `sketch.export(layer, { output: '/abs/dir', filename: 'name.png', formats: ['png'], scales: ['2.0'], overwriting: true })` inside `run_code`. The `output` option must be an absolute directory path; never pass `output: false` in `run_code` to return a binary buffer.
+
+## 2. Bundled `sketchtool` CLI Toolchain
+
+Sketch 2026.3+ bundles the native command-line binary at `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool`. Use `sketchtool` for bulk file inventory, pre-open inspection of oversized or abnormal archives, duplicate object ID detection, or headless batch exports:
+
+- `sketchtool metadata <file>` and `sketchtool list pages|artboards|layers <file>`: inspect page and artboard structure without opening the document in the GUI.
+- `sketchtool duplicates <file>`: detect and repair duplicate object IDs.
+- `sketchtool migrate <file>`: migrate and save documents with the native Sketch engine and clean up redundant collaboration patches.
+- `sketchtool export preview|artboards|layers|pages <file> --output=/abs/dir`: run headless batch preview exports.
+
+Never use offline Python, Node, or shell scripts to hand-craft, synthesize, or mutate `.sketch` ZIP/JSON archives.
+
+## 3. Native Component Architecture, Full Overrides, and Modern Layout and Styling
+
+### Single Symbol Master Home and Cross-Library Binding
+
+- Place every `SymbolMaster` exclusively at the top level of the dedicated `Symbols` page (`sketch.Page.getSymbolsPage(doc)`). Never leave a `SymbolMaster` on a regular page or nest it inside an `Artboard` or `Group`.
+- Reference shared design-system components (`foreignSymbols`), color variables (`foreignSwatches`), and shared styles (`sharedTextStyles` and `sharedLayerStyles`) through Sketch Libraries in business module documents instead of duplicating foundational components locally.
+
+### Full Override-Driven States (Do Not Arbitrarily `detach()` Instances)
+
+Drive component instance variations through `commonOverrideIDPrefix + '_' + property` rather than calling `detach()`:
+
+- `stringValue`: override text copy.
+- `symbolID`: swap nested state child symbols.
+- `isVisible` and `preservesSpaceWhenHidden`: control visibility and layout reservation for optional buttons, error messages, or badges.
+- `swatchValue`, `color:fill-N`, `color:border-N`, `textColor`, and `fillColor`: apply semantic color overrides.
+- `textStyle` and `layerStyle`: switch shared typography and layer styles.
+- `horizontalSizing` and `verticalSizing`: adjust instance flex sizing behavior.
+- `image` and `imageResizeBehavior`: override image fills with `2` (Fit) or `3` (Fill).
+- `flowDestination`: bind prototype navigation target Frame IDs or `'back'` (`sketch.Flow.BackTarget`) directly on component instances, and verify prototype links with `flow.isValidConnection()` and `flowStartPoint = true` on entry frames.
+
+### Modern Containers, Stack Layout, and Native Styling
+
+- Use `sketch.Group.Frame` (passing `background: { enabled: false }` for transparent layout containers) and `sketch.Group.Graphic` (proportionally scaled icon or illustration containers; check `isGraphicFrame` before `isFrame`).
+- Compose layouts with `stackLayout` (`Direction.Row` / `Direction.Column`, `gap`, `padding`, `wraps`, `bordersAffectLayout`). In `parent.layers`, the highest index renders at the leftmost or topmost position; reorder children by setting `layer.index = n` followed by `stackLayout.apply()`, and never assign `parent.layers = [...]` directly. Pair `stackLayout` with `FlexSizing` (`Fixed`, `Fit`, `Fill`, `Relative`, `minSize`, `maxSize`) and `instance.resizeWithSmartLayout()`.
+- Render dividers using per-side container borders `border.sides = { top: 0, right: 0, bottom: 1, left: 0 }`; never draw standalone `1px`-high rectangle layers.
+- Apply `CornerStyle.Smooth` or `corners.concentric = true` for nested rounded corners, and use `style.tint = { swatch }` for unified icon or container tinting. Call `doc.processPendingChanges()` after modifying color variables, shared styles, or concentric corners.
+
+## 4. Orthogonal Organization of Pages, Business States, and Responsive Breakpoints
+
+Keep `.sketch` deliverables organized by cohesive functional module (`design/current/<domain>/<module>.sketch`) and enforce strict document-scale guardrails:
+
+- **Consolidated Design-System Library**: Keep the design-system master library (such as `bencao.sketch`) consolidated into showcase and specification pages (containing only `SymbolInstance` layers) plus the `Symbols` master page. Do not maintain triplicate `Core/Light/Dark` cloned `SymbolMaster` sets.
+- **Sub-Flow Page Partitioning**: Partition each business module document by core business sub-flow into `2` to `8` business Pages plus `1` `Symbols` Page. Never split pages by `viewport width × theme` into dozens or hundreds of Pages.
+- **Full States on Primary Viewports, Layout Reflow Only on Secondary Breakpoints**:
+  - Cover complete business state branches in both Light and Dark themes at the primary viewports (desktop `1440`, mobile `390`).
+  - At secondary responsive breakpoints (`834`, `768`, `320`, and grid-switching boundaries), retain only representative primary-state frames where layout reflow actually occurs. Never clone micro-states (such as inline field errors or modal dialogs) across the full `state × width × theme` Cartesian product.
+  - Keep each business module document within `<= 12` Pages, `<= 250` top-level Frames, and `<= 50,000` total layers.
