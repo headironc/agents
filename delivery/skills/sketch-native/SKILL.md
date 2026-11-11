@@ -15,11 +15,11 @@ When the task runs under Codex model routing, use `gpt-6.1-sol` at `medium` effo
 
 Before starting any `.sketch` design or review work, inspect installed and enabled Libraries through `get_libraries` or `run_code` (`sketch.Library.getLibraries()`) and verify that local Sketch (`~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/`) has the following Libraries installed and enabled:
 
-1. **Project Design-System Library** (such as `bencao.sketch`): If the library is not registered or is disabled, call `const lib = sketch.Library.getLibraryForDocumentAtPath('/abs/path/to/bencao.sketch'); lib.enabled = true;` in `run_code` and verify `lib.enabled === true`.
-2. **`Apple iOS 27 UI Kit`**: Required for iOS and Mini Program status bars, Home Indicator safe areas, and native system controls (if registered but disabled, set `lib.enabled = true` and verify `lib.enabled === true`).
-3. **Sketch Official `Default Templates` and `Inspire UI Kit`**: If present under `~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/` but not registered or enabled, mount and enable them through `const lib = sketch.Library.getLibraryForDocumentAtPath(...); lib.enabled = true;` and verify `lib.enabled === true`.
+1. **Project Design-System Library** (such as `bencao.sketch`): During read-only inspection or review, report if the library is unregistered or disabled without modifying host configuration. When the task authorizes registering or enabling host Sketch Libraries, call `const lib = sketch.Library.getLibraryForDocumentAtPath('/abs/path/to/bencao.sketch'); lib.enabled = true;` in `run_code` and verify `lib.enabled === true`.
+2. **`Apple iOS 27 UI Kit`**: Required for iOS and Mini Program status bars, Home Indicator safe areas, and native system controls (when host Library changes are authorized and the library is registered but disabled, set `lib.enabled = true` and verify `lib.enabled === true`).
+3. **Sketch Official `Default Templates` and `Inspire UI Kit`**: If present under `~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/` but not registered or enabled, report the status during read-only inspection; when host Library changes are authorized, mount and enable them through `const lib = sketch.Library.getLibraryForDocumentAtPath(...); lib.enabled = true;` and verify `lib.enabled === true`.
 
-If any required Library is missing from the host machine, report the environment gap immediately before proceeding with dependent design work.
+If any required Library is missing from the host machine, or remains unregistered or disabled when host configuration changes are not authorized, report the environment gap immediately before proceeding with dependent work.
 
 ## 1. Sketch MCP 8 Tools and Standard Invocation Sequence
 
