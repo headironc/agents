@@ -15,9 +15,9 @@ When the task runs under Codex model routing, use `gpt-6.1-sol` at `medium` effo
 
 Before starting any `.sketch` design or review work, inspect installed and enabled Libraries through `get_libraries` or `run_code` (`sketch.Library.getLibraries()`) and verify that local Sketch (`~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/`) has the following Libraries installed and enabled:
 
-1. **Project Design-System Library** (such as `bencao.sketch`): If the library is not registered or enabled, call `sketch.Library.getLibraryForDocumentAtPath('/abs/path/to/bencao.sketch')` in `run_code` to register and enable it automatically.
-2. **`Apple iOS 27 UI Kit`**: Required for iOS and Mini Program status bars, Home Indicator safe areas, and native system controls.
-3. **Sketch Official `Default Templates` and `Inspire UI Kit`**: If present under `~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/` but not enabled, mount them through `sketch.Library.getLibraryForDocumentAtPath(...)`.
+1. **Project Design-System Library** (such as `bencao.sketch`): If the library is not registered or is disabled, call `const lib = sketch.Library.getLibraryForDocumentAtPath('/abs/path/to/bencao.sketch'); lib.enabled = true;` in `run_code` and verify `lib.enabled === true`.
+2. **`Apple iOS 27 UI Kit`**: Required for iOS and Mini Program status bars, Home Indicator safe areas, and native system controls (if registered but disabled, set `lib.enabled = true` and verify `lib.enabled === true`).
+3. **Sketch Official `Default Templates` and `Inspire UI Kit`**: If present under `~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/` but not registered or enabled, mount and enable them through `const lib = sketch.Library.getLibraryForDocumentAtPath(...); lib.enabled = true;` and verify `lib.enabled === true`.
 
 If any required Library is missing from the host machine, report the environment gap immediately before proceeding with dependent design work.
 
@@ -67,12 +67,12 @@ Sketch 2026.3+ ships authoritative operational and API documentation inside the 
 - After every appearance or layout change, call `get_screenshot({ targetDocumentID, layerID })` to inspect the rendered pixels for hierarchy, alignment, spacing rhythm, unclipped typography, and enclosed container boundaries.
 - When exporting disk slices or temporary preview images, call `sketch.export(layer, { output: '/abs/dir', filename: 'name.png', formats: ['png'], scales: ['2.0'], overwriting: true })` inside `run_code`. The `output` option must be an absolute directory path; never pass `output: false` in `run_code` to return a binary buffer.
 
-## 2. Bundled `sketchtool` CLI Toolchain
+## 2. Bundled `sketchtool` CLI Toolchain (Prefer First for Large-File Triage and Batch Export)
 
-Sketch 2026.3+ bundles the native command-line binary at `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool`. Use `sketchtool` for bulk file inventory, pre-open inspection of oversized or abnormal archives, duplicate object ID detection, or headless batch exports:
+Sketch 2026.3+ bundles the native headless command-line binary at `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool`. Prefer `sketchtool` first for bulk multi-file inventory, pre-open triage of oversized or abnormal archives, duplicate object ID repair, native migration, and batch exports before opening large documents in the Sketch GUI (avoiding Cocoa window and GPU texture overhead). Once a document is open for interactive authoring, use Sketch's built-in MCP server for all layer creation, library binding, Stack layout, Symbol overrides, frame-level `get_screenshot` verification, and `doc.save()`:
 
-- `sketchtool metadata <file>` and `sketchtool list pages|artboards|layers <file>`: inspect page and artboard structure without opening the document in the GUI.
-- `sketchtool duplicates <file>`: detect and repair duplicate object IDs.
+- `sketchtool metadata <file>` and `sketchtool list pages|artboards|layers <file>`: inspect page and artboard structure headlessly without opening the document in the GUI.
+- `sketchtool duplicates <file>`: detect and repair duplicate object IDs before opening.
 - `sketchtool migrate <file>`: migrate and save documents with the native Sketch engine and clean up redundant collaboration patches.
 - `sketchtool export preview|artboards|layers|pages <file> --output=/abs/dir`: run headless batch preview exports.
 
