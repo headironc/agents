@@ -28,7 +28,7 @@ Current routing belongs to the [model policy](../delivery/policy/models.md#task-
 
 ## sketch-native
 
-[sketch-native](../delivery/skills/sketch-native/SKILL.md) is a shared repository-maintained skill for macOS native `.sketch` (`Sketch 2026.3+`) design work through Sketch's built-in MCP server. Rather than copying Sketch API manuals or maintaining custom offline ZIP/JSON archive mutators and CoreText measurement scripts, the skill directs agents to load Sketch's application-bundled `MCPGuides` (`mcp`, `use`, `layout`, `styling`, `symbols`, `assets`, `prototyping`, and `troubleshooting`) via `get_guide`, discover reusable library assets (`get_libraries`, `get_design_assets`, `get_symbol_overrides`), compose screens with `Group.Frame` and `StackLayout`, bind `Swatch` Color Variables and Shared Styles, and verify every appearance change through `get_screenshot`.
+[sketch-native](../delivery/skills/sketch-native/SKILL.md) is a shared repository-maintained skill for macOS native `.sketch` (`Sketch 2026.3+`) design work through Sketch's built-in MCP server and bundled `sketchtool` CLI. Rather than copying Sketch API manuals or maintaining custom offline ZIP/JSON archive mutators and CoreText measurement scripts, the skill directs agents to verify required Libraries, load Sketch's application-bundled `MCPGuides` (`mcp`, `use`, `layout`, `styling`, `symbols`, `assets`, `prototyping`, and `troubleshooting`) via `get_guide`, discover reusable library assets (`get_libraries`, `get_design_assets`, `get_symbol_overrides`), compose screens with `Group.Frame` and `StackLayout`, bind `Swatch` Color Variables and Shared Styles, and verify every appearance change through `get_screenshot`.
 
 ## Retired designs
 

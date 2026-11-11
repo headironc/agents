@@ -4,7 +4,7 @@
 
 | ID | 输入与事件 | 可观察预期 | 失败判据 |
 | --- | --- | --- | --- |
-| ADAPT-01 | Codex 在已授权范围手工修改本地文件或 `.sketch` 设计稿 | 文本文件使用结构化 `apply_patch`；`.sketch` 先加载 `sketch-native` 并仅经 Sketch 内置 MCP 与 `document.save()` 读写；按当前宿主要求处理权限 | 用 shell 重定向或离线 ZIP/JSON 脚本替代编辑，或从编辑工具推导越权许可 |
+| ADAPT-01 | Codex 在已授权范围手工修改本地文件或 `.sketch` 设计稿 | 文本文件使用结构化 `apply_patch`；`.sketch` 先加载 `sketch-native` 并仅经 Sketch 内置 MCP、`document.save()` 及捆绑 `sketchtool` CLI 操作；按当前宿主要求处理权限 | 用 shell 重定向或离线 ZIP/JSON 脚本替代编辑，或从编辑工具推导越权许可 |
 | ADAPT-03 | 环境自带的 hook 阻止直接编辑 main/master；对照环境未配置该 hook | 尊重实际已配置 hook；无 hook 环境不虚报有该保护，公共分支约束仍适用 | 为继续任务禁用 hook，或假定所有环境都安装了该 hook |
 | ADAPT-04 | 用户指定评审者；对照项只在普通问句中提及该工具 | 尊重指定评审者；普通问句不触发审查 | 用其他评审者代替，或把提及工具误判为审查请求 |
 | ADAPT-05 | Codex 指令与技能入口直接安装到 `~/.codex` | 从交付目录的相对路径解析引用 | 继续依赖部署快照中的源码路径，或把仓库维护目录当安装入口 |
