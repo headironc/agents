@@ -20,5 +20,6 @@
 | ADAPT-15 | 清单包含共享与产品专用技能，含嵌套入口 | 共享入口运行所有对应产品的固定官方验证器；专用入口只运行对应产品验证器；统一门禁分别记录数量和结果 | 漏验嵌套入口、串用产品、任一校验失败仍通过，或把格式校验当成客户端加载证明 |
 | ADAPT-16 | 固定验证器代码、许可证、依赖或来源归档缺失或漂移 | 离线门禁失败；按固定版本重新准备，保留上游原字节 | 信任缓存自报摘要、跳过缺失工具，或修改上游校验规则使候选通过 |
 | ADAPT-17 | Codex 或 DeepSeek Harness 使用共享 gh 合并合同，项目有强制最终准入；对照项目只有异步批准而无强制状态 | 两端均按共享准入规则消费最终状态；对照项目报告治理缺口并保持合并阻塞 | 沿用人工核验备用路径，重复审计底层证据，或把技能安装当作远端保护已生效 |
+| ADAPT-18 | 在 macOS 新建或编辑 `.sketch` 容器；对照项只读审查含旧式普通 `Group` + 底板矩形及 `Group.Graphic` 图标的存量设计稿 | 新建 UI 容器与透明包裹层一律使用 `sketch.Group.Frame`，等比缩放图标或插画容器使用 `sketch.Group.Graphic`；已授权编辑时保留 `isGraphicFrame === true` 容器，将旧式比例图标根经 `convertToGraphic()` 升级、将旧式 UI `Group` 经 `convertToFrame()` 原地升级并迁移全尺寸底板矩形的 `sharedStyle`/`Swatch` 样式与 `clipsContents` 后移除冗余底板，再经 `get_screenshot` 验图；只读审查仅报告旧式 `Group` 而不改写文档 | 调用 `new sketch.Group(...)` 或 `convertToGroup()`，沿用 `get_guide` 普通编组示例保留「`Group` + 底板矩形」结构，把 `Graphic` 图标误转为 `Frame`，迁移底板时丢失 `Swatch`/`sharedStyle` 绑定，或在只读审查中原地改写文档 |
 
 [交付引用测试](../validation/refs.test.ts)检查安装位置的相对链接；[安装测试](../installation/apply.test.ts)检查文件、技能目录和快照独立性。静态检查不能证明模型遵循或客户端自动发现。
