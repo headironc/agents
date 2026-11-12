@@ -97,7 +97,7 @@ Drive component instance variations through `commonOverrideIDPrefix + '_' + prop
 - `textStyle` and `layerStyle`: switch shared typography and layer styles.
 - `horizontalSizing` and `verticalSizing`: adjust instance flex sizing behavior.
 - `image` and `imageResizeBehavior`: override image fills with `2` (Fit) or `3` (Fill).
-- `flowDestination`: bind prototype navigation target Frame IDs or `'back'` (`sketch.Flow.BackTarget`) directly on component instances, and verify prototype links with `flow.isValidConnection()` and `flowStartPoint = true` on entry frames.
+- `flowDestination`: bind target Frame IDs for prototype navigation or `'back'` (`sketch.Flow.BackTarget`) directly on component instances within the same viewport width and theme track (see Section 5).
 
 ### Modern Containers, Stack Layout, and Native Styling
 
@@ -110,13 +110,35 @@ Drive component instance variations through `commonOverrideIDPrefix + '_' + prop
 - Render dividers using per-side container borders `border.sides = { top: 0, right: 0, bottom: 1, left: 0 }`; never draw standalone `1px`-high rectangle layers.
 - Apply `CornerStyle.Smooth` or `corners.concentric = true` for nested rounded corners, and use `style.tint = { swatch }` for unified icon or container tinting. Call `doc.processPendingChanges()` after modifying color variables, shared styles, or concentric corners.
 
-## 4. Orthogonal Organization of Pages, Business States, and Responsive Breakpoints
+## 4. Orthogonal Organization, Spatial Zoning, and Responsive Breakpoints
 
-Keep `.sketch` deliverables organized by cohesive functional module (`design/current/<domain>/<module>.sketch`) and enforce strict document-scale guardrails:
+Keep `.sketch` deliverables organized by cohesive functional module (`design/current/<domain>/<module>.sketch`) and enforce strict document-scale and canvas-layout guardrails:
 
 - **Consolidated Design-System Library**: Keep the design-system master library (such as `bencao.sketch`) consolidated into showcase and specification pages (containing only `SymbolInstance` layers) plus the `Symbols` master page. Do not maintain triplicate `Core/Light/Dark` cloned `SymbolMaster` sets.
-- **Sub-Flow Page Partitioning**: Partition each business module document by core business sub-flow into `2` to `8` business Pages plus `1` `Symbols` Page. Never split pages by `viewport width × theme` into dozens or hundreds of Pages.
-- **Full States on Primary Viewports, Layout Reflow Only on Secondary Breakpoints**:
+- **Sub-Flow Page Partitioning and Document Scale**: Partition the document for each business module by core sub-flow into `2` to `8` business Pages plus `1` `Symbols` Page, and never split pages by `viewport width × theme` into dozens or hundreds of Pages. Target `<= 250` top-level Frames and `<= 50,000` total layers for new or deduplicated standard modules (keeping each individual Page within `<= 250` top-level Frames), while enforcing a hard whole-document ceiling of `<= 12` Pages, `<= 1,200` top-level Frames, and `<= 200,000` total layers (honoring the consuming project's explicit thresholds during read-only audits so large multi-flow modules with full contract coverage are not falsely flagged when free of Cartesian-product duplication).
+- **Primary Viewports vs. On-Demand Secondary Breakpoints**:
   - Cover complete business state branches in both Light and Dark themes at the primary viewports (desktop `1440`, mobile `390`).
-  - At secondary responsive breakpoints (`834`, `768`, `320`, and grid-switching boundaries), retain only representative primary-state frames where layout reflow actually occurs. Never clone micro-states (such as inline field errors or modal dialogs) across the full `state × width × theme` Cartesian product.
-  - Keep each business module document within `<= 12` Pages, `<= 250` top-level Frames, and `<= 50,000` total layers.
+  - Select secondary responsive breakpoints on demand from `{1200, 834, 768, 320}` only where structural layout reflow occurs (such as sidebar collapse, table-to-card conversion, or toolbar wrapping). Omit secondary breakpoints when no structural reflow occurs, and never clone micro-states (such as inline field errors or modal dialogs) across the full `state × width × theme` Cartesian product.
+- **Three-Band Canvas Zoning, Sidebar Order, and Hierarchical Frame Naming**:
+  - Arrange top-level Frames on each business Page with step progression along the horizontal `X` axis (`120` to `160px` column and row gutters) and three vertical `Y` bands separated by `360` to `480px` inter-band gaps:
+    1. **Band 1 (Top — Happy Path on Primary Viewports)**: Place core step-by-step user flows first (`1440 · Light` on row 1, aligned `1440 · Dark` on row 2, followed by `390 · Light` and `390 · Dark` rows when an interactive mobile flow exists). Prefix main-flow Frame names with primary step numbers (such as `01 · Column List · 1440 · Light`, `02 · Create Column · 1440 · Light`).
+    2. **Band 2 (Middle — Edge and Contract States on Primary Viewports)**: Place non-happy-path states (empty states, permission denials, validation or concurrency conflicts, API failure and unknown-outcome recovery, and `64`-character overflow checks) in Light and Dark pairs aligned under the corresponding Band 1 step or grouped by state category. Anchor Frame names to the parent step (such as `02a · Create Column - Duplicate Name · 1440 · Light`) instead of continuing flat top-level numbering.
+    3. **Band 3 (Bottom — Secondary Responsive Reflows)**: Place static reflow Frames at the bottom with a breakpoint prefix (such as `R1 · Column List · 768 · Light`).
+  - Synchronize the layer-list order of each Page (via `frame.index`, where the highest index sits at the top of the left sidebar Layer List and index `0` sits at the bottom) with the `Band 1 -> Band 2 -> Band 3` reading order so sidebar navigation matches the canvas layout.
+
+## 5. Prototype Entry Convergence, Same-Track Wiring, and Production UI Purity
+
+Keep interactive prototypes focused on genuine user navigation while reviewing backend and responsive contract states statically on the canvas:
+
+- **Converged Prototype Start Points (`flowStartPoint`)**:
+  - Set `frame.flowStartPoint = true` exclusively on the step `01` entry Frame of each primary `viewport × theme` track in Band 1 (`2` start points per desktop-only Page for `1440 Light` and `1440 Dark`, or up to `4` when `390 Light` and `390 Dark` primary mobile flows exist).
+  - Explicitly set `frame.flowStartPoint = false` on all subsequent Happy Path steps, all Band 2 edge and contract Frames, and all Band 3 secondary breakpoint Frames so the Sketch Prototypes panel lists only true sub-flow entry points.
+- **Same-Track Navigation and Zero Orphan Flows**:
+  - Restrict every `layer.flow` and `flowDestination` connection to top-level Frames sharing the exact same `frame.width` and `Light` or `Dark` theme, or to `sketch.Flow.BackTarget` (`'back'`). Never wire cross-viewport jumps (such as `390` to `1440`) or cross-theme jumps.
+  - Keep Band 3 responsive reflow Frames and non-interactive Band 2 contract Frames free of outgoing prototype links: set `layer.flow = undefined` and clear every `SymbolInstance` override where `property === 'flowDestination'` to `""` so Sketch never promotes isolated Frames into implicit prototype roots.
+  - Probe the prototype graph of each Page in `run_code` and verify every active link by resolving `layer.flow.target` (or checking that `layer.flow.targetId` or `override.value` resolves to an existing same-track top-level Frame in the document, or that `layer.flow.isBackAction()` or `override.value === 'back'` holds). Never call `layer.flow.isValidConnection()` (overriding `get_guide`, because `isValidConnection` belongs to `Override` rather than `Flow` and throws `TypeError` on `layer.flow`).
+- **Production UI Purity and Single-Source Navigation Controls**:
+  - Keep every Frame faithful to production UI. Never render prototype-only debug triggers (such as `"Prototype Demo: ..."` buttons or bars for switching states) or stack hidden `sketch.HotSpot` overlays onto business screens to reach backend error states. Wire genuine user-triggered dialogs (such as confirmation modals for deactivation) on the same track, and review backend, empty, and boundary contract states statically in Band 2.
+  - Place at most one page-level back or breadcrumb control in the top header region; never duplicate back links in both the header and footer (form footers retain only `Cancel` and the primary submit action).
+  - Omit standalone manual `Refresh` buttons on ordinary CRUD lists and detail screens unless asynchronous polling or manual synchronization is an explicit product requirement. Maintain a single primary CTA per action bar with secondary or destructive actions visually subordinated.
+- **Read-Only Audit Parity**: During read-only inspection or review, report excess `flowStartPoint` flags, cross-track or broken `flow` links, unzoned canvases, or prototype-only debug controls without mutating the document.
