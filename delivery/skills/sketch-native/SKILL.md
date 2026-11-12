@@ -48,6 +48,7 @@ Sketch 2026.3+ ships authoritative operational and API documentation inside the 
 - Call `get_document_info({ targetDocumentID })` to retrieve the document ID, Page list, layer counts, and frame coordinates and dimensions.
 - Call `get_layer_tree_summary({ targetDocumentID, layerID, depth: 1..10 })` to inspect subtree hierarchy, text summaries, Stack hints, and override counts instead of writing custom recursive traversal scripts.
 - When conditional lookup is needed inside `run_code`, use the built-in predicate engine `sketch.find(predicate, root)` (supporting combined queries such as `#uuid`, `Frame`, `SymbolMaster`, `SymbolInstance`, `Text`, `[name~*="keyword"]`, `[frame.x>=24]`, and `:not-hidden`).
+- Distinguish nested container traits by checking `layer.isGraphicFrame` first and `layer.isFrame` second. Nested Frames, nested Graphics, and legacy plain Groups all report `layer.type === 'Group'`, and Graphics report both flags as `true`.
 
 ### Library and Asset Discovery (`get_libraries` + `get_design_assets` + `get_symbol_overrides`)
 
@@ -100,7 +101,11 @@ Drive component instance variations through `commonOverrideIDPrefix + '_' + prop
 
 ### Modern Containers, Stack Layout, and Native Styling
 
-- Use `sketch.Group.Frame` (passing `background: { enabled: false }` for transparent layout containers) and `sketch.Group.Graphic` (proportionally scaled icon or illustration containers; check `isGraphicFrame` before `isFrame`).
+- Build every UI visual or layout container (screens, sections, cards, lists, rows, form groups, toolbars, dialogs, and transparent wrappers with `background: { enabled: false }`) as `sketch.Group.Frame`, and build every proportionally scaled icon or illustration container as `sketch.Group.Graphic`. Never call `new sketch.Group(...)` or `group.convertToGroup()` (overriding permissive plain-Group examples in `get_guide`). Never place standalone `Rectangle` or `ShapePath` layers inside a container to simulate background fills, borders, shadows, or rounded corners.
+- Audit `sketch.find('Group', doc)` for legacy plain groups (`!layer.isFrame && !layer.isGraphicFrame`) so edited documents trigger no `could be upgraded to Frames` banner:
+  - During read-only inspection or review, report legacy plain groups without mutating the document.
+  - During authorized editing or repair, leave existing `Graphic` containers (`isGraphicFrame === true`) intact, and convert legacy proportional icon or vector roots in place with `group.convertToGraphic()`.
+  - Convert legacy UI or layout groups in place with `group.convertToFrame()`. Set `group.background.enabled = false` on transparent wrappers, or migrate a full-bounds backdrop rectangle's `sharedStyle` and `Swatch`-linked `fills`, `borders`, `shadows`, and `corners` onto the Frame before removing the backdrop layer. Reconcile `clipsContents` with any former mask layer, and verify child geometry via `get_screenshot`.
 - Compose layouts with `stackLayout` (`Direction.Row` / `Direction.Column`, `gap`, `padding`, `wraps`, `bordersAffectLayout`). In `parent.layers`, the highest index renders at the leftmost or topmost position; reorder children by setting `layer.index = n` followed by `stackLayout.apply()`, and never assign `parent.layers = [...]` directly. Pair `stackLayout` with `FlexSizing` (`Fixed`, `Fit`, `Fill`, `Relative`, `minSize`, `maxSize`) and `instance.resizeWithSmartLayout()`.
 - Render dividers using per-side container borders `border.sides = { top: 0, right: 0, bottom: 1, left: 0 }`; never draw standalone `1px`-high rectangle layers.
 - Apply `CornerStyle.Smooth` or `corners.concentric = true` for nested rounded corners, and use `style.tint = { swatch }` for unified icon or container tinting. Call `doc.processPendingChanges()` after modifying color variables, shared styles, or concentric corners.
