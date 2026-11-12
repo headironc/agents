@@ -97,7 +97,7 @@ Drive component instance variations through `commonOverrideIDPrefix + '_' + prop
 - `textStyle` and `layerStyle`: switch shared typography and layer styles.
 - `horizontalSizing` and `verticalSizing`: adjust instance flex sizing behavior.
 - `image` and `imageResizeBehavior`: override image fills with `2` (Fit) or `3` (Fill).
-- `flowDestination`: bind target Frame IDs for prototype navigation or `'back'` (`sketch.Flow.BackTarget`) directly on component instances within the same viewport width and theme track (see Section 5).
+- `flowDestination`: bind target Frame IDs for prototype navigation or `'back'` (`sketch.Flow.BackTarget`) directly on component instances within the same viewport and theme track (see Section 5).
 
 ### Modern Containers, Stack Layout, and Native Styling
 
@@ -134,9 +134,9 @@ Keep interactive prototypes focused on genuine user navigation while reviewing b
   - Set `frame.flowStartPoint = true` exclusively on the step `01` entry Frame of each primary `viewport × theme` track in Band 1 (`2` start points per desktop-only Page for `1440 Light` and `1440 Dark`, or up to `4` when `390 Light` and `390 Dark` primary mobile flows exist).
   - Explicitly set `frame.flowStartPoint = false` on all subsequent Happy Path steps, all Band 2 edge and contract Frames, and all Band 3 secondary breakpoint Frames so the Sketch Prototypes panel lists only true sub-flow entry points.
 - **Same-Track Navigation and Zero Orphan Flows**:
-  - Restrict every `layer.flow` and `flowDestination` connection to top-level Frames sharing the exact same `frame.width` and `Light` or `Dark` theme, or to `sketch.Flow.BackTarget` (`'back'`). Never wire cross-viewport jumps (such as `390` to `1440`) or cross-theme jumps.
+  - Restrict full-screen `layer.flow` and `flowDestination` navigation to top-level Frames with the same `frame.width` and `Light` or `Dark` theme, or to `sketch.Flow.BackTarget` (`'back'`); permit Sketch Overlay targets (such as confirmation modals, drawers, or popovers) to use intrinsic Overlay dimensions when bound to the same primary viewport track and theme. Never wire cross-viewport jumps (such as `390` to `1440`) or cross-theme jumps.
   - Keep Band 3 responsive reflow Frames and non-interactive Band 2 contract Frames free of outgoing prototype links: set `layer.flow = undefined` and clear every `SymbolInstance` override where `property === 'flowDestination'` to `""` so Sketch never promotes isolated Frames into implicit prototype roots.
-  - Probe the prototype graph of each Page in `run_code` and verify every active link by resolving `layer.flow.target` (or checking that `layer.flow.targetId` or `override.value` resolves to an existing same-track top-level Frame in the document, or that `layer.flow.isBackAction()` or `override.value === 'back'` holds). Never call `layer.flow.isValidConnection()` (overriding `get_guide`, because `isValidConnection` belongs to `Override` rather than `Flow` and throws `TypeError` on `layer.flow`).
+  - Probe the prototype graph of each Page in `run_code`: verify `layer.flow` with `layer.flow.isValidConnection()` together with same-track target resolution via `layer.flow.target` or `layer.flow.targetId` (or `layer.flow.isBackAction()`), and verify `SymbolInstance` `flowDestination` overrides (whose `value` is a string ID or `'back'` rather than a `Flow` instance) by resolving `override.value` against an existing same-track top-level Frame or `'back'`.
 - **Production UI Purity and Single-Source Navigation Controls**:
   - Keep every Frame faithful to production UI. Never render prototype-only debug triggers (such as `"Prototype Demo: ..."` buttons or bars for switching states) or stack hidden `sketch.HotSpot` overlays onto business screens to reach backend error states. Wire genuine user-triggered dialogs (such as confirmation modals for deactivation) on the same track, and review backend, empty, and boundary contract states statically in Band 2.
   - Place at most one page-level back or breadcrumb control in the top header region; never duplicate back links in both the header and footer (form footers retain only `Cancel` and the primary submit action).
