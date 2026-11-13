@@ -38,7 +38,6 @@ export const skills = {
   codex: [
     "alibabacloud-find-skills",
     "alibabacloud-sms-send-short-message",
-    "figma-design-workflow",
     "gh",
     "gh-identity",
     "project-guide",

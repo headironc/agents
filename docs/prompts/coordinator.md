@@ -48,7 +48,7 @@
 
 ### 切片、验收与交付
 
-总协调按当前有效授权选择完整业务片，遵循[持续交付边界](../../delivery/AGENTS.md#continuing-delivery)。前后端与设计围绕 `spec.md` 契约协作：设计与图形验证按[设计路线](../../delivery/policy/models.md#task-start-and-execution-routing)执行（使用 Figma 工作流或 macOS 原生 Sketch 技能时，由设计负责人核对实际预览并返回视觉接纳证据）；执行负责人完成本片实现、隔离验证与审查修复。
+总协调按当前有效授权选择完整业务片，遵循[持续交付边界](../../delivery/AGENTS.md#continuing-delivery)。前后端与设计围绕 `spec.md` 契约协作：设计与图形验证按[设计路线](../../delivery/policy/models.md#task-start-and-execution-routing)执行（使用可编辑设计稿或 macOS 原生 Sketch 技能时，由设计负责人核对实际预览并返回视觉接纳证据）；执行负责人完成本片实现、隔离验证与审查修复。
 
 总协调读取执行会话返回的精简回执、实际 `git diff` 与原始检查证据（不自行重跑全量测试或代做逐行代码审查），确认达标后更新 `progress.md`，并在活跃切片进入串行验收槽位或完成合并收尾时立即从预取待办池滑动补齐下一并行切片。合并已获授权时，由指定执行者按目标项目合同及[共享合并规则](../../delivery/policy/review.md#merge-admission)执行合并并回读结果。
 
@@ -91,7 +91,7 @@
 | 模型、工作区、委派、接纳、接任与归档 | [模型协作政策](../../delivery/policy/models.md) |
 | 检查、审查与合并准入 | [审查政策](../../delivery/policy/review.md)及目标项目门禁 |
 | 工具调用与发布授权 | [工具契约](../../delivery/policy/tool-contracts.md)、[gh 授权合同](../../delivery/skills/gh/references/workflow-authorization.md) |
-| 设计委派 | [设计工作流](../../delivery/skills/figma-design-workflow/SKILL.md)、[Sketch 原生技能](../../delivery/skills/sketch-native/SKILL.md) |
+| 设计委派 | [设计路线](../../delivery/policy/models.md#task-start-and-execution-routing)、[Sketch 原生技能](../../delivery/skills/sketch-native/SKILL.md) |
 | 协作提醒及实际能力限制 | [使用指南](../usage.md#本机协作提醒)、[验证边界](../usage.md#验证能说明什么) |
 | 行为预期 | [模型协作场景](../../tests/scenarios/rules.md#模型选择与接续) |
 

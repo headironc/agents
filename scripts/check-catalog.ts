@@ -90,7 +90,6 @@ export const requiredRepositoryPaths = [
   "delivery/policy/review.md",
   "delivery/policy/deepseek-harness.md",
   "delivery/policy/antigravity.md",
-  "delivery/skills/figma-design-workflow/SKILL.md",
   "delivery/skills/sketch-native/SKILL.md",
   "delivery/skills/gh/SKILL.md",
   "delivery/skills/gh/references/extended-commands.md",

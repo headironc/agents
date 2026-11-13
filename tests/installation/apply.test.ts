@@ -1295,8 +1295,7 @@ test("DeepSeek Harness receives its supported rules, capabilities, tools and ski
         target.product === "dsh" &&
         (target.category === "guide" ||
           target.path.endsWith("/policy/antigravity.md") ||
-          target.path.endsWith("/capability/codex.toml") ||
-          target.path.endsWith("/skills/figma-design-workflow")),
+          target.path.endsWith("/capability/codex.toml")),
     ),
   );
   for (const relative of personal)

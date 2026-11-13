@@ -2,7 +2,7 @@
 
 Contract subject: `dsh`.
 
-本合同定义通过本机安装的官方 DeepSeek Harness CLI（`dsh`）执行只读分析、有界开发与修复的结构化契约、参数与结果核验规则。可选委派、模型分层及授权由[模型政策](models.md#deepseek-harness-delegation)定义。开发执行遵循[开发设备选择](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。设计稿默认路线见[任务起点](models.md#task-start-and-execution-routing)，可编辑结果与视觉验收见 Codex 的 `figma-design-workflow` 技能。先核对实际 CLI 版本、实际接收服务、凭据来源及有效参数。
+本合同定义通过本机安装的官方 DeepSeek Harness CLI（`dsh`）执行只读分析、有界开发与修复的结构化契约、参数与结果核验规则。可选委派、模型分层及授权由[模型政策](models.md#deepseek-harness-delegation)定义。开发执行遵循[开发设备选择](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。设计稿与视觉验收默认沿[任务起点](models.md#task-start-and-execution-routing)执行（macOS `.sketch` 设计稿加载 `sketch-native` 技能）。先核对实际 CLI 版本、实际接收服务、凭据来源及有效参数。
 
 ## 执行客户端、接收服务与凭据来源
 
@@ -30,7 +30,7 @@ Contract subject: `dsh`.
 
 ### 显式设计模式
 
-单纯的设计稿创建与迭代沿用[模型政策的设计路线](models.md#task-start-and-execution-routing)与 Codex 的 `figma-design-workflow` 技能。仅当用户有效指令显式选用 DeepSeek Harness 辅助设计草稿或前端原型时，按本合同的只读或有界执行模式绑定目标目录、权限与输入材料，最终像素与交互判断仍由主负责人验收。
+单纯的设计稿创建与迭代沿用[模型政策的设计路线](models.md#task-start-and-execution-routing)（macOS `.sketch` 设计稿加载 `sketch-native` 技能）。仅当用户有效指令显式选用 DeepSeek Harness 辅助设计草稿或前端原型时，按本合同的只读或有界执行模式绑定目标目录、权限与输入材料，最终像素与交互判断仍由主负责人验收。
 
 ## 模型、推理档位与命令参数
 
