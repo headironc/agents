@@ -13,7 +13,7 @@
 | 总协调启动提示词 | [通用启动模板](docs/prompts/coordinator.md) | 明确启用后，总协调保持极简上下文（目标 `<50K Token`）负责拆分、派发、跟进和精简证据接纳，执行会话默认按 `Coder/Reviewer low` 高速完成编码验证与 PR，实现多切片全自动连续推进；普通文档，不安装 |
 | 本机协作提醒 | [使用与恢复](docs/usage.md#本机协作提醒) | 本机可选配置，独立于源码交付；启用状态与授权按实际环境核对 |
 | DeepSeek Harness (`dsh`) 委派与调用 | [分工与授权](delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](delivery/policy/deepseek-harness.md) | 按任务与能力适配选用（连接本合同定义的 OpenCode Go 或 DeepSeek 官方路由，日常默认 `deepseek-v4.1-flash` 显式 `low` 档位）；提供无密钥 `headless` 凭据与路由片段 [`dsh-headless.patch.yml`](delivery/capability/dsh-headless.patch.yml)；负责人判断与验收；未接入 CI 或审查关卡 |
-| 设计稿与看图验收 | [figma-design-workflow](delivery/skills/figma-design-workflow/SKILL.md)、[sketch-native](delivery/skills/sketch-native/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Figma 工作流为 Codex 专用，Sketch 原生技能限 macOS 安装与运行；保留可编辑结果与真实像素验收；历史实测范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
+| 设计稿与看图验收 | [sketch-native](delivery/skills/sketch-native/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Sketch 原生技能限 macOS 安装与运行；保留可编辑结果与真实像素验收；验证范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
 | 产品指令 | [交付目录](docs/usage.md#交付目录) | 直接维护与安装位置相同的源码布局 |
 | 文档检查器 | [工具契约](delivery/policy/tool-contracts.md) | 提示中文句长，阻塞混排空格及表格编号错误 |
 | 任务临时目录与遗留扫描 | [生命周期](delivery/policy/models.md#task-temporary-directories)、[调用入口](delivery/policy/tool-contracts.md#task-temp) | 前台命令使用私有 scratch 并收尾；遗留扫描只读，历史目录不自动删除 |

@@ -15,7 +15,7 @@
 | ADAPT-10 | 普通的局部修复，依赖清楚、范围已定 | 直接做，不强制计划模式 | 为走流程而规划 |
 | ADAPT-11 | 消费者仓库保留旧 Claude PR 工作流 YAML，但 API 状态为 `disabled_manually`；Codex App 对当前 PR 发布了绑定 head SHA 和触发事件的摘要 | 核对消费者仓库的工作流状态、App 身份、PR head、触发事件和实际报告；有发现时读取行内评论，无发现时结合摘要或反应确认运行；采信满足覆盖条件的 Codex 证据，把已禁用的 Claude 路线记为不可用 | 因本仓库已删除工作流便假定消费者也已删除，要求已禁用的检查通过，把无行内评论当成未运行，或把普通 CI 绿灯当成模型审查 |
 | ADAPT-12 | 隔离安装的 AGENTS.md 引用 `policy/models.md`；对照候选缺少入口引用或政策成员 | 完整候选的入口进入 CLI 输入，政策按交付清单安装且字节一致；缺少引用或成员时验证失败 | 只检查仓库源文件存在，或把无模型加载检查当作模型已读取正文、遵守政策或切换模型的证据 |
-| ADAPT-13 | 同一 Skills 源码按产品部署 | 按产品清单交付完整技能包及对应规则与公共依赖；三端仅在 macOS 接收 `sketch-native`；嵌套入口由 wechatide 父入口路由 | 把 Codex Figma 设计编排技能交给其他产品，在非 macOS 安装 Sketch 技能，要求 DeepSeek Harness 将嵌套子目录自动列为顶层技能，或覆盖用户已有 `.credentials.yaml` / `profiles/` |
+| ADAPT-13 | 同一 Skills 源码按产品部署 | 按产品清单交付完整技能包及对应规则与公共依赖；三端仅在 macOS 接收 `sketch-native`；嵌套入口由 wechatide 父入口路由 | 把产品专属文件（如 `policy/antigravity.md`、`capability/codex.toml`）或 `wechatide` 越界交给未选产品，在非 macOS 安装 Sketch 技能，要求 DeepSeek Harness 将嵌套子目录自动列为顶层技能，或覆盖用户已有 `.credentials.yaml` / `profiles/` |
 | ADAPT-14 | gh 在 DeepSeek Harness 或 Antigravity CLI 中按需读取评审规则 | 直接读取已安装的 `policy/review.md`，其引用闭包在所选产品发布树内自洽 | 引用未向该产品安装的专属文件，导致发布树断链 |
 | ADAPT-15 | 清单包含共享与产品专用技能，含嵌套入口 | 共享入口运行所有对应产品的固定官方验证器；专用入口只运行对应产品验证器；统一门禁分别记录数量和结果 | 漏验嵌套入口、串用产品、任一校验失败仍通过，或把格式校验当成客户端加载证明 |
 | ADAPT-16 | 固定验证器代码、许可证、依赖或来源归档缺失或漂移 | 离线门禁失败；按固定版本重新准备，保留上游原字节 | 信任缓存自报摘要、跳过缺失工具，或修改上游校验规则使候选通过 |

@@ -6,7 +6,6 @@ import { readSourceEntries } from "./source.ts";
 
 // Require delivered tool capabilities and their intended products.
 const requiredSkills = [
-  { path: "figma-design-workflow", target: "codex" },
   { path: "sketch-native", target: "codex,dsh,antigravity" },
   { path: "gh", target: "codex,dsh,antigravity" },
   { path: "project-guide", target: "codex,dsh,antigravity" },

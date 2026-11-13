@@ -121,7 +121,6 @@ const required = [
   "delivery/policy/review.md",
   "delivery/policy/deepseek-harness.md",
   "delivery/policy/antigravity.md",
-  "delivery/skills/figma-design-workflow/SKILL.md",
   "delivery/skills/sketch-native/SKILL.md",
   "delivery/skills/gh/SKILL.md",
   "delivery/skills/gh/references/extended-commands.md",
@@ -249,7 +248,7 @@ test("Codex loader accepts a temporary root reached through a symlink", (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(
     result.stdout,
-    /Codex loaded AGENTS\.md and 17 delivered skills; model policy is available on demand/,
+    /Codex loaded AGENTS\.md and 16 delivered skills; model policy is available on demand/,
   );
 });
 
@@ -517,7 +516,11 @@ function fixture(t: TestContext) {
   }
   const nodeBin = path.join(binDir, "node");
   const stat = lstatSync(nodeBin, { throwIfNoEntry: false });
-  if (!stat?.isFile() || stat.isSymbolicLink() || stat.size !== pinnedNodeSize) {
+  if (
+    !stat?.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.size !== pinnedNodeSize
+  ) {
     rmSync(nodeBin, { force: true });
     // Copy across read-only container mounts without sharing mutable runtime bytes.
     copyFileSync(process.execPath, nodeBin, constants.COPYFILE_FICLONE);
@@ -586,7 +589,7 @@ test("repository and all gates register each official product validator", async 
   ] as const) {
     const specs = await checkSpecs([...groups], "all");
     for (const [product, name] of [
-      ["codex", "Codex skill validation: 17 entries"],
+      ["codex", "Codex skill validation: 16 entries"],
       ["dsh", "DeepSeek Harness skill validation: 16 entries"],
       ["antigravity", "Antigravity skill validation: 6 entries"],
     ]) {
@@ -703,7 +706,6 @@ test("a stale base is reported, and silent wherever the answer would be noise", 
 test("the real checker refuses every missing R5 delivery member before execution", async (t) => {
   const members = [
     "delivery/skills/gh-identity/SKILL.md",
-    "delivery/skills/figma-design-workflow/SKILL.md",
     "delivery/skills/sketch-native/SKILL.md",
     "delivery/skills/gh-identity/references/auth-readiness.md",
     "delivery/skills/gh/references/workflow-authorization.md",

@@ -19,16 +19,16 @@ import { fixtureRepository, repositoryRoot } from "./fixtures.ts";
 const skill = (name: string) =>
   `---\nname: ${name}\ndescription: Read a synthetic fixture.\n---\n\n# Fixture\n\nRead the supplied value.\n`;
 
-test("design orchestration stays Codex-only while Sketch reaches all products on macOS", () => {
+test("delivered skills scope dual-product shared entries and reach all products on macOS for Sketch", () => {
   const entries = readSkillEntries(repositoryRoot);
-  assert.equal(entries.length, 17);
+  assert.equal(entries.length, 16);
   assert.equal(
     entries.find((entry) => entry.path === "project-guide")?.target,
     "codex,dsh,antigravity",
   );
   assert.ok(
     entries.every((entry) =>
-      ["shared", "codex", "codex,dsh,antigravity"].includes(entry.target),
+      ["shared", "codex,dsh,antigravity"].includes(entry.target),
     ),
   );
   assert.deepEqual(selectSkillEntries(entries, "codex"), entries);
@@ -43,17 +43,12 @@ test("design orchestration stays Codex-only while Sketch reaches all products on
       "sketch-native",
     ],
   );
-  assert.deepEqual(
-    selectSkillEntries(entries, "dsh"),
-    entries.filter((entry) => entry.path !== "figma-design-workflow"),
-  );
+  assert.deepEqual(selectSkillEntries(entries, "dsh"), entries);
   assert.deepEqual(
     publicMembers(entries)
-      .filter(
-        (member) => member.source === "delivery/skills/figma-design-workflow",
-      )
+      .filter((member) => member.source === "delivery/skills/wechatide")
       .map((member) => member.product),
-    ["codex"],
+    ["codex", "dsh"],
   );
   assert.deepEqual(
     publicMembers(entries, undefined, "darwin")
@@ -68,8 +63,8 @@ test("design orchestration stays Codex-only while Sketch reaches all products on
     [],
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 17, DeepSeek Harness 16, Antigravity 6",
-    "Codex skill validation: 17 entries",
+    "Skill membership: DELIVERED; Codex 16, DeepSeek Harness 16, Antigravity 6",
+    "Codex skill validation: 16 entries",
     "DeepSeek Harness skill validation: 16 entries",
     "Antigravity skill validation: 6 entries",
   ]);
@@ -125,7 +120,7 @@ test("nested members belong to their top-level skill and do not add install targ
     entries.find((entry) => entry.path === "suite/skills/child")?.topLevel,
     "suite",
   );
-  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 10);
+  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 9);
   assert.equal(selectSkillEntries(entries, "dsh").length, 18);
   assert.ok(
     !selectSkillEntries(entries, "dsh").some(
@@ -133,37 +128,38 @@ test("nested members belong to their top-level skill and do not add install targ
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 20, DeepSeek Harness 18, Antigravity 6",
-    "Codex skill validation: 20 entries",
+    "Skill membership: DELIVERED; Codex 19, DeepSeek Harness 18, Antigravity 6",
+    "Codex skill validation: 19 entries",
     "DeepSeek Harness skill validation: 18 entries",
     "Antigravity skill validation: 6 entries",
   ]);
 });
 
-test("design workflow membership and product cannot be weakened", (t) => {
+test("required skill membership and product cannot be weakened", (t) => {
   const f = fixtureRepository(t);
   const manifest = "config/personal-skills.txt";
   const original = readFileSync(path.join(f.directory, manifest), "utf8");
-  f.put(manifest, original.replace("figma-design-workflow\tcodex\n", ""));
+  f.put(
+    manifest,
+    original.replace("sketch-native\tcodex,dsh,antigravity\n", ""),
+  );
   assert.throws(
     () => readSkillEntries(f.directory),
-    /Required skill is missing: figma-design-workflow/,
+    /Required skill is missing: sketch-native/,
   );
   f.put(
     manifest,
     original.replace(
-      "figma-design-workflow\tcodex",
-      "figma-design-workflow\tshared",
+      "sketch-native\tcodex,dsh,antigravity",
+      "sketch-native\tshared",
     ),
   );
   assert.throws(
     () => readSkillEntries(f.directory),
-    /Required skill product differs: figma-design-workflow/,
+    /Required skill product differs: sketch-native/,
   );
   f.put(manifest, original);
-  rmSync(
-    path.join(f.directory, "delivery/skills/figma-design-workflow/SKILL.md"),
-  );
+  rmSync(path.join(f.directory, "delivery/skills/sketch-native/SKILL.md"));
   assert.throws(
     () => readSkillEntries(f.directory),
     /manifest and source entrypoints differ/,

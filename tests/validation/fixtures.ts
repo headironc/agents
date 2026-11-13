@@ -170,8 +170,7 @@ export function fixtureRepository(t: TestContext) {
   const putSkillManifest = (additional: string) =>
     put(
       "config/personal-skills.txt",
-      "figma-design-workflow\tcodex\n" +
-        "sketch-native\tcodex,dsh,antigravity\n" +
+      "sketch-native\tcodex,dsh,antigravity\n" +
         "gh\tcodex,dsh,antigravity\ngh-identity\tcodex,dsh,antigravity\nalibabacloud-find-skills\tcodex,dsh,antigravity\nalibabacloud-sms-send-short-message\tcodex,dsh,antigravity\nwechatide\tshared\nwechatide/skills/automator\tshared\nwechatide/skills/cloudbase-operator\tshared\nwechatide/skills/compiler\tshared\nwechatide/skills/debugger\tshared\nwechatide/skills/initializer\tshared\nwechatide/skills/installer\tshared\nwechatide/skills/previewer\tshared\nwechatide/skills/project-config\tshared\nwechatide/skills/project-manager\tshared\n" +
         "project-guide\tcodex,dsh,antigravity\n" +
         additional,

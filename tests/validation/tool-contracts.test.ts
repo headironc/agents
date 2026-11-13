@@ -64,7 +64,6 @@ test("every delivered consumer has its independently expected binding and declar
       "git",
       "python",
     ],
-    "delivery/skills/figma-design-workflow/SKILL.md": ["dsh"],
     "delivery/skills/gh-identity/SKILL.md": ["gh"],
     "delivery/skills/project-guide/SKILL.md": ["git", "rg"],
     "delivery/skills/gh-identity/references/auth-readiness.md": ["gh"],

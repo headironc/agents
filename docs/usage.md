@@ -245,9 +245,9 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | Antigravity CLI 工具 | `$HOME/.gemini/antigravity-cli/tools/<name>.mjs` | 同一份打包工具 |
 | Antigravity CLI 技能 | `$HOME/.gemini/antigravity-cli/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
-Codex 交付八个完整顶层技能包，十七个内容入口参与验证。DeepSeek Harness（`dsh`）接收其中七个共享包、十六个内容入口。`figma-design-workflow` 依赖 Codex 的模型路线与负责人验收，仅交付给 Codex。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收 `AGENTS.md`、七份政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
+Codex 与 DeepSeek Harness（`dsh`）均交付七个完整顶层技能包，十六个内容入口参与验证。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收 `AGENTS.md`、七份政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
 
-Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共六个顶层包及六个入口；其他平台保持五个包。配套依赖为三份公共合同和三个工具，不接收 Codex 规则、模型路线、Figma 设计工作流或配置片段。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
+Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共六个顶层包及六个入口；其他平台保持五个包。配套依赖为三份公共合同和三个工具，不接收 Codex 规则、模型路线或配置片段。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
 
 Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。选择 Antigravity CLI 时使用上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
@@ -300,7 +300,7 @@ bot 退役之前生成的回执，其 rollback 不再是可用退路。这些 ro
 - **本地门禁与无模型加载检查**（[工具门禁](tooling.md#选择检查)）：`all` 验证类型、构建闭包、打包工具新鲜度、[技能清单](../config/personal-skills.txt)成员、三端[技能格式校验](tooling.md#技能格式校验)、发布形态引用、隔离安装回归及 Codex `debug prompt-input` 加载检查。这些检查确认源码自洽且 CLI 能识别入口，但**不证明**个人环境已安装、客户端已发现技能、模型在运行中读取了按需正文或遵守了行为规则。
 - **静态行为场景**（[公共行为场景](../tests/scenarios/rules.md)与[产品场景](../tests/scenarios/adapters.md)）：从现行规则与工具合同推导输入、预期与失败判据，供静态核对与候选审查使用。真实模型行为验证须另行取得覆盖模型、材料与调用范围的授权（参见[模型政策](../delivery/policy/models.md#deepseek-harness-delegation)）。
 - **工作区、临时资源、合并后清理与协作提醒的有界演练**：历史隔离演练已覆盖 `task-temp` 前台清理、单会话单实施 worktree 限制、PR 合并后远端分支清理、[本机提醒](#本机协作提醒)定时恢复与同机空闲会话接任；但受沙箱拦截的本地 worktree 移除、活动写任务跨主机接任、断网或进程崩溃恢复及服务端实际模型/effort 身份仍需按实际任务环境核实。
-- **设计工作流与原生 Sketch 验证**：[figma-design-workflow](../delivery/skills/figma-design-workflow/SKILL.md) 与 [sketch-native](../delivery/skills/sketch-native/SKILL.md) 绑定可编辑产物、原生组件与真实像素验收（早期演练来源见[技能来源](skill-sources.md#figma-design-workflow)）；单页静态演练不替代多状态交互、跨尺寸布局或真实系统输入验收。
+- **设计路线与原生 Sketch 验证**：[设计模型路线](../delivery/policy/models.md#task-start-and-execution-routing)与 [sketch-native](../delivery/skills/sketch-native/SKILL.md)（来源见[技能来源](skill-sources.md#sketch-native)）绑定可编辑产物、原生组件与真实像素验收；单页静态演练不替代多状态交互、跨尺寸布局或真实系统输入验收。
 - **DeepSeek Harness (`dsh`) 与外部 PR 审查**：`dsh` 桌面端与叠加 [`dsh-headless.patch.yml`](../delivery/capability/dsh-headless.patch.yml) 的 `headless` 模式已实测托管凭据复用与[事件流终态核验](../delivery/policy/deepseek-harness.md#事件采集成功判据与异常恢复)（退出码 `0` 且 `final.reason.kind === "completed"`）。正式代码与安全审查由外部提供方按[共享审查规则](../delivery/policy/review.md#review-coverage)与 [gh 操作参考](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)执行；候选更新后须核对当前最新摘要与评论，不能单凭旧 head 的 `latestReviews` 或本地绿灯替代独立审查。
 
 ## 阿里云短信
