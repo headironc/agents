@@ -112,7 +112,7 @@ export function checkCodexLoader(
       "task-temporary-directories",
       "task-completion-and-chat-archival",
     ]) {
-      if (!instructions.includes(`](${modelPolicy}#${section})`))
+      if (!instructions.includes(`](policy/execution.md#${section})`))
         throw new Error(`Codex instructions lack lifecycle route: ${section}`);
     }
     const mergeCleanup =

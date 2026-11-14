@@ -21,7 +21,7 @@ const skill = (name: string) =>
 
 test("delivered skills scope dual-product shared entries and reach all products on macOS for Sketch", () => {
   const entries = readSkillEntries(repositoryRoot);
-  assert.equal(entries.length, 16);
+  assert.equal(entries.length, 15);
   assert.equal(
     entries.find((entry) => entry.path === "project-guide")?.target,
     "codex,dsh,antigravity",
@@ -38,7 +38,6 @@ test("delivered skills scope dual-product shared entries and reach all products 
       "alibabacloud-find-skills",
       "alibabacloud-sms-send-short-message",
       "gh",
-      "gh-identity",
       "project-guide",
       "sketch-native",
     ],
@@ -63,10 +62,10 @@ test("delivered skills scope dual-product shared entries and reach all products 
     [],
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 16, DeepSeek Harness 16, Antigravity 6",
-    "Codex skill validation: 16 entries",
-    "DeepSeek Harness skill validation: 16 entries",
-    "Antigravity skill validation: 6 entries",
+    "Skill membership: DELIVERED; Codex 15, DeepSeek Harness 15, Antigravity 5",
+    "Codex skill validation: 15 entries",
+    "DeepSeek Harness skill validation: 15 entries",
+    "Antigravity skill validation: 5 entries",
   ]);
 });
 
@@ -120,18 +119,18 @@ test("nested members belong to their top-level skill and do not add install targ
     entries.find((entry) => entry.path === "suite/skills/child")?.topLevel,
     "suite",
   );
-  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 9);
-  assert.equal(selectSkillEntries(entries, "dsh").length, 18);
+  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 8);
+  assert.equal(selectSkillEntries(entries, "dsh").length, 17);
   assert.ok(
     !selectSkillEntries(entries, "dsh").some(
       (entry) => entry.path === "private",
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 19, DeepSeek Harness 18, Antigravity 6",
-    "Codex skill validation: 19 entries",
-    "DeepSeek Harness skill validation: 18 entries",
-    "Antigravity skill validation: 6 entries",
+    "Skill membership: DELIVERED; Codex 18, DeepSeek Harness 17, Antigravity 5",
+    "Codex skill validation: 18 entries",
+    "DeepSeek Harness skill validation: 17 entries",
+    "Antigravity skill validation: 5 entries",
   ]);
 });
 

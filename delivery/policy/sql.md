@@ -1,6 +1,6 @@
 # SQL Coding Preferences
 
-These preferences, including [SQL correctness](#sql-correctness), apply to projects that explicitly adopt them in their project instructions, subject to explicit project overrides. [Rust's database-error guidance](rust.md#errors-and-validation) also references [Database failures](#database-failures) within its adopted scope. Apply the applicable sections of this document together with the shared rules in [AGENTS.md](../AGENTS.md), resolved relative to this document. PostgreSQL-specific conventions below apply to PostgreSQL projects. These preferences do not authorize database changes or override project database safety boundaries. Use the business-flow and capability-ownership guidance in [AGENTS.md](../AGENTS.md#code-preferences) before choosing tables and fields; SQL preferences do not decide business rules.
+These preferences, including [SQL correctness](#sql-correctness), apply to projects that explicitly adopt them in their project instructions, subject to explicit project overrides. [Rust's database-error guidance](rust.md#errors-and-validation) also references [Database failures](#database-failures) within its adopted scope. Apply the applicable sections of this document together with the [shared rules](common.md), resolved relative to this document. PostgreSQL-specific conventions below apply to PostgreSQL projects. These preferences do not authorize database changes or override project database safety boundaries. Use the shared [business-flow and capability-ownership guidance](common.md#code-preferences) before choosing tables and fields; SQL preferences do not decide business rules.
 
 ## SQL correctness
 
@@ -73,7 +73,7 @@ These preferences, including [SQL correctness](#sql-correctness), apply to proje
 
 ## Database failures
 
-Apply the [shared error and redaction contract](../AGENTS.md#code-preferences) and the owning use case's unknown-commit recovery contract to database failures:
+Apply the [shared error and redaction contract](common.md#code-preferences) and the owning use case's unknown-commit recovery contract to database failures:
 
 - Convert a constraint error into a business rejection only at the boundary that owns that constraint's known business meaning. Keep the conversion in one place; ordinary callers propagate it, and handlers match it when an action depends on that outcome.
 - Identify PostgreSQL constraints by SQLSTATE and the exact constraint identity, using schema and table information when needed. Never classify by message text; unavailable identity fields do not justify guessing a business rejection.

@@ -1,6 +1,6 @@
 # 交付与使用指南
 
-本仓库按产品交付 Skills 及必要依赖。安装支持 Codex、DeepSeek Harness (`dsh`) 和 Antigravity CLI。安装计划没有默认产品，只向明确选中的产品交付内容。Codex 与 DeepSeek Harness 接收全局指令 `AGENTS.md`、模型选择政策、调用合同、Rust/SQL 偏好与对应推荐配置片段。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
+本仓库按产品交付 Skills 及必要依赖。安装支持 Codex、DeepSeek Harness (`dsh`) 和 Antigravity CLI。安装计划没有默认产品，只向明确选中的产品交付内容。三端接收按产品生成的全局 `AGENTS.md` 和适用政策；产品差异、工具与配置的归属见[规则与交付架构](../README.md#规则与交付架构)。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
 
 按任务查阅：[阅读与采用](#阅读与采用)列出文档入口，[交付目录](#交付目录)说明源码布局。[产品选择与安装](#产品选择与安装)给出计划、应用与恢复步骤，[验证能说明什么](#验证能说明什么)列出证据边界。各技能的使用说明见本页对应章节。
 
@@ -9,13 +9,13 @@
 | 读者与任务 | 当前入口 | 适用范围 |
 | --- | --- | --- |
 | 在本仓库工作 | [AGENTS.md](../AGENTS.md) → [Codex 规则](../delivery/AGENTS.md) | 先加载 Codex 规则，再读相关使用与维护合同 |
-| 维护或审查 Codex 规则 | [Codex 规则](../delivery/AGENTS.md)、[行为场景](../tests/scenarios/rules.md) | 核对现行规则归属、例外和独立推导的预期；场景不是第二份运行规则 |
-| 维护产品指令 | [交付目录](#交付目录)、[Codex 规则](../delivery/AGENTS.md)、[产品场景](../tests/scenarios/adapters.md) | 直接维护交付目录的唯一规则源 |
+| 维护或审查通用规则 | [通用规则](../delivery/policy/common.md)、[行为场景](../tests/scenarios/rules.md) | 核对归属、例外和独立推导的预期；场景不是第二份运行规则 |
+| 维护产品指令 | [架构与手工源](../README.md#规则与交付架构)、[交付目录](#交付目录)、[产品场景](../tests/scenarios/adapters.md) | 修改通用源或产品适配，再生成入口；不手改生成物 |
 | 组织执行、选择模型路线、安排会话与 Goal，或协作、接续和收尾 | [任务起点](../delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](../delivery/policy/models.md)、[模型场景](../tests/scenarios/rules.md#模型选择与接续) | 由 Codex 规则入口按需加载；衔接需求与授权、工作区选择与绑定、Goal、自主执行、结果接纳及收尾，实际经验见[验证边界](#验证能说明什么) |
 | 按任务选用 DeepSeek Harness (`dsh`) | [分工与授权](../delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](../delivery/policy/deepseek-harness.md) | 仅使用本合同定义的 OpenCode Go 或 DeepSeek 官方路由；按能力适配交付完整工作，保留任务边界及验收，不设调用比例 |
-| 项目明确采用 Rust 偏好 | [Rust 偏好](../delivery/policy/rust.md)与[代码偏好](../delivery/AGENTS.md#code-preferences) | 依项目明确采用的范围读取 |
-| 项目明确采用 SQL 偏好 | [SQL 偏好](../delivery/policy/sql.md)与[代码偏好](../delivery/AGENTS.md#code-preferences) | 按项目采用范围加载 SQL correctness 及其错误处理引用；PostgreSQL 约定仅适用于该数据库，表名遵循[表与模式命名偏好](../delivery/policy/sql.md#tables-and-schemas) |
-| 协同设计数据模型 | [代码偏好](../delivery/AGENTS.md#code-preferences)、[SQL 建模偏好](../delivery/policy/sql.md#data-modeling) | 先恢复整体流程与已定职责，再围绕实际未决选择细化；不设固定逐表审批，具体拆分、应用 ID 和类型取值由所属项目记录 |
+| 项目明确采用 Rust 偏好 | [Rust 偏好](../delivery/policy/rust.md)与[代码偏好](../delivery/policy/common.md#code-preferences) | 依项目明确采用的范围读取 |
+| 项目明确采用 SQL 偏好 | [SQL 偏好](../delivery/policy/sql.md)与[代码偏好](../delivery/policy/common.md#code-preferences) | 按项目采用范围加载 SQL correctness 及其错误处理引用；PostgreSQL 约定仅适用于该数据库，表名遵循[表与模式命名偏好](../delivery/policy/sql.md#tables-and-schemas) |
+| 协同设计数据模型 | [代码偏好](../delivery/policy/common.md#code-preferences)、[SQL 建模偏好](../delivery/policy/sql.md#data-modeling) | 先恢复整体流程与已定职责，再围绕实际未决选择细化；不设固定逐表审批，具体拆分、应用 ID 和类型取值由所属项目记录 |
 | 撰写中文或英文文档 | [写作参考](../delivery/policy/writing.md)、[检查脚本](../scripts/check-prose.mjs) | 脚本阻塞中西文空格错误，句长只给出提示；其余由作者判断 |
 | 维护按编号引用的表格 | [标识符检查](../scripts/check-ids.mjs) | 同一前缀按出现顺序递增、不重复；跳号允许 |
 | 采用能力配置推荐值 | [能力配置](../delivery/capability/README.md)、[Codex 片段](../delivery/capability/codex.toml)、[DeepSeek Harness 片段](../delivery/capability/dsh-headless.patch.yml)、[Rust lint](../delivery/capability/rust-lints.toml) | 全是推荐文本，合并由本人做一次。安装后位于 `${CODEX_HOME:-$HOME/.codex}/capability/` 或 `${DSH_HOME:-$HOME/.dsh}/capability/`。本仓库不写任何产品或消费项目的配置文件 |
@@ -25,21 +25,21 @@
 
 其他仓库使用这些源码时，项目指令必须明确引用实际位置。复制一个路径名不会使文件自动加载。当前检查保留工具归属和消费者绑定验证。两平台 CI 结果见 [README](../README.md)。安装器提供[计划、应用与恢复](#产品选择与安装)。实际替换个人配置仍必须逐次授权。交付目录只是可检查的候选，不切换个人配置。
 
-公共入口保留动作触发点，详细步骤由链接的权威章节维护。首次编辑进入[工作区规则](../delivery/policy/models.md#workspaces)，最后一次编辑后进入[检查规则](../delivery/policy/review.md#checks)。合并回读和任务收尾仍各自触发对应流程，包括短任务和恢复后的任务。按标题读取当前动作所需正文，复用未变内容；入口变短不免除正文中的前置、例外和恢复要求。
+公共入口保留动作触发点，详细步骤由链接的权威章节维护。首次编辑进入[工作区规则](../delivery/policy/execution.md#workspaces)，最后一次编辑后进入[检查规则](../delivery/policy/review.md#checks)。合并回读和任务收尾仍各自触发对应流程，包括短任务和恢复后的任务。按标题读取当前动作所需正文，复用未变内容；入口变短不免除正文中的前置、例外和恢复要求。
 
 ### 规则放置与实施范围
 
-[实施切片规则](../delivery/AGENTS.md#implementation-slices)规定单次实施边界。整体架构的认可不授权实施全部阶段。默认“开始”与“继续”指向当前明确提出的切片。后续选片按[持续交付边界](../delivery/AGENTS.md#continuing-delivery)核对原授权：有效批次内继续，未覆盖时等待选择。每片仍独立完整交付，发布、合并和部署各自核权。验收预期见[小切片场景](../tests/scenarios/rules.md#小切片实施)。
+[实施切片规则](../delivery/policy/common.md#implementation-slices)规定单次实施边界。整体架构的认可不授权实施全部阶段。默认“开始”与“继续”指向当前明确提出的切片。后续选片按[持续交付边界](../delivery/policy/common.md#continuing-delivery)核对原授权：有效批次内继续，未覆盖时等待选择。每片仍独立完整交付，发布、合并和部署各自核权。验收预期见[小切片场景](../tests/scenarios/rules.md#小切片实施)。
 
-[代码偏好](../delivery/AGENTS.md#code-preferences)区分个人偏好与项目规范。复用的个人 Rust、SQL 偏好保留在交付 `policy/`。项目按需明确采用，入口不复制全文。团队强制规则、业务不变量和验证命令由消费仓库拥有。团队、CI 或托管审查必需的规范必须纳入项目版本控制。项目 AGENTS.md 明确适用范围和权威文件位置，避免依赖作者的个人主目录。
+[代码偏好](../delivery/policy/common.md#code-preferences)区分个人偏好与项目规范。复用的个人 Rust、SQL 偏好保留在交付 `policy/`。项目按需明确采用，入口不复制全文。团队强制规则、业务不变量和验证命令由消费仓库拥有。团队、CI 或托管审查必需的规范必须纳入项目版本控制。项目 AGENTS.md 明确适用范围和权威文件位置，避免依赖作者的个人主目录。
 
 将规范纳入项目时，保留实际采用章节及必需引用。Rust 的数据库错误章节引用 SQL 失败边界，不表示采用全部 SQL 命名偏好。迁入的项目规则在声明范围内由项目维护。个人偏好后续更新不自动覆盖项目决定。本仓库继续提供复用源，不自动迁移或安装到其他项目。
 
-[模型政策](../delivery/policy/models.md)拥有任务组织、执行、验收及收尾的决策。按任务从[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)进入，查阅[工作区](../delivery/policy/models.md#workspaces)、[Goal](../delivery/policy/models.md#goals) 及[收尾](../delivery/policy/models.md#task-completion-and-chat-archival)规则。代码工具的通用绑定见[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)。团队采用仍遵循上述项目内版本化要求。入口引用不等于正文已经加载；安装政策不切换模型或修改客户端配置。
+[模型政策](../delivery/policy/models.md)拥有任务组织、执行、验收及收尾的决策。按任务从[任务起点](../delivery/policy/models.md#task-start-and-execution-routing)进入，查阅[工作区](../delivery/policy/execution.md#workspaces)、[Goal](../delivery/policy/models.md#goals) 及[收尾](../delivery/policy/models.md#task-completion-and-chat-archival)规则。代码工具的通用绑定见[执行上下文](../delivery/policy/tool-contracts.md#执行上下文)。团队采用仍遵循上述项目内版本化要求。入口引用不等于正文已经加载；安装政策不切换模型或修改客户端配置。
 
 已授权的权限缺口梳理、自动审批附加策略更新和接班，按[策略接续](../delivery/policy/models.md#automatic-review-policy-succession)处理。Goal 与策略的[正文归属及动作映射](../delivery/policy/models.md#goal-and-authorization-content)由同一政策维护；具体实例留在执行材料，原授权限制仍逐次核对。配置写入、会话创建和审批器实际加载分别取证。
 
-[阶段职责](../delivery/policy/models.md#delegation-and-acceptance)拥有委派、缺口核实、交付责任及结果接纳。阶段共用检出与写者交接见[工作区规则](../delivery/policy/models.md#workspaces)。
+[阶段职责](../delivery/policy/models.md#delegation-and-acceptance)拥有委派、缺口核实、交付责任及结果接纳。阶段共用检出与写者交接见[工作区规则](../delivery/policy/execution.md#workspaces)。
 
 [Codex 模型偏好](../delivery/policy/models.md#current-defaults)与[外部路线模型偏好](../delivery/policy/models.md#route-model-preferences)分别维护具体模型及档位。创建、续接和变更时的参数及证据要求见[运行限制](../delivery/policy/models.md#runtime-limits)。
 
@@ -93,7 +93,7 @@
 [wechatide](../delivery/skills/wechatide/SKILL.md) 从[实际交付索引](../delivery/skills/wechatide/references/capabilities.md)路由九个子入口并核验返回：
 
 - **本地配置与安装诊断（无需启动 DevTools）**：[project-config](../delivery/skills/wechatide/skills/project-config/SKILL.md) 按[字段规则](../delivery/skills/wechatide/skills/project-config/references/fields.md)读取与合并本地 JSON 配置，不触发项目 hooks；[installer](../delivery/skills/wechatide/skills/installer/SKILL.md) 仅在执行器报 `cli-unavailable` / `cli-unbound` 或用户明确询问安装状态时调用只读 `check-install.mjs`，诊断十二类安装与 `PATH` 状态，不自动下载、安装或修改 `PATH`。
-- **DevTools CLI 执行与业务子入口（仅限 macOS）**：[initializer](../delivery/skills/wechatide/skills/initializer/SKILL.md)、[compiler](../delivery/skills/wechatide/skills/compiler/SKILL.md)、[debugger](../delivery/skills/wechatide/skills/debugger/SKILL.md)、[previewer](../delivery/skills/wechatide/skills/previewer/SKILL.md)、[project-manager](../delivery/skills/wechatide/skills/project-manager/SKILL.md)、[automator](../delivery/skills/wechatide/skills/automator/SKILL.md) 与 [cloudbase-operator](../delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md) 统一经[调用执行器](../delivery/skills/wechatide/scripts/call.sh)与 [CLI 合同](../delivery/skills/wechatide/references/cli.md)（适配 DevTools `2.02.2610302` / 技能 `0.3.15` skill-call 路线，固定客户端名 `ClaudeCode`、`Codex`，不读取钥匙串或注入 Token；登录与客户端授权按[异步任务](../delivery/skills/wechatide/references/tasks.md)有界轮询）。对外发布（`upload`、`share_minicode`）、运行态改动（`automation_wx_api`、`debug_clear_cache`、`automation_evaluate`）及六项云开发写操作均须用户针对具体目标单独确认；未知写结果先读回核实，不盲目重发。
+- **DevTools CLI 执行与业务子入口（仅限 macOS）**：[initializer](../delivery/skills/wechatide/skills/initializer/SKILL.md)、[compiler](../delivery/skills/wechatide/skills/compiler/SKILL.md)、[debugger](../delivery/skills/wechatide/skills/debugger/SKILL.md)、[previewer](../delivery/skills/wechatide/skills/previewer/SKILL.md)、[project-manager](../delivery/skills/wechatide/skills/project-manager/SKILL.md)、[automator](../delivery/skills/wechatide/skills/automator/SKILL.md) 与 [cloudbase-operator](../delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md) 统一经[调用执行器](../delivery/skills/wechatide/scripts/call.sh)与 [CLI 合同](../delivery/skills/wechatide/references/cli.md)（适配 DevTools `2.02.2610302` / 技能 `0.3.15` skill-call 路线，固定客户端名 `ClaudeCode`、`Codex`，不读取钥匙串或注入 Token；登录与客户端授权按[异步任务](../delivery/skills/wechatide/references/tasks.md)有界轮询）。发布、运行态改动和云写操作按各子技能绑定具体目标与有效授权，复用已覆盖的任务或批次授权。未知写结果先回读，不盲目重发。
 
 十个入口均为验证成员，安装成员只有顶层 `wechatide`（上游 `0.3.15` 新增的 `simulator` 入口及未登记别名仍拒绝）。来源与实测边界见[来源记录](skill-sources.md#wechatide)（本机已实测客户端授权、只读状态、云开发 `-h` 与 `check-install.mjs`，其余开窗、编译、自动化、预览上传与云端读写由离线假 CLI 回归与下列静态场景覆盖）：
 
@@ -132,11 +132,11 @@
 
 当前成员与产品归属以[清单](../config/personal-skills.txt)为准。旧流程技能只保留历史来源，不继续安装。写作和工具参考属于公共 `policy/` 路径的成员。安装来源与限制见[安装快照过渡](#既有安装快照过渡)。
 
-[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权。先核实[受限的依赖更新豁免](../delivery/policy/review.md#dependency-updates)，保留适用检查和合并边界。可信自动化提交的低风险清单／锁文件更新适用例外。人工依赖更新、主版本升级、混入可执行或越界改动的切片及资格未知项走正常审查。仍需 AI 审查时，常规提供方与 Cubic 额度不足时的替代由[提供方选择](../delivery/policy/review.md#review-provider-selection)统一维护。选定方按[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)显式 `@` 请求。已有有效覆盖或请求时复用；不要依赖 PR 事件自动触发。[共享观察规则](../delivery/policy/review.md#asynchronous-observation)拥有异步等待与观察恢复边界。限定发现清单与限定修复范围分别处理，已有授权内的新缺陷继续修复。[gh-identity 源码入口](../delivery/skills/gh-identity/SKILL.md)负责 `headironc` 的身份就绪与认证恢复；历史凭据与安装状态见[安装快照过渡](#既有安装快照过渡)。
+[gh 的工作流合同](../delivery/skills/gh/references/workflow-authorization.md)拥有目标、修复范围及审查请求授权；[身份合同](../delivery/skills/gh/references/auth-readiness.md)拥有 `headironc` 就绪与认证恢复。审查按[依赖更新豁免](../delivery/policy/review.md#dependency-updates)、[提供方选择](../delivery/policy/review.md#review-provider-selection)、[触发合同](../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)和[观察规则](../delivery/policy/review.md#asynchronous-observation)执行。历史凭据与安装状态见[安装快照过渡](#既有安装快照过渡)。
 
 ## 规则与技能维护
 
-公共规则拥有跨任务约束和代码偏好。工具拥有服务权限、调用参数、错误与恢复合同。规则变更同步实际消费者、产品生成物和适用场景。静态检查、实际模型行为和候选审查分别报告。Rust 偏好支持迭代期增量 `cargo check -p <package>` 与定向单测，在发布前执行逐包构建与完整门禁；SQL 偏好支持清晰的复合 `snake_case` 复数表名（如 `order_items`）。Rust 与 SQL 偏好只适用于明确采用它们的项目。
+公共规则拥有跨任务约束和代码偏好。工具拥有服务权限、调用参数、错误与恢复合同。规则变更同步实际消费者、产品生成物和适用场景。静态检查、实际模型行为和候选审查分别报告。项目明确采用的 [Rust](../delivery/policy/rust.md) 与 [SQL](../delivery/policy/sql.md) 偏好由各自政策维护。
 
 工具技能按完整单元交付。入口、引用、必要资产、执行器、测试与许可证共同验收。来源记录保留原件身份和采用范围。跨技能调用使用可用安装名。内部引用从物理安装目录解析，保持完整可达。清单决定成员与产品，不授予业务权限。新增入口同步登记、反例与完整门禁。不得删减清单来绕过缺失能力。
 
@@ -144,7 +144,7 @@
 
 ## 任务临时目录与收尾
 
-[生命周期](../delivery/policy/models.md#task-temporary-directories)拥有任务临时资源的归属和收尾责任。[调用合同](../delivery/policy/tool-contracts.md#task-temp)拥有参数、清理边界及错误处理。入口随各产品工具交付，不安装定时任务或个人配置。以下命令从仓库运行；安装后把工具路径换为产品根下的 `tools/task-temp.mjs`，并使用兼容 Node。
+[生命周期](../delivery/policy/execution.md#task-temporary-directories)拥有任务临时资源的归属和收尾责任。[调用合同](../delivery/policy/tool-contracts.md#task-temp)拥有参数、清理边界及错误处理。入口随各产品工具交付，不安装定时任务或个人配置。以下命令从仓库运行；安装后使用[交付目录](#交付目录)列出的对应工具路径，并使用兼容 Node。
 
 ```bash
 .cache/agents-tools/bin/node delivery/tools/task-temp.mjs run \
@@ -156,27 +156,17 @@
   --root "${CODEX_HOME:-$HOME/.codex}/worktrees"
 ```
 
-run 保持原工作目录，只清理本次分配的 scratch 及归属目录。前台命令须等待全部后代结束，并使用工具提供的临时路径。正常非零退出也清理；诊断原件先输出或写到目录之外。中断、Git 元数据、归属变化和检查失败留下路径及原因，任务收尾继续核实。扫描只列直接子目录和可读归属，无法判断会话是否结束或目录是否可删。历史目录不补标记、不删除。工具不接管已有测试工具的清理，也不代替客户端 worktree 退役。
-
-[工作区规则](../delivery/policy/models.md#workspaces)限制每个会话最多拥有一个源码实施 worktree。第二个独立实施工作树交给另一个获授权会话。恢复原绑定及测试内部自行创建并清除的 Git fixture 不计作新增实施工作树。这是代理行为约束；扫描工具不提供跨会话配额拦截。有限模型演练见[验证边界](#验证能说明什么)。
-
-触发入口在 [AGENTS.md](../delivery/AGENTS.md#working-together)。单人单会话开发默认直接在当前已核实的主检出（Primary checkout）与特性分支写入；仅在并发多会话写入、存在冲突 WIP、隔离实验性 spike 或明确要求隔离时，才按[工作区规则](../delivery/policy/models.md#workspaces)分配独立 worktree 并核对编辑工具实际指向的目录。最后一次编辑后，由作者回读并运行[适用检查](../delivery/policy/review.md#checks)。只读调查沿用 Local；已有写入绑定按续作规则核对。
-
-直接建临时目录或运行会生成目录的命令前，加载临时目录合同。命令退出时核清理结果；中断恢复时先核已知目录及原操作。获授权的合并流程确认 PR 已合并后，立即进入[工作树和分支清理](../delivery/skills/gh/references/operations.md#post-merge-cleanup)。恢复后确认由他人完成的合并也走同一入口。报告完成、交接或归档前，由收尾章节核资源去向。普通进度回复不触发在用工作区退役。已读规则和未变绑定沿用，不逐轮重读或扫描整机。
-
-合并后清理覆盖该 PR 独占的 worktree 及对应本地、远端分支。客户端预建的任务工作树同样纳入核对。工作树退役后，确认本地分支没有被其他 worktree 使用，再核对分支头并删除。主工作区、共享资源、变化后的分支头和在用材料按合同保留。队列受理、未知结果或关闭未合并都不触发删除。各项清理分别回读，已由平台移除的目标只核缺失。保留项在最终结果中说明所有者、原因和下一清理条件。
+`run` 的分配与清理由[调用合同](../delivery/policy/tool-contracts.md#task-temp)约束；`scan` 只读列出候选，不证明目录可删。[工作区规则](../delivery/policy/execution.md#workspaces)拥有检出选择与绑定，[合并后清理](../delivery/skills/gh/references/operations.md#post-merge-cleanup)拥有已合并 PR 的资源回收，[任务收尾](../delivery/policy/models.md#task-completion-and-chat-archival)拥有完成、交接和归档前的核对。触发入口在 [AGENTS.md](../delivery/policy/common.md#working-together)，有限模型演练见[验证边界](#验证能说明什么)。
 
 仓库源码和无模型加载检查不代表个人环境已生效。发布安装并回读后，新会话才能从对应安装入口读取候选规则。已有会话沿实际已加载版本核对。客户端在首轮之前创建目录的动作，无法由尚未加载的模型规则预先拦截。真实触发仍通过获授权的模型场景演练确认。
 
 ## 工具偏好
 
-[依赖规则](../delivery/AGENTS.md#code-preferences)要求先查看适合目标仓库的现成工具库，包括 npm 生态。它还要求核对已有依赖、维护证据、官方文档和实际契约。已有标准库或项目依赖能合适地提供能力时，优先复用它们。
-
-[维护工具语言偏好](../delivery/AGENTS.md#code-preferences)面向新写工具，默认选择 TypeScript。它服从目标仓库明确的语言和运行环境要求。它不要求迁移已有工具或改写业务代码。本仓库另有几项固定选择，由 [AGENTS.md](../AGENTS.md) 单独规定。选择包括固定 Node、Bash 下载启动器。上游 Python 工具也保留。
+依赖复用与新工具语言选择见[代码偏好](../delivery/policy/common.md#code-preferences)。本仓库的固定 Node、Bash 下载启动器及上游 Python 工具保留要求见 [AGENTS.md](../AGENTS.md)。
 
 ## 产品选择与安装
 
-安装器已交付 plan、apply、verify 和 rollback。plan 必须至少传入一个 `--product`，值为 `codex`、`dsh` 或 `antigravity`。重复该参数可明确选择多个产品；没有默认双端安装。缺少选择、无效值或重复产品均返回参数错误，不创建计划。旧 `--include-product` 参数及已退役的 `claude` 产品名不再接受。在候选源码上完成构建和完整门禁后生成 V7 计划。未提交改动由门禁报告的源码身份绑定：
+安装器已交付 plan、apply、verify 和 rollback。plan 必须至少传入一个 `--product`，值为 `codex`、`dsh` 或 `antigravity`。重复该参数可明确选择多个产品；没有默认双端安装。缺少选择、无效值或重复产品均返回参数错误，不创建计划。旧 `--include-product` 参数及已退役的 `claude` 产品名不再接受。在候选源码上完成构建和完整门禁后生成 V8 计划。未提交改动由门禁报告的源码身份绑定：
 
 ```bash
 umask 077
@@ -191,7 +181,7 @@ bash scripts/install.sh plan --product codex --source "$PWD" --report .cache/rep
 
 DeepSeek Harness（`0.2.2-rc.1` 实测）的 `desktop` 与 `headless` 两个 profile 共同继承 `@deepseek-ai/dsh-base`，默认启用 `@deepseek-ai/dsh-agent-instructions`、`@deepseek-ai/dsh-skill`、`@deepseek-ai/dsh-skill-filesystem` 和 `@deepseek-ai/dsh-tool-skill`，并共享用户主目录 `${DSH_HOME:-$HOME/.dsh}`。全局指令按固定顺序先读取 `${DSH_HOME:-$HOME/.dsh}/AGENTS.md`，再读取 `${DSH_AGENTS_HOME:-$HOME/.agents}/AGENTS.md`（正文去首尾空白相同则去重），随后按从 Git 根到当前工作目录（`cwd`）由浅入深读取项目级 `AGENTS.md`、`CLAUDE.md`、`AGENTS.local.md` 与 `CLAUDE.local.md`（总上限 64 KiB；全局级不读取 `CLAUDE.md`）。技能发现按单层 `<root>/<name>/SKILL.md` 或 `<root>/<name>.md` 扫描（跳过 `.` 开头隐藏目录，单文件上限 256 KiB），优先级由高到低为：项目 `<projectRoot>/.dsh/skills`（`100`）> `<projectRoot>/.agents/skills`（`200`）> 自定义 `customSkillDirs`（`300`）> 用户级 `${DSH_HOME:-$HOME/.dsh}/skills`（`400`）> `${DSH_AGENTS_HOME:-$HOME/.agents}/skills`（`500`）> 内置技能目录（`600`）。因此 `--product dsh` 直接将规则与技能安装到 `${DSH_HOME:-$HOME/.dsh}`，桌面端与 `headless` 共享同一安装位置且无须额外开关即可自动加载指令与技能；用户原有的 `.credentials.yaml`、`.anonymous-user-id`、`profiles/`、`sessions/`、`storages/` 和 `attachments/` 保持原样。
 
-Antigravity CLI 的目标根固定为 `$HOME/.gemini/antigravity-cli`，只发布下表成员。安装器不创建 Plugin，也不写 `settings.json`、发现 manifest、hooks、MCP 或规则入口。该根的 `skills/` 由 CLI 自动发现，App 不读取。已有 CLI 专属或共享目录中的同名技能可能影响优先级；实际来源通过 `/skills` 核对，见[官方发现规则](https://antigravity.google/docs/customization-discovery?tab=cli)。
+V8 将 Antigravity 产品根设为 `$HOME/.gemini`，原生全局入口为 `AGENTS.md`，同时作用于 CLI 和 App。既有 `antigravity-cli/skills/`、`policy/` 和 `tools/` 的实际路径不变；CLI 专属技能目录不会因此被 App 自动发现。安装器只管理交付清单中的目标，不创建 Plugin，不写 `settings.json`、发现 manifest、hooks 或 MCP 配置。已有同名规则与技能仍须按[官方发现规则](https://antigravity.google/docs/customization-discovery/)核对；源码与隔离安装检查不证明当前会话已加载。
 
 仅更新部分受管目标时，重复传入 `--target KEY` 指定完整目标集合。KEY 与下述接管名称相同，例如 `--target codex:policy/review.md --target codex:gh`。选择接受已选产品的受管文件和完整技能目录，拒绝重复、未知名称及技能内部文件路径。技能目录沿用完整备份、替换、回读和回滚，不拆分安装内部成员。未传时沿用整批计划。`--target` 不替代 `--adopt`；已有差异目标仍须明确接管。调用者按当前任务核对完整依赖，安装器不自动加入其他目标。未选目标不读取内容、不要求接管，也不修改权限。完整源码检查与冻结快照仍覆盖原候选。
 
@@ -199,11 +189,11 @@ Antigravity CLI 的目标根固定为 `$HOME/.gemini/antigravity-cli`，只发�
 
 报告必须来自同一平台和固定 Node 的完整通过的 `all`。检出 HEAD 必须等于报告基线，源码字节必须与报告一致。计划记录本机稳定标识：Linux 取 `/etc/machine-id`，macOS 取 `sysctl -n kern.uuid`。取不到即拒绝。apply、verify、rollback 均核对该标识。主机名变更只在 verify 中报告。报告绑定的被忽略文件同样阻止计划。
 
-运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，保存计划与回执。V7 的候选和恢复运行副本位于同一状态根的 `agents/install/<run-id>/`，独立于产品目录。计划另在 `--output` 写出同字节审阅副本。计划不写公开目标内容。为核对文件系统的大小写别名和共享祖先，会建立选中产品缺失的根及祖先。计划成功后保留这些目录和私有安装器目录。规划阶段准备的根不列入 apply 创建的目录，rollback 保留这些根。计划失败时只清理本次建立的目录；祖先仍为空时才移除。既有目录及权限保持原状。
+运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，保存计划与回执。V7/V8 的候选和恢复运行副本位于同一状态根的 `agents/install/<run-id>/`，独立于产品目录。计划另在 `--output` 写出同字节审阅副本。计划不写公开目标内容。为核对文件系统的大小写别名和共享祖先，会建立选中产品缺失的根及祖先。计划成功后保留这些目录和私有安装器目录。规划阶段准备的根不列入 apply 创建的目录，rollback 保留这些根。计划失败时只清理本次建立的目录；祖先仍为空时才移除。既有目录及权限保持原状。
 
 已有链接，包括指向旧部署快照的链接，都必须用 `--adopt KEY` 显式接管。悬空链接、普通文件和已有目录同样如此。接管文件或目录时，目标及目录成员必须由安装用户拥有。复制备份无法恢复其他用户的所有权，计划会报告 `backup-owner-unrestorable`。已交付内容与新候选完全一致时列为不变。KEY 见[安装目标](#安装目标与接管)。未列入清单的名称只以路径列在 `reported` 中；安装器不读取其内容。
 
-新入口同时接受 V5 双端、V6 三端与 V7 显式选择记录。V5/V6 保留原先的产品集合及 Codex 根下的 `.agents-install/<run-id>/` 恢复路径，不迁移或扩大旧记录。V5 不推导第三端目标；各版本回执与计划版本一致。公开目标为普通文件或完整技能目录。入口拒绝 V4 及更早版本的 apply、verify 和 rollback，不转换记录或清理旧材料。原 V4 运行副本和必要材料仍在时，可用原回执提供的恢复命令。`status` 不识别这些旧回执；部署目录中仍有旧回执时报告 `indeterminate`，并在 `unreadable` 中列出路径。这一限制在新目标验证通过后仍存在。
+新入口生成 V8 计划，并接受 V5 双端、V6 三端和 V7 显式选择记录。V6/V7 的 Antigravity 仍按旧 CLI 根解释；V8 增加共享全局入口，既有资产路径不变。V5/V6 保留原先的产品集合及 Codex 根下的 `.agents-install/<run-id>/` 恢复路径，不迁移或扩大旧记录。V5 不推导第三端目标；各版本回执与计划版本一致。公开目标为普通文件或完整技能目录。入口拒绝 V4 及更早版本的 apply、verify 和 rollback，不转换记录或清理旧材料。原 V4 运行副本和必要材料仍在时，可用原回执提供的恢复命令。`status` 不识别这些旧回执；部署目录中仍有旧回执时报告 `indeterminate`，并在 `unreadable` 中列出路径。这一限制在新目标验证通过后仍存在。
 
 参数错误返回 2。缺口以 JSON `gaps` 输出并返回 1，此时不建立运行目录。源、报告、根目录与目标的读取问题也列为缺口。候选目标超出记录大小限制时报告 `source-unreadable`。权限问题同样一次列出。计划写入中途失败只删除本次创建的运行目录、私有候选和审阅副本。新建上级目录仅在仍为空时删除。
 
@@ -231,31 +221,33 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | 目标类别 | 安装位置 | 候选来源 |
 | --- | --- | --- |
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
-| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/{writing,tool-contracts,review,rust,sql,models,deepseek-harness,antigravity}.md` | `delivery/policy/` 对应八个文件 |
+| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/*.md` | `delivery/policy/` 中适用于 Codex 的政策 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
 | 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应四个文件 |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
 | Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
-| DeepSeek Harness 按需参考 | `${DSH_HOME:-$HOME/.dsh}/policy/{writing,tool-contracts,review,rust,sql,models,deepseek-harness}.md` | 同一份 `delivery/policy/` 七个适用文件 |
+| DeepSeek Harness 按需参考 | `${DSH_HOME:-$HOME/.dsh}/policy/*.md` | `delivery/policy/` 中适用于 dsh 的政策 |
 | DeepSeek Harness 工具 | `${DSH_HOME:-$HOME/.dsh}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
 | DeepSeek Harness 推荐配置 | `${DSH_HOME:-$HOME/.dsh}/capability/{README.md,dsh-headless.patch.yml,rust-lints.toml}` | 同一份 `delivery/capability/` 适用配置片段 |
-| DeepSeek Harness 指令 | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` | `delivery/AGENTS.md` |
+| DeepSeek Harness 指令 | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` | `delivery/products/dsh/AGENTS.md` 生成物 |
 | DeepSeek Harness 技能 | `${DSH_HOME:-$HOME/.dsh}/skills/<name>` | 清单选择 `dsh` 的完整顶层目录 |
-| Antigravity CLI 按需参考 | `$HOME/.gemini/antigravity-cli/policy/{writing,tool-contracts,review}.md` | 同一份公共合同，由技能引用 |
+| Antigravity 全局指令 | `$HOME/.gemini/AGENTS.md` | `delivery/products/antigravity/AGENTS.md` 生成物；CLI 与 App 共用 |
+| Antigravity 按需参考 | `$HOME/.gemini/antigravity-cli/policy/*.md` | 通用规则、执行、写作、工具、评审及采用后的 Rust/SQL 政策 |
 | Antigravity CLI 工具 | `$HOME/.gemini/antigravity-cli/tools/<name>.mjs` | 同一份打包工具 |
+| Antigravity Rust 参考配置 | `$HOME/.gemini/antigravity-cli/capability/rust-lints.toml` | 采用 Rust 偏好的项目可合并；不自动修改项目配置 |
 | Antigravity CLI 技能 | `$HOME/.gemini/antigravity-cli/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
-Codex 与 DeepSeek Harness（`dsh`）均交付七个完整顶层技能包，十六个内容入口参与验证。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收 `AGENTS.md`、七份政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
+Codex 与 DeepSeek Harness（`dsh`）的技能清单均含六个完整顶层包、十五个内容入口。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
 
-Antigravity CLI 接收 `gh`、`gh-identity`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共六个顶层包及六个入口；其他平台保持五个包。配套依赖为三份公共合同和三个工具，不接收 Codex 规则、模型路线或配置片段。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
+Antigravity CLI 接收 `gh`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共五个顶层包及五个入口；其他平台保持四个包。配套交付本端全局规则、公共政策、三个工具和 Rust lint 参考片段，不接收 Codex 专属模型路线或产品配置。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
 
-Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。选择 Antigravity CLI 时使用上述固定根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
+Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。Antigravity 新计划使用 `$HOME/.gemini`，V6/V7 旧记录沿用其记录的 CLI 根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
 adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `dsh:gh`；其他成员使用 `codex:AGENTS.md`、`dsh:policy/writing.md` 等相对路径。一个 KEY 只接管对应产品的目标。裸技能名、未知、未选产品或未使用的 KEY 均拒绝。任一选中产品的根、权限或接管缺口阻止整个计划。清单外名称仅报告，保留原值。
 
 ### 安装记录与恢复边界
 
-报告只证明已记录的检查，不授予安装权限。候选绑定源码字节、完整报告与固定运行副本。复制前后及计划冻结时均核对身份。候选冻结后不原地更新。私有运行副本包含固定 Node、安装 bundle 和许可证。V7 由状态目录承载恢复，单产品安装也不依赖其他产品根。V5/V6 仍依赖记录中的 Codex 私有目录。公开内容不依赖恢复目录，恢复命令依赖该目录。缺失、损坏或平台不符时拒绝，不联网修复。
+报告只证明已记录的检查，不授予安装权限。候选绑定源码字节、完整报告与固定运行副本。复制前后及计划冻结时均核对身份。候选冻结后不原地更新。私有运行副本包含固定 Node、安装 bundle 和许可证。V7/V8 由状态目录承载恢复，单产品安装也不依赖其他产品根。V5/V6 仍依赖记录中的 Codex 私有目录。公开内容不依赖恢复目录，恢复命令依赖该目录。缺失、损坏或平台不符时拒绝，不联网修复。
 
 持久计划是恢复依据，审阅副本只是同字节副本。应用前核对同次持久计划，再把其身份写入回执。审阅副本随后缺失不影响 verify 或 rollback。持久计划损坏、移动或被链接替换时拒绝。工具不扫描其他运行来猜测替代记录。计划与回执字段由 `scripts/install-records.ts` 唯一定义。结构验证不替代主机、路径与当前目标核对。
 
@@ -269,7 +261,7 @@ adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `dsh:gh`；其�
 
 自研会话客户端、合同和专属审批片段已退出新交付。新计划只报告现存的清单外文件，不接管或卸载。旧计划继续通过其绑定的安装器和原恢复材料读回与恢复。退役不改写旧计划、回执、恢复快照或会话记录。
 
-逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果。V5/V6/V7 运行目录均位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的受支持计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。V7 的 plan、apply、verify 和 rollback，以及新入口的 status，通过 JSON `products` 展示实际产品集合。计划的 `roots` 中仅记录选中产品的根，由这些根唯一拥有该选择。旧运行副本保持原有输出格式。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和该计划的每个目标，不读取候选源码。无法读取或不受支持的回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。新计划不卸载未选产品的既有安装；status 只证明当前计划的目标，未被该计划列出的旧成员保持原样。合并源码不会自动更新已安装目标。
+逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果。V5/V6/V7/V8 运行目录均位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的受支持计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。V7/V8 的 plan、apply、verify 和 rollback，以及新入口的 status，通过 JSON `products` 展示实际产品集合。计划的 `roots` 中仅记录选中产品的根，由这些根唯一拥有该选择。旧运行副本保持原有输出格式。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和该计划的每个目标，不读取候选源码。无法读取或不受支持的回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。新计划不卸载未选产品的既有安装；status 只证明当前计划的目标，未被该计划列出的旧成员保持原样。合并源码不会自动更新已安装目标。
 
 个人安装形态只有一种，没有 managed 模式或 bot 入口目标。`~/.agents/github-app/` 不在安装范围内，本地 bot 凭据提供器已退役。个人安装不交付 App 私钥或本地令牌签发入口。旧项目审查关卡及其签发入口已移除，不属于当前源码或个人安装目标。
 

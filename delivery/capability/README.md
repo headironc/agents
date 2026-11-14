@@ -1,23 +1,23 @@
 # 能力配置
 
-这一类发布的全是**推荐值**。`codex.toml`、`dsh-headless.patch.yml` 与 `rust-lints.toml` 都是给你合并进自己配置的文本。本仓库不写任何产品配置文件，也不写消费项目的 `Cargo.toml`。
-
-理由是所有权。产品配置是你的文件，里面有与规则无关的个人内容。覆盖它会出事。所以这里只发布可比对的文本，合并由你做一次。
+本目录发布供使用者合并的推荐配置片段，不写产品配置或消费项目的 `Cargo.toml`。个人文件可能包含其他设置，合并由使用者完成。
 
 ## 安装
 
-把 `codex.toml` 的内容并进 `${CODEX_HOME:-$HOME/.codex}/config.toml`。把 `dsh-headless.patch.yml` 的内容并进 `${DSH_HOME:-$HOME/.dsh}/profiles/headless/cordis.patch.yml`（或在调用 `dsh headless` 时通过 `--patch` 传入该文件路径）。`rust-lints.toml` 合并进采用 `policy/rust.md` 的项目的 Cargo.toml。
+| 片段 | 合并位置或使用方式 |
+| --- | --- |
+| `codex.toml` | `${CODEX_HOME:-$HOME/.codex}/config.toml` |
+| `dsh-headless.patch.yml` | `${DSH_HOME:-$HOME/.dsh}/profiles/headless/cordis.patch.yml`，或调用时通过 `--patch` 传入 |
+| `rust-lints.toml` | 明确采用 `policy/rust.md` 的项目的 `Cargo.toml` |
 
 ## 推荐值
 
-`codex.toml` 里的两项保持注释，展示与[操作边界](../AGENTS.md#operation-boundaries)相配的可选设置。仅安装这个片段不会改变个人配置。
+`codex.toml` 以注释展示与[操作边界](../policy/common.md#operation-boundaries)相配的可选设置；安装片段不启用这些设置。
 
-`sandbox_mode` 与 `approval_policy` 对应操作边界：`workspace-write` 限制写入当前工作区目录（不限制只读访问），`on-request` 在越界或外部动作前请求确认。是否启用由使用者自行决定。
-
-`dsh-headless.patch.yml` 提供官方 DeepSeek Harness `headless` profile 的无密钥 Cordis patch 列表。官方默认 `headless` profile 停用了托管凭据存储（`credentials`、`authorization`、`deepseek-account` 均为 `disabled: true`），且默认模型指向 `deepseek-official` / `deepseek-flash`。合并该片段（或通过 `--patch` 临时叠加）后，`headless` 可直接复用桌面端在 `${DSH_HOME:-$HOME/.dsh}/.credentials.yaml` 中托管的 `OPENCODE_GO_API_KEY` 凭据引用，并将默认模型路由设为 `opencode-go` / `deepseek-v4.1-flash`（`reasoningEffort: low`）。片段仅含插件开关与凭据引用变量名，不包含任何 API key。
+`dsh-headless.patch.yml` 让官方 `headless` profile 复用桌面端托管凭据，并选择 `opencode-go` 路由。片段只含插件开关和凭据引用名，不含密钥。默认 profile、凭据优先级、模型与参数由 [DeepSeek Harness 调用合同](../policy/deepseek-harness.md)维护。
 
 ## 规则与执行配置
 
-规则的预期行为由 [Rust 规范](../policy/rust.md)与 [DeepSeek Harness 调用合同](../policy/deepseek-harness.md)定义。`rust-lints.toml` 提供其中可机械判定部分的执行配置，`dsh-headless.patch.yml` 提供 `dsh headless` 启用托管凭据与 `opencode-go` 路由的声明配置。规范保留要求，配置拥有启用方式，两者职责不同。消费者未启用配置时，已采用的要求仍然适用，但不能声称工具已强制执行。
+[规则](../policy/rust.md)拥有行为要求，配置片段拥有启用方式。消费者未启用片段时，已经采用的规则仍然有效，但不能声称工具已强制执行。
 
-`rust-lints.toml` 仅收录在目标工具链上实测能拦截违规输入且放行合规输入的 lint 条目；工具链未能生效的规则仍由 `policy/rust.md` 正文约束。
+`rust-lints.toml` 只收录在目标工具链上实测能拒绝违规输入、放行合规输入的 lint；其他要求仍由 Rust 规则正文约束。DeepSeek Harness 的声明配置及使用边界见上述调用合同。

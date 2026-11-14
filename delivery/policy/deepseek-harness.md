@@ -2,7 +2,7 @@
 
 Contract subject: `dsh`.
 
-本合同定义通过本机安装的官方 DeepSeek Harness CLI（`dsh`）执行只读分析、有界开发与修复的结构化契约、参数与结果核验规则。可选委派、模型分层及授权由[模型政策](models.md#deepseek-harness-delegation)定义。开发执行遵循[开发设备选择](models.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](models.md#desktop-capabilities)安排对应阶段。设计稿与视觉验收默认沿[任务起点](models.md#task-start-and-execution-routing)执行（macOS `.sketch` 设计稿加载 `sketch-native` 技能）。先核对实际 CLI 版本、实际接收服务、凭据来源及有效参数。
+本合同定义通过本机安装的官方 DeepSeek Harness CLI（`dsh`）执行只读分析、有界开发与修复的参数与结果核验规则。调用与委派遵循宿主已采用的模型路线和[公共操作边界](common.md#operation-boundaries)；本合同不授予调用权限。开发执行遵循[开发设备选择](execution.md#local-development)。客户端缺少 Desktop 工具时，按[能力核对](execution.md#desktop-capabilities)安排对应阶段。macOS `.sketch` 设计稿加载 `sketch-native` 技能。先核对实际 CLI 版本、实际接收服务、凭据来源及有效参数。
 
 ## 执行客户端、接收服务与凭据来源
 
@@ -24,13 +24,13 @@ Contract subject: `dsh`.
 
 ### 有界执行
 
-在已授权的开发仓库或独立 Git 工作树中，按模型政策主动交付适任的完整结果，包括已授权的分析、代码或文档编辑、测试和修复。可见任务负责人绑定单一结果、宿主、真实工作区、基线候选及允许操作，排除秘密和无关内容。共享工作区只留一个写者，并行写任务使用隔离写区。
+在已授权的开发仓库中，按[实现切片](common.md#implementation-slices)交付完整结果，包括已授权的分析、代码或文档编辑、测试和修复。任务负责人绑定单一结果、宿主、真实工作区、基线候选及允许操作，排除秘密和无关内容。按[工作区规则](execution.md#workspaces)选择当前检出或隔离写区，共享工作区只留一个写者。
 
 使用 `dsh headless --permission-mode workspace-write --approval-policy never --json -`，将子进程当前工作目录（`cwd`）绑定到目标检出或工作树（`sandbox-policy` 默认以 `process.cwd()` 作为 `workspaceRoot`）。当任务在关联工作树（linked worktree）中需要访问共享 Git 元数据目录（如执行索引暂存、提交或触发仓库 hooks）时，先解析物理绝对路径 `git_dir=$(git rev-parse --path-format=absolute --git-common-dir)`，并以可重复的 `--add-dir "$git_dir"` 显式授予该次调用。共享 `.git` 授权覆盖 refs、hooks 和 config，仅用于受信任任务，宿主后续执行 Git 操作前须核对元数据改动。若已显式配置并启用实验性 Auto review，可按其合同使用 `--permission-mode auto --approval-policy never`。普通有界执行不自动继承桌面 GUI 专属工具，也不增加发布、合并或部署权限。
 
 ### 显式设计模式
 
-单纯的设计稿创建与迭代沿用[模型政策的设计路线](models.md#task-start-and-execution-routing)（macOS `.sketch` 设计稿加载 `sketch-native` 技能）。仅当用户有效指令显式选用 DeepSeek Harness 辅助设计草稿或前端原型时，按本合同的只读或有界执行模式绑定目标目录、权限与输入材料，最终像素与交互判断仍由主负责人验收。
+单纯的设计稿创建与迭代沿用宿主已采用的设计路线（macOS `.sketch` 设计稿加载 `sketch-native` 技能）。仅当用户有效指令显式选用 DeepSeek Harness 辅助设计草稿或前端原型时，按本合同的只读或有界执行模式绑定目标目录、权限与输入材料，最终像素与交互判断仍由主负责人验收。
 
 ## 模型、推理档位与命令参数
 

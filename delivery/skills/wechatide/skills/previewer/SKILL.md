@@ -36,7 +36,7 @@ When a preview or upload returns `pending` with a `taskId`, retain the task with
 | Permission or account failure | Report that the account needs developer permission for this AppID, or log in again through initializer; do not retry the same call in a loop |
 | The user declines the upload or cancels its confirmation | Report it and stop; do not start another upload |
 | Timeout or unknown outcome | Report it as unknown and check the retained task before considering a repeat |
-| A successful result naming a dropped flag in `warnings` | An upload has already published: report the dropped flag and the version that actually reached WeChat rather than running it again, as the CLI contract's correction rule would. A QR code is only rendered here, so correct the flag from `-h` and create it again. A pushed preview already reached the developer's WeChat, so say that before correcting the flag and pushing once more |
+| A successful result naming a dropped flag in `warnings` | An upload has already published: report the dropped flag and the version that actually reached WeChat without running it again. A QR code is only rendered here, so correct the flag from `-h` and create it again. A pushed preview already reached the developer's WeChat, so say that before correcting the flag and pushing once more |
 | The preview arrives but shows stale or wrong content | Hand the project and page to compiler for a refresh, then to debugger for evidence |
 
 ## Return

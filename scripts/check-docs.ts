@@ -10,6 +10,7 @@ import { lint, readConfig } from "markdownlint/sync";
 import type { Configuration } from "markdownlint";
 import jsoncParse from "markdownlint-cli2/parsers/jsonc";
 import { listSourcePaths, readSourceIdentity } from "./source.ts";
+import { generatedInstructionPaths } from "./build-instructions.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 
@@ -110,6 +111,7 @@ export function checkDocuments(
       ]);
   }
   if (mode !== "markdown") {
+    // Generated entrypoints use native installation paths; check-refs validates those layouts.
     console.log(
       "Links and anchors are checked offline; external URLs are excluded.",
     );
@@ -119,7 +121,11 @@ export function checkDocuments(
       path.join(toolsRoot, "lychee.toml"),
       "--root-dir",
       root,
-      ...files.map((file) => path.join(root, file)),
+      ...files
+        .filter(
+          (file) => !generatedInstructionPaths.some((entry) => entry === file),
+        )
+        .map((file) => path.join(root, file)),
     ]);
   }
 }

@@ -52,6 +52,7 @@ const expectedTestPaths = {
     "tests/task-temp.test.ts",
     "tests/validation/capability.test.ts",
     "tests/validation/refs.test.ts",
+    "tests/validation/instructions.test.ts",
     "tests/installation/build.test.ts",
     "tests/installation/plan.test.ts",
     "tests/installation/apply.test.ts",
@@ -97,9 +98,17 @@ const required = [
     "task-temp.ts",
     "check-refs.ts",
     "check-codex-loader.ts",
+    "build-instructions.ts",
   ].map((name) => `scripts/${name}`),
   "delivery/policy/tool-contracts.md",
   "delivery/AGENTS.md",
+  "delivery/products/dsh/AGENTS.md",
+  "delivery/products/antigravity/AGENTS.md",
+  "delivery/policy/common.md",
+  "delivery/policy/execution.md",
+  "delivery/rules/codex.md",
+  "delivery/rules/dsh.md",
+  "delivery/rules/antigravity.md",
   "delivery/tools/check-prose.mjs",
   "delivery/tools/check-ids.mjs",
   "delivery/tools/task-temp.mjs",
@@ -127,8 +136,7 @@ const required = [
   "delivery/skills/gh/references/operations.md",
   "delivery/skills/gh/LICENSE.txt",
   "scripts/check-report.ts",
-  "delivery/skills/gh-identity/SKILL.md",
-  "delivery/skills/gh-identity/references/auth-readiness.md",
+  "delivery/skills/gh/references/auth-readiness.md",
   "delivery/skills/gh/references/workflow-authorization.md",
   "scripts/install.sh",
   "scripts/install.ts",
@@ -248,7 +256,7 @@ test("Codex loader accepts a temporary root reached through a symlink", (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(
     result.stdout,
-    /Codex loaded AGENTS\.md and 16 delivered skills; model policy is available on demand/,
+    /Codex loaded AGENTS\.md and 15 delivered skills; model policy is available on demand/,
   );
 });
 
@@ -287,7 +295,7 @@ test("Codex loader rejects missing workspace, scratch, merge and closeout routes
     const target =
       section === "post-merge-cleanup"
         ? "skills/gh/references/operations.md"
-        : "policy/models.md";
+        : "policy/execution.md";
     f.put(
       "delivery/AGENTS.md",
       instructions.replaceAll(`](${target}#${section})`, `](${target})`),
@@ -589,9 +597,9 @@ test("repository and all gates register each official product validator", async 
   ] as const) {
     const specs = await checkSpecs([...groups], "all");
     for (const [product, name] of [
-      ["codex", "Codex skill validation: 16 entries"],
-      ["dsh", "DeepSeek Harness skill validation: 16 entries"],
-      ["antigravity", "Antigravity skill validation: 6 entries"],
+      ["codex", "Codex skill validation: 15 entries"],
+      ["dsh", "DeepSeek Harness skill validation: 15 entries"],
+      ["antigravity", "Antigravity skill validation: 5 entries"],
     ]) {
       const selected = specs.filter((spec) => spec.name === name);
       assert.equal(selected.length, 1);
@@ -705,9 +713,8 @@ test("a stale base is reported, and silent wherever the answer would be noise", 
 
 test("the real checker refuses every missing R5 delivery member before execution", async (t) => {
   const members = [
-    "delivery/skills/gh-identity/SKILL.md",
     "delivery/skills/sketch-native/SKILL.md",
-    "delivery/skills/gh-identity/references/auth-readiness.md",
+    "delivery/skills/gh/references/auth-readiness.md",
     "delivery/skills/gh/references/workflow-authorization.md",
     "docs/skill-sources.md",
     "delivery/policy/writing.md",

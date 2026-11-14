@@ -33,6 +33,8 @@ gh 拥有通用 CLI/API/stack 调用合同，没有执行器。alibabacloud-find
 
 ## 准备工具
 
+规则手工源与产品入口的分工见[交付架构](../README.md#规则与交付架构)。`bun run build:instructions` 从通用正文和三端适配生成原生入口；`build:install` 先执行这一步，再构建安装器。`Product instruction freshness` 门禁检查产物与源一致。不要手改生成入口，也不要单独对它们运行格式化。
+
 宿主机需要 Bash、Git、jq、gh、curl。还需要 tar、unzip、Python 3.9 或更高版本。摘要工具可用 `sha256sum` 或 `shasum`。安装器不安装系统软件。它不修改 shell、个人代理或 agent 配置。归档测试还使用 `zip`。缺少必需工具会失败。
 
 ```bash
@@ -55,21 +57,19 @@ Node 和 Bun 的版本由 [package.json](../package.json) 指定。[tool-version
 
 `format` 写回排版，`format:check` 只检查并通过退出码报告结果。两者传入同一批改动文件，不做全仓重排。格式检查独立于 `check.sh all`，完成改动时两者都运行。Prettier 处理源码排版。文档门禁阻塞混排空格和编号错误，并汇总句长提示。
 
-本仓库是这些维护工具的第一个消费者。文档门禁直接检查仓库文档，工具打包检查比对真实产物。技能引用检查读取发布视图，安装回归在临时目标验证交付与恢复。Codex 加载检查把安装清单铺到临时 `CODEX_HOME`。它用固定版本 CLI 的 `debug prompt-input` 回读完整指令和清单中的 Codex 技能入口。模型政策另核对入口引用和隔离文件与源码的字节一致性。按需正文仍由模型在触发时读取，加载检查不证明该行为。检查不调用模型，也不修改个人安装。这些检查进入统一本地门禁。提交钩子另须配置 `core.hooksPath` 才会自动触发；入口存在不代表已经启用。旧 GitHub CI 入口已退役。PR 审查结果的部分覆盖不能证明整个候选已受审。
-
-### CI 重建状态
-
-旧冻结配方、监督执行、报告上传、自动准入、凭据签发和可信合并入口均已移除。新 CI 从零建立，不要求兼容旧配方、旧报告协议或旧来源指定。
-
-本地工具、依赖锁、源码检查和安装回归继续维护。[原生工作流](../.github/workflows/check.yml)复用这些入口。真实运行、保护与审查配置按[实例与证据边界](review-gate.md#实例与证据边界)绑定，本地检查不发布 GitHub 准入结论。
+本仓库是这些维护工具的第一个消费者。文档门禁检查全部 Markdown 的格式；手工源的链接在仓库位置检查，三份原生生成入口的链接由产品发布视图检查。安装回归在临时目标验证交付与恢复。Codex 加载检查用固定 CLI 的 `debug prompt-input` 回读临时 `CODEX_HOME` 中的完整指令和技能目录，并核对按需政策的交付字节。它不调用模型，也不证明模型遵守规则。dsh 与 Antigravity 的生成、安装和引用检查不等于原生会话已加载。提交钩子须配置 `core.hooksPath` 才会自动触发。
 
 成员解析器计算当前清单的产品数量。`.cache/agents-build/` 只保留安装器产物。
 
-安装器的构建命令生成 `.cache/agents-build/install.mjs`。它还生成 Zod、js-yaml 许可证 `install-licenses.txt`。工具安装器从同一已核验归档提取 Node 的唯一顶层许可证。它写到 `.cache/agents-tools/licenses/node-LICENSE`。完整门禁绑定这些文件与固定 Node，作为安装运行副本的输入。V7 安装计划在状态根的 `agents/install/<run-id>/` 保存候选和恢复运行副本，仅绑定显式选择的产品。V5/V6 保留 Codex 私有目录的原路径。门禁在临时目录重建并比对，也在脱离依赖的位置运行 bundle。缺失或过期失败。
+安装器的构建命令生成 `.cache/agents-build/install.mjs`。它还生成 Zod、js-yaml 许可证 `install-licenses.txt`。工具安装器从同一已核验归档提取 Node 的唯一顶层许可证。它写到 `.cache/agents-tools/licenses/node-LICENSE`。完整门禁绑定这些文件与固定 Node，作为安装运行副本的输入。V8 安装计划在状态根的 `agents/install/<run-id>/` 保存候选和恢复运行副本，仅绑定显式选择的产品。V5/V6 保留 Codex 私有目录的原路径；V7 沿用记录中的产品布局。门禁在临时目录重建并比对，也在脱离依赖的位置运行 bundle。缺失或过期失败。
 
 安装器只把已验证的候选原子替换到 `.cache/agents-tools/bin/`。归档缓存每次重新校验摘要。随后它流式读取唯一的目标成员并检查版本。已有可执行文件不能仅凭版本输出绕过归档验证。损坏缓存、目录或链接目标、未知格式及版本不匹配都会失败。失败工具的旧目标保持原样。先前已成功准备的工具和有效下载缓存保留。
 
 默认准备还包含[验证器清单](../scripts/skill-validator-versions.json)固定的上游 Python 原文件、PyYAML 与许可证。Codex 与 Anthropic 验证器保存在仓库私有缓存。每次离线检查从固定归档重建预期字节。它拒绝修改过的代码，也拒绝缺失或多余文件与链接。校验不信任可改写的缓存清单。准备过程会下载官方工具并执行版本探针。它不进行模型请求或个人安装。
+
+### CI 重建状态
+
+退役范围由[项目约定](review-gate.md#当前退役状态)维护。本地工具、依赖锁、源码检查和安装回归继续维护，[原生工作流](../.github/workflows/check.yml)复用这些入口。当前运行语义见 [CI 与审查边界](#ci-与审查边界)；真实运行、保护与审查配置按[实例与证据边界](review-gate.md#实例与证据边界)绑定，本地检查不发布 GitHub 准入结论。
 
 ## 技能格式校验
 

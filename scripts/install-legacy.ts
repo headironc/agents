@@ -45,6 +45,59 @@ export function legacyFileMembers(version: 5 | 6 | 7): {
     relative: string;
     source: string;
   }[] = [];
+  // Freeze the pre-V8 publication map: current entrypoints and policy additions must not
+  // reinterpret a persistent plan or prevent its original runtime from restoring it.
+  for (const product of ["codex", "dsh", "antigravity"] as const) {
+    const policies = [
+      "writing",
+      "tool-contracts",
+      "review",
+      ...(product !== "antigravity"
+        ? ["rust", "sql", "models", "deepseek-harness"]
+        : []),
+      ...(product === "codex" ? ["antigravity"] : []),
+    ];
+    for (const name of policies)
+      members.push({
+        product,
+        category: "policy",
+        relative: `policy/${name}.md`,
+        source: `delivery/policy/${name}.md`,
+      });
+    for (const name of ["check-ids", "check-prose", "task-temp"])
+      members.push({
+        product,
+        category: "tool",
+        relative: `tools/${name}.mjs`,
+        source: `delivery/tools/${name}.mjs`,
+      });
+    if (product !== "antigravity") {
+      members.push({
+        product,
+        category: "instructions",
+        relative: "AGENTS.md",
+        source: "delivery/AGENTS.md",
+      });
+      for (const name of [
+        "README.md",
+        "dsh-headless.patch.yml",
+        "rust-lints.toml",
+        ...(product === "codex" ? ["codex.toml"] : []),
+      ])
+        members.push({
+          product,
+          category: "capability",
+          relative: `capability/${name}`,
+          source: `delivery/capability/${name}`,
+        });
+    }
+  }
+  members.push({
+    product: "codex",
+    category: "guide",
+    relative: "README.md",
+    source: "delivery/README.md",
+  });
   for (const [category, relative] of retiredClaudeMembers)
     members.push({
       product: "claude",
@@ -89,11 +142,11 @@ export function validLegacyProductRoots(
 }
 
 export function privateRunDirectory(
-  version: 5 | 6 | 7,
+  version: 5 | 6 | 7 | 8,
   roots: { state: { path: string }; codex?: { path: string } | undefined },
   id: string,
 ): string {
-  return version === 7
+  return version >= 7
     ? path.join(roots.state.path, "agents/install", id)
     : path.join(roots.codex?.path ?? "", ".agents-install", id);
 }

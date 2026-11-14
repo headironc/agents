@@ -156,7 +156,7 @@ const runId = z.string().regex(runIdPattern);
 
 export const InstallPlanSchema = z
   .strictObject({
-    version: z.union([z.literal(5), z.literal(6), z.literal(7)]),
+    version: z.union([z.literal(5), z.literal(6), z.literal(7), z.literal(8)]),
     createdAt: z.iso.datetime({ precision: 3 }),
     run: z.strictObject({
       id: runId,
@@ -204,10 +204,10 @@ export const InstallPlanSchema = z
     const issue = (message: string) =>
       context.addIssue({ code: "custom", message });
     const { sha256, ...body } = plan;
-    if (plan.version === 7) {
+    if (plan.version >= 7) {
       if (!installationProducts(plan.roots).length)
-        issue("V7 plans require at least one product root");
-    } else if (!validLegacyProductRoots(plan.version, plan.roots))
+        issue("Plans require at least one product root");
+    } else if (!validLegacyProductRoots(plan.version as 5 | 6, plan.roots))
       issue("Legacy product roots must match the plan version");
     if (canonicalDigest(body) !== sha256) issue("Plan digest mismatch");
     if (plan.selectedTargets) {
@@ -265,7 +265,8 @@ export const InstallPlanSchema = z
       category: (typeof memberCategories)[number];
       relative: string;
       source: string;
-    }[] = [...publicMembers([]), ...legacyFileMembers(plan.version)];
+    }[] =
+      plan.version === 8 ? publicMembers([]) : legacyFileMembers(plan.version);
     plan.targets.forEach((target, index) => {
       const inside = (root: string, file: string) => {
         const relative = path.relative(root, file);
@@ -277,17 +278,25 @@ export const InstallPlanSchema = z
         );
       };
       const name = target.key.slice(target.product.length + 1);
-      const relative = target.category === "skill" ? `skills/${name}` : name;
+      const prefix =
+        plan.version === 8 && target.product === "antigravity"
+          ? "antigravity-cli/"
+          : "";
+      const relative =
+        target.category === "skill" ? `${prefix}skills/${name}` : name;
       const member =
         target.category === "skill"
           ? /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
-            ? { relative, source: `delivery/${relative}` }
+            ? { relative, source: `delivery/skills/${name}` }
             : undefined
           : fileMembers.find(
               (member) =>
                 member.product === target.product &&
                 member.category === target.category &&
-                member.relative === relative,
+                member.relative ===
+                  (target.category === "instructions"
+                    ? relative
+                    : `${prefix}${relative}`),
             );
       if (
         !target.key.startsWith(`${target.product}:`) ||
@@ -423,7 +432,7 @@ function sameTarget(left: TargetState, right: TargetState): boolean {
  */
 export const InstallReceiptSchema = z
   .strictObject({
-    version: z.union([z.literal(5), z.literal(6), z.literal(7)]),
+    version: z.union([z.literal(5), z.literal(6), z.literal(7), z.literal(8)]),
     plan: z.strictObject({ path: absolutePath, sha256: digest }),
     run: z.strictObject({ id: runId, directory: absolutePath }),
     // The persistent recovery command is `<node> <installer> rollback --receipt <receipt>`.

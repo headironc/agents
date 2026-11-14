@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:install": ".cache/agents-tools/bin/node scripts/build-install.ts",
+    "build:instructions": ".cache/agents-tools/bin/node scripts/build-instructions.ts",
+    "build:install": ".cache/agents-tools/bin/node scripts/build-instructions.ts && .cache/agents-tools/bin/node scripts/build-install.ts",
     "format": ".cache/agents-tools/bin/node node_modules/prettier/bin/prettier.cjs --prose-wrap never --write",
     "format:check": ".cache/agents-tools/bin/node node_modules/prettier/bin/prettier.cjs --prose-wrap never --check"
   },

@@ -4,7 +4,7 @@ Read the [GitHub CLI contract](../SKILL.md). Use tool `gh` for the operation act
 
 ## Identity and authorization
 
-Before a named operation, read this skill's [workflow authorization](workflow-authorization.md). Use the installed `gh-identity` skill and its `references/auth-readiness.md` for identity selection and credential recovery. Resolve references from each skill's physical directory. Preserve the workflow's target, authorized effects and limits; command examples grant no additional authority.
+Before a named operation, read this skill's [workflow authorization](workflow-authorization.md). Read [authentication readiness](auth-readiness.md) before identity selection or credential recovery and before the first GitHub network command. Resolve references from this skill's physical directory. Preserve the workflow's target, authorized effects and limits; command examples grant no additional authority.
 
 Every operation uses `headironc`. Follow the Git transport rules for the HTTPS default, credential helper and target access checks. A GitHub API identity alone does not prove which credentials Git uses or establish push permission. Verify the actual transport before its write; require SSH identity evidence only when the operation uses SSH. After an identity failure, stop and report it; do not select another account or credential source.
 
@@ -38,10 +38,10 @@ Require explicit authority for the exact PR, open non-draft state, target branch
 
 ### Post-merge cleanup
 
-Confirmed merge readback immediately triggers cleanup under the existing [merge authorization](workflow-authorization.md#targets-and-authorized-effects):
+Confirmed merge readback immediately triggers cleanup under the existing [merge authorization](workflow-authorization.md#targets-and-authorized-effects) and [shared closeout rules](../../../policy/execution.md#task-completion-and-chat-archival):
 
 - **Primary checkout on a feature branch (solo default)**: When the clean primary checkout is owned by this task and bound to the merged feature branch, switch back to a verified safe branch (such as `main`) without touching unrelated worktrees.
-- **Dedicated task worktree**: If an isolated worktree was allocated for this PR and its HEAD matches the merged PR head with no remaining consumers or uncommitted changes, preserve any needed ignored evidence outside it and retire the worktree through the client's archival tool or `git worktree remove`. When a coordinator merges a delegated worker slice (or retires a superseded helper worker) with no remaining responsibility or in-flight operation on that worker chat, atomically retire the worker's worktree, archive the completed worker chat (`set_thread_archived` with `archived: true`), and remove the entry from the active `progress.md` table before advancing the slot. Never force-remove primary, pinned, or shared checkouts.
+- **Dedicated task worktree**: If an isolated worktree was allocated for this PR and its HEAD matches the merged PR head with no remaining consumers or uncommitted changes, preserve any needed ignored evidence outside it and retire the worktree through the client's archival tool or `git worktree remove`. When a coordinator merges a delegated worker slice (or retires a superseded helper worker) with no remaining responsibility or in-flight operation on that worker chat, atomically retire the worker's worktree, archive the completed worker chat through the current client's supported and authorized mechanism, and remove the entry from the active `progress.md` table before advancing the slot. Report an unavailable archival capability without claiming it completed. Never force-remove primary, pinned, or shared checkouts.
 - **Branch removal and readback**: Once no worktree uses the local branch and its tip equals the merged PR head, delete the local branch and delete the remote head ref while it still points to that head. Read back worktree and ref states and report the merged PR and cleanup results separately.
 
 ## Native stacks

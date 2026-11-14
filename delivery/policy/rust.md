@@ -1,6 +1,6 @@
 # Rust Coding Preferences
 
-These preferences, including type grouping, apply within the scope explicitly adopted by a project's instructions, subject to explicit project overrides. Apply them together with the shared rules in [AGENTS.md](../AGENTS.md), resolved relative to this document.
+These preferences, including type grouping, apply within the scope explicitly adopted by a project's instructions, subject to explicit project overrides. Apply them together with the [shared rules](common.md), resolved relative to this document.
 
 These requirements remain applicable when a consuming project has not enabled the delivered lint configuration. The configuration enforces part of this document; a missing check or a missed violation does not change the requirement. Keep invocation details and measured coverage limits with that configuration.
 
@@ -12,7 +12,7 @@ These requirements remain applicable when a consuming project has not enabled th
 - When a package directly uses a dependency feature, declare that feature in the consuming package's dependency specification. Do not rely on another workspace package to enable it.
 - Keep test fixtures, test-only embedded databases and other test tools out of application packages' normal and build dependency graphs. Applications consume fixture libraries through `dev-dependencies`; test-only fixture packages may use normal dependencies to implement those libraries. An embedded database used as production storage remains a normal application dependency.
 - Keep deployment and migration dependencies in the packages that own those operations. Check production dependency boundaries through the project's CI and preserve those gates when the scope changes.
-- Before database tests, read the project's database safety and verification requirements for isolation, migrations, runtime identity, fixture lifecycle and host requirements. Apply the [shared validation boundary](../AGENTS.md#checks).
+- Before database tests, read the project's database safety and verification requirements for isolation, migrations, runtime identity, fixture lifecycle and host requirements. Apply the [shared validation boundary](review.md#checks).
 
 ## Module layout
 
@@ -93,13 +93,13 @@ Within a file, keep a type definition and its associated `impl` blocks together.
 
 ## Settings
 
-- Apply the [shared settings ownership and loading boundary](../AGENTS.md#code-preferences): group settings by consuming capability with private fields and validated constructors, let entrypoint-private Serde input structs own required fields, defaults (applied only when an input is absent, rejecting explicitly empty values), and unknown-field rejection, and convert inputs into domain settings through explicit constructors.
+- Apply the [shared settings ownership and loading boundary](common.md#code-preferences): group settings by consuming capability with private fields and validated constructors, let entrypoint-private Serde input structs own required fields, defaults (applied only when an input is absent, rejecting explicitly empty values), and unknown-field rejection, and convert inputs into domain settings through explicit constructors.
 - Name project-owned aggregate containers `Settings` (module/value `settings`), omit redundant enclosing-group field prefixes (as in `Endpoint { host, timeout }`), and preserve official dependency names such as `config::Config`.
 - Load production entrypoints directly from agreed sources using an existing crate; keep explicit input maps or environment injection as internal test entrypoints.
 
 ## Errors and validation
 
-- Inspect dependency error variants and caller handling before wrapping errors, applying the [shared error and redaction contract](../AGENTS.md#code-preferences) and the [SQL failure boundary](sql.md#database-failures) for database errors.
+- Inspect dependency error variants and caller handling before wrapping errors, applying the [shared error and redaction contract](common.md#code-preferences) and the [SQL failure boundary](sql.md#database-failures) for database errors.
 - Prefer `#[from]` and `?` (or `match` / a named function, without error-conversion closures) for wrapping, and use early returns for completed success paths.
 - Log errors with `Debug`, never `Display`, only at the final handling boundary without exposing secrets or raw database payloads.
 - Do not use `unwrap()`. Allow `expect()` with a reason only in test modules, integration-test crates, or test-only fixture packages under [workspace validation](#workspace-validation); keep it denied in production and examples.
