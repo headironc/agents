@@ -11,6 +11,7 @@
 | 在本仓库工作 | [AGENTS.md](../AGENTS.md) → [Codex 规则](../delivery/AGENTS.md) | 先加载 Codex 规则，再读相关使用与维护合同 |
 | 维护或审查通用规则 | [通用规则](../delivery/policy/common.md)、[行为场景](../tests/scenarios/rules.md) | 核对归属、例外和独立推导的预期；场景不是第二份运行规则 |
 | 维护产品指令 | [架构与手工源](../README.md#规则与交付架构)、[交付目录](#交付目录)、[产品场景](../tests/scenarios/adapters.md) | 修改通用源或产品适配，再生成入口；不手改生成物 |
+| 在 Antigravity（CLI 与 App）工作或排查会话行为 | [Antigravity 适配](../delivery/rules/antigravity.md)、[运行与使用政策](../delivery/policy/antigravity.md)、[运行场景](../tests/scenarios/rules.md#antigravity-运行时会话空间与子代理回传) | 常驻入口保持凝练并受 `24,000` 字节门禁约束；`config/policy/antigravity.md` 维护会话 `brain/`、只读边界、子代理 `send_message` 回传及 CLI 参考 |
 | 组织执行、选择模型路线、安排会话与 Goal，或协作、接续和收尾 | [任务起点](../delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](../delivery/policy/models.md)、[模型场景](../tests/scenarios/rules.md#模型选择与接续) | 由 Codex 规则入口按需加载；衔接需求与授权、工作区选择与绑定、Goal、自主执行、结果接纳及收尾，实际经验见[验证边界](#验证能说明什么) |
 | 按任务选用 DeepSeek Harness (`dsh`) | [分工与授权](../delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](../delivery/policy/deepseek-harness.md) | 仅使用本合同定义的 OpenCode Go 或 DeepSeek 官方路由；按能力适配交付完整工作，保留任务边界及验收，不设调用比例 |
 | 项目明确采用 Rust 偏好 | [Rust 偏好](../delivery/policy/rust.md)与[代码偏好](../delivery/policy/common.md#code-preferences) | 依项目明确采用的范围读取 |
@@ -205,7 +206,7 @@ bash scripts/install.sh plan --product codex --source "$PWD" --report .cache/rep
 
 DeepSeek Harness（`0.2.2-rc.1` 实测）的 `desktop` 与 `headless` 两个 profile 共同继承 `@deepseek-ai/dsh-base`，默认启用 `@deepseek-ai/dsh-agent-instructions`、`@deepseek-ai/dsh-skill`、`@deepseek-ai/dsh-skill-filesystem` 和 `@deepseek-ai/dsh-tool-skill`，并共享用户主目录 `${DSH_HOME:-$HOME/.dsh}`。全局指令按固定顺序先读取 `${DSH_HOME:-$HOME/.dsh}/AGENTS.md`，再读取 `${DSH_AGENTS_HOME:-$HOME/.agents}/AGENTS.md`（正文去首尾空白相同则去重），随后按从 Git 根到当前工作目录（`cwd`）由浅入深读取项目级 `AGENTS.md`、`CLAUDE.md`、`AGENTS.local.md` 与 `CLAUDE.local.md`（总上限 64 KiB；全局级不读取 `CLAUDE.md`）。技能发现按单层 `<root>/<name>/SKILL.md` 或 `<root>/<name>.md` 扫描（跳过 `.` 开头隐藏目录，单文件上限 256 KiB），优先级由高到低为：项目 `<projectRoot>/.dsh/skills`（`100`）> `<projectRoot>/.agents/skills`（`200`）> 自定义 `customSkillDirs`（`300`）> 用户级 `${DSH_HOME:-$HOME/.dsh}/skills`（`400`）> `${DSH_AGENTS_HOME:-$HOME/.agents}/skills`（`500`）> 内置技能目录（`600`）。因此 `--product dsh` 直接将规则与技能安装到 `${DSH_HOME:-$HOME/.dsh}`，桌面端与 `headless` 共享同一安装位置且无须额外开关即可自动加载指令与技能；用户原有的 `.credentials.yaml`、`.anonymous-user-id`、`profiles/`、`sessions/`、`storages/` 和 `attachments/` 保持原样。
 
-V9 保留 `$HOME/.gemini` 产品根及 App、CLI 共用的 `AGENTS.md`，将技能、政策、工具和参考片段统一交付到 `config/`。两端从 `config/skills/<name>/SKILL.md` 自动发现技能，其余资产保持相对引用。安装器只管理交付清单中的目标，不创建 Plugin，不写 `settings.json`、发现 manifest、hooks 或 MCP 配置。已有同名规则与技能仍须按[官方发现规则](https://antigravity.google/docs/customization-discovery/)核对；源码与隔离安装检查不证明当前会话已加载。
+V9 保留 `$HOME/.gemini` 产品根及 App、CLI 共用的 `AGENTS.md`，将技能、政策、工具和参考片段统一交付到 `config/`（按[规则与工作流说明](https://antigravity.google/docs/rules-workflows)，单规则文件展开上限 `24,000` 字节，全部常驻规则共享 `20,000` tokens 内联预算）。两端从 `config/skills/<name>/SKILL.md` 自动发现技能，其余资产保持相对引用；各端自身的 `<appDataDir>`（CLI 为 `~/.gemini/antigravity-cli/`，App 为 `~/.gemini/antigravity/`，IDE 为 `~/.gemini/antigravity-ide/`，含各自的会话 `brain/<conversation-id>/` 与 `settings.json`）保持隔离且不被安装器触碰。安装器只管理交付清单中的目标，不创建 Plugin，不写 `settings.json`、发现 manifest、hooks 或 MCP 配置。已有同名规则与技能仍须按[官方发现规则](https://antigravity.google/docs/customization-discovery/)核对；源码与隔离安装检查不证明当前会话已加载。
 
 仅更新部分受管目标时，重复传入 `--target KEY` 指定完整目标集合。KEY 与下述接管名称相同，例如 `--target codex:policy/review.md --target codex:gh`。选择接受已选产品的受管文件和完整技能目录，拒绝重复、未知名称及技能内部文件路径。技能目录沿用完整备份、替换、回读和回滚，不拆分安装内部成员。未传时沿用整批计划。`--target` 不替代 `--adopt`；已有差异目标仍须明确接管。调用者按当前任务核对完整依赖，安装器不自动加入其他目标。未选目标不读取内容、不要求接管，也不修改权限。完整源码检查与冻结快照仍覆盖原候选。
 
@@ -238,7 +239,7 @@ bash scripts/install.sh status
 
 全为 `unchanged` 的运行没有替换步骤。对其 rollback 会把回执标为 `rolled-back`，但原有目标仍在。若无其他已安装回执，`status` 将返回 `none`。这不是卸载入口。
 
-Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安装、技能发现及使用者直接操作 CLI 的说明。其他 agent 的调用入口、委派和模型路线已移除。原有安装目标及旧 V5/V6 记录的验证和恢复保持不变。
+[Antigravity 使用支持](../delivery/policy/antigravity.md)同时交付给 Antigravity 与 Codex，维护会话 `brain/` 只读边界、子代理长报告回传、规则预算、技能发现及使用者直接操作 CLI 的说明。其他代理的调用入口、委派和模型路线已移除。原有安装目标及旧 V5/V6 记录的验证和恢复保持不变。
 
 ### 安装目标与接管
 
@@ -258,14 +259,14 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | DeepSeek Harness 指令 | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` | `delivery/products/dsh/AGENTS.md` 生成物 |
 | DeepSeek Harness 技能 | `${DSH_HOME:-$HOME/.dsh}/skills/<name>` | 清单选择 `dsh` 的完整顶层目录 |
 | Antigravity 全局指令 | `$HOME/.gemini/AGENTS.md` | `delivery/products/antigravity/AGENTS.md` 生成物；CLI 与 App 共用 |
-| Antigravity 按需参考 | `$HOME/.gemini/config/policy/*.md` | 通用规则、执行、写作、工具、评审及采用后的 Rust/SQL 政策 |
+| Antigravity 按需参考 | `$HOME/.gemini/config/policy/*.md` | 通用规则、执行、写作、工具、评审、Antigravity 运行与使用政策及采用后的 Rust/SQL 政策 |
 | Antigravity 工具 | `$HOME/.gemini/config/tools/<name>.mjs` | 同一份打包工具 |
 | Antigravity Rust 参考配置 | `$HOME/.gemini/config/capability/rust-lints.toml` | 采用 Rust 偏好的项目可合并；不自动修改项目配置 |
 | Antigravity App 与 CLI 技能 | `$HOME/.gemini/config/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
 Codex 与 DeepSeek Harness（`dsh`）在 macOS 上均交付十个完整顶层包、十九个内容入口。其他平台交付九个包、十八个入口。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity App 和 CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
 
-Antigravity App 与 CLI 接收 `gh`、`project-guide`、`modern-web-guidance`、`property-based-testing`、`rust-risk-review`、`web-quality-audit`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共九个顶层包及九个入口；其他平台交付八个包。配套交付本端全局规则、公共政策、三个工具和 Rust lint 参考片段，不接收 Codex 专属模型路线或产品配置。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
+Antigravity App 与 CLI 接收 `gh`、`project-guide`、`modern-web-guidance`、`property-based-testing`、`rust-risk-review`、`web-quality-audit`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共九个顶层包及九个入口；其他平台交付八个包。配套交付本端全局规则、公共政策与本端运行政策（`policy/antigravity.md`）、三个工具和 Rust lint 参考片段，不接收 Codex 专属模型路线或产品配置。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
 
 Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。Antigravity 新计划使用 `$HOME/.gemini`，V6/V7 旧记录沿用其记录的 CLI 根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 

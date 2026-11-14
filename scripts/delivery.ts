@@ -21,7 +21,7 @@ const sharedPolicies = [
   "execution",
 ];
 const agentPolicies = ["rust", "sql", "models", "deepseek-harness"];
-const codexOnlyPolicies = ["antigravity"];
+const antigravityPolicies = ["antigravity"];
 // Deployed executables a consuming project runs directly, published beside the rules they enforce.
 // Kept in name order, so a new entry lands in one place and the plan stays comparable.
 const tools: [string, string][] = [
@@ -93,7 +93,9 @@ export function publicMembers(
             (name) => product === "codex" || name !== "models",
           )
         : []),
-      ...(product === "codex" ? codexOnlyPolicies : []),
+      ...(product === "codex" || product === "antigravity"
+        ? antigravityPolicies
+        : []),
     ])
       members.push({
         category: "policy",

@@ -413,6 +413,7 @@ test("explicit Antigravity selection contains its platform-compatible skills and
       "antigravity:alibabacloud-sms-send-short-message",
       "antigravity:gh",
       "antigravity:modern-web-guidance",
+      "antigravity:policy/antigravity.md",
       "antigravity:policy/review.md",
       "antigravity:policy/common.md",
       "antigravity:policy/execution.md",

@@ -11,6 +11,7 @@ import path from "node:path";
 import test from "node:test";
 import type { TestContext } from "node:test";
 import {
+  antigravityRuleByteLimit,
   buildInstructions,
   generatedInstructionPaths,
   renderInstructions,
@@ -108,7 +109,8 @@ test("unsupported source links reject the build before any generated entry chang
 test("declared source links resolve from each native entry and retain fragments", () => {
   const source =
     "# Shared instructions\n[Policy](execution.md#workspaces) [Tool](../tools/check-prose.mjs) [Skill](../skills/gh/SKILL.md) [Here](#local) [Web](https://example.com/)\n";
-  const adapter = "[Route](../policy/models.md#goals)\n";
+  const adapter =
+    "[Route](../policy/models.md#goals) [Runtime](../policy/antigravity.md#会话空间与只读边界)\n";
   for (const product of ["codex", "dsh", "antigravity"] as const) {
     const prefix = product === "antigravity" ? "config/" : "";
     const output = renderInstructions(source, adapter, product);
@@ -117,8 +119,29 @@ test("declared source links resolve from each native entry and retain fragments"
       "tools/check-prose.mjs",
       "skills/gh/SKILL.md",
       "policy/models.md#goals",
+      "policy/antigravity.md#会话空间与只读边界",
     ])
       assert.ok(output.includes(`](${prefix}${target})`));
     assert.ok(output.includes("[Here](#local) [Web](https://example.com/)"));
   }
+});
+
+test("Antigravity instructions stay within the 24 KB per-file rule cap", () => {
+  const actual = readFileSync(
+    path.resolve(
+      import.meta.dirname,
+      "../../delivery/products/antigravity/AGENTS.md",
+    ),
+    "utf8",
+  );
+  assert.ok(Buffer.byteLength(actual, "utf8") < antigravityRuleByteLimit);
+  assert.throws(
+    () =>
+      renderInstructions(
+        "# Shared instructions\n",
+        `# Antigravity behavior\n\n${"a".repeat(antigravityRuleByteLimit)}\n`,
+        "antigravity",
+      ),
+    /Antigravity instructions exceed 24000 bytes/,
+  );
 });
