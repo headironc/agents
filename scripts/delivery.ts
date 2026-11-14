@@ -13,7 +13,13 @@ export const memberCategories = [
 export const products = ["codex", "dsh", "antigravity"] as const;
 export type Product = (typeof products)[number];
 export const darwinOnlySkills = new Set(["sketch-native"]);
-const sharedPolicies = ["writing", "tool-contracts", "review"];
+const sharedPolicies = [
+  "writing",
+  "tool-contracts",
+  "review",
+  "common",
+  "execution",
+];
 const agentPolicies = ["rust", "sql", "models", "deepseek-harness"];
 const codexOnlyPolicies = ["antigravity"];
 // Deployed executables a consuming project runs directly, published beside the rules they enforce.
@@ -81,7 +87,12 @@ export function publicMembers(
   for (const product of products) {
     for (const name of [
       ...sharedPolicies,
-      ...(product === "codex" || product === "dsh" ? agentPolicies : []),
+      ...(product === "antigravity" ? ["rust", "sql"] : []),
+      ...(product === "codex" || product === "dsh"
+        ? agentPolicies.filter(
+            (name) => product === "codex" || name !== "models",
+          )
+        : []),
       ...(product === "codex" ? codexOnlyPolicies : []),
     ])
       members.push({
@@ -112,12 +123,21 @@ export function publicMembers(
       relative: `capability/${name}`,
       source,
     });
-  for (const product of ["codex", "dsh"] as const)
+  members.push({
+    category: "capability",
+    product: "antigravity",
+    relative: "capability/rust-lints.toml",
+    source: "delivery/capability/rust-lints.toml",
+  });
+  for (const product of products)
     members.push({
       category: "instructions",
       product,
       relative: "AGENTS.md",
-      source: "delivery/AGENTS.md",
+      source:
+        product === "codex"
+          ? "delivery/AGENTS.md"
+          : `delivery/products/${product}/AGENTS.md`,
     });
   for (const product of products)
     for (const name of skills(product)) {
@@ -131,6 +151,12 @@ export function publicMembers(
   return products
     .filter((product) => selected === undefined || product === selected)
     .flatMap((product) =>
-      members.filter((member) => member.product === product),
+      members
+        .filter((member) => member.product === product)
+        .map((member) =>
+          product === "antigravity" && member.category !== "instructions"
+            ? { ...member, relative: `antigravity-cli/${member.relative}` }
+            : member,
+        ),
     );
 }

@@ -279,11 +279,7 @@ export function inspectRoots(
         : {}),
       ...(selected.includes("antigravity")
         ? {
-            antigravity: root(
-              "antigravity",
-              path.join(home, ".gemini/antigravity-cli"),
-              null,
-            ),
+            antigravity: root("antigravity", path.join(home, ".gemini"), null),
           }
         : {}),
       state,

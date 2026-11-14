@@ -145,6 +145,11 @@ export async function checkSpecs(
       [process.execPath, "scripts/check-install-build.ts"],
       ["node", "bun"],
     );
+    add(
+      "Product instruction freshness",
+      [process.execPath, "scripts/build-instructions.ts", "--check"],
+      ["node"],
+    );
     // The document checkers read Markdown through pinned packages, so their versions belong in the
     // report beside the binaries, the way markdownlint is named for the contract check below. The
     // bundled products carry the same packages, so their freshness check depends on them too.
@@ -528,7 +533,7 @@ async function runChecks(specs: CheckSpec[]): Promise<CheckResult[]> {
     "Repository regression: delivery/skills/wechatide/tests/call.test.mjs",
     "Repository regression: tests/check-prose.test.mjs",
   ]);
-  for (let index = 0; index < specs.length; ) {
+  for (let index = 0; index < specs.length;) {
     if (
       specs[0]?.name === "TypeScript" ||
       specs[index]!.name.startsWith("Repository regression: ")

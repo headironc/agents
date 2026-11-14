@@ -102,7 +102,8 @@ function readRecord(
     "version" in value &&
     value.version !== 5 &&
     value.version !== 6 &&
-    value.version !== 7
+    value.version !== 7 &&
+    value.version !== 8
   ) {
     throw new RecordVersionError(`Unsupported ${code} version: ${physical}`);
   }
@@ -276,7 +277,9 @@ function checkHost(
     const recorded = plan.roots[name as RootName];
     if (
       !recorded ||
-      root.path !== recorded.path ||
+      (name === "antigravity" && plan.version < 8
+        ? path.join(root.path, "antigravity-cli")
+        : root.path) !== recorded.path ||
       root.variable !== recorded.variable
     )
       problems.push({ code: "roots-changed", root: name as RootName });

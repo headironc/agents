@@ -9,7 +9,6 @@ const requiredSkills = [
   { path: "sketch-native", target: "codex,dsh,antigravity" },
   { path: "gh", target: "codex,dsh,antigravity" },
   { path: "project-guide", target: "codex,dsh,antigravity" },
-  { path: "gh-identity", target: "codex,dsh,antigravity" },
   { path: "alibabacloud-find-skills", target: "codex,dsh,antigravity" },
   {
     path: "alibabacloud-sms-send-short-message",

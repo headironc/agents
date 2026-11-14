@@ -1,7 +1,7 @@
 ---
 name: gh
 description: >-
-  Apply GitHub CLI, API targeting, response handling, and native-stack command guidance. Supports named workflows without granting mutation authority.
+  Use GitHub CLI for named workflows, identity readiness, API requests, and native stacks. Preserve the caller's mutation authority.
 metadata:
   maintenance: local
   upstream-repository: https://github.com/cli/cli
@@ -15,9 +15,9 @@ metadata:
 
 Contract subject: `gh`.
 
-Use this contract for an operation already selected by the caller. Take the intended host, repository, object or ref, requested fields and completeness scope from the task or verified handoff. Return the exact target, command result, required data and pagination coverage; report failed or incomplete evidence before any dependent action. Identity selection and business authorization remain with the caller. For opening, reviewing, merging or releasing, load the relevant [operation reference](references/operations.md) before preparing the operation.
+Use this contract for an operation already selected by the caller. Take the intended host, repository, object or ref, requested fields and completeness scope from the task or verified handoff. Return the exact target, command result, required data and pagination coverage; report failed or incomplete evidence before any dependent action. Business authorization remains with the caller; use the authentication reference for identity readiness. For opening, reviewing, merging or releasing, load the relevant [operation reference](references/operations.md) before preparing the operation.
 
-Use the installed command's help for actual flags, supported fields and preview availability before constructing an invocation. Before preparing a named GitHub workflow, read [workflow authorization](references/workflow-authorization.md) from this skill's physical directory. It owns targets, authorized effects, repair scope, automatic reviews, waiting, and completion. Use the installed `gh-identity` skill only for identity readiness and permitted credential recovery. These invocation patterns do not start it or expand its authority. If a required installed skill or reference is unavailable, stop the dependent operation; do not reconstruct its permissions from these examples.
+Use the installed command's help for actual flags, supported fields and preview availability before constructing an invocation. Before preparing a named GitHub workflow, read [workflow authorization](references/workflow-authorization.md) from this skill's physical directory. It owns targets, authorized effects, repair scope, automatic reviews, waiting, and completion. Identity readiness and permitted credential recovery follow [Authentication](#authentication). If a required reference is unavailable, stop the dependent operation; command examples do not supply missing permissions.
 
 ## Interactivity policy
 
@@ -88,13 +88,13 @@ For a write with a timeout, nonzero exit or partial success, retain the exact ta
 
 ## Authentication
 
-For a named workflow, use the installed `gh-identity` skill to load its `references/auth-readiness.md` before the first network command. Use its selected profile and required status and identity queries. Do not substitute generic `gh auth status --json` output for that identity proof. Follow that owner's explicit credential-recovery and read-retry procedure when its conditions apply. A command failure alone does not authorize another account, credential recovery or a configuration change outside that procedure.
+For identity readiness, credential recovery, or a named workflow, read [authentication readiness](references/auth-readiness.md) before the first GitHub network command, including HTTPS Git that uses the selected credential. Use its profile, status and identity queries, and bounded recovery procedure. Generic `gh auth status --json` output is not that proof; command failure alone does not authorize another account or configuration change.
 
 ## Native stacks
 
 Contract subject: `gh-stack`.
 
-Before the first `gh stack` call, inspect the actual subcommand's help. Read the relevant [operation reference](references/operations.md) for opening, reviewing, merging or publishing, including native stacks. These are operations under this tool, not separate workflow skills. Their named identity capabilities remain owned by the installed gh-identity contract.
+Before the first `gh stack` call, inspect the actual subcommand's help. Read the relevant [operation reference](references/operations.md) for opening, reviewing, merging or publishing, including native stacks. These are operations under this tool, not separate workflow skills. Their identity preparation follows [authentication readiness](references/auth-readiness.md).
 
 If the native command or required identity capability is unavailable, report the missing capability instead of installing an extension or substituting an unrelated stack implementation.
 

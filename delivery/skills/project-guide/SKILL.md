@@ -5,7 +5,7 @@ description: Identify a project's working version, discover task-relevant author
 
 # Project Guide
 
-Ground the requested work in the target project's own sources. Use the four capabilities below to the extent the task requires; an orientation request needs no check execution. This skill owns discovery and validation guidance. Business decisions, implementation scope, review, release, merge, deployment, and production operations remain with their existing owners. Ordinary development needs no additional workflow ceremony.
+Use the target project's sources and only the capabilities the task requires. This skill owns discovery and validation guidance, not business decisions, implementation scope, review, or external operations. Ordinary development needs no extra workflow; orientation requires no check execution.
 
 Read the [Git contract](../../policy/tool-contracts.md#git). Use tool `git` under that contract. Read the [search contract](../../policy/tool-contracts.md#rg). Use tool `rg` under that contract. Resolve these references from this installed skill directory.
 
@@ -17,7 +17,7 @@ Read guidance and command definitions from the selected version. Reading a diffe
 
 ## Discover authoritative guidance
 
-Read applicable project instructions and follow the project's navigation to the materials that govern this task. Let the project determine paths, reading order, authority, and adoption scope. Trace a relevant link far enough to reach the rule or executable owner, without loading every document by default.
+Follow project instructions and navigation for this task's paths, reading order, authority, and adoption scope. Trace relevant links to their rule or executable owner without loading every document.
 
 Distinguish confirmed decisions and current requirements from proposals, unresolved questions, samples, and historical evidence. Apply the project's precedence rules; recency alone does not settle a conflict. Expose a material unresolved conflict before dependent work, while continuing unaffected work.
 
@@ -27,11 +27,11 @@ When navigation is absent, inspect the existing source, manifests, scripts, and 
 
 Prefer the project's existing change classifier and check runner. Read their input contract, including baseline semantics, dirty and untracked inputs, dependency consumers, and unknown-comparison handling. A selected package is not necessarily its affected consumers. A list or classification result is a check plan, not an executed check. Follow the project's conservative fallback when comparison is unknown, retaining the reason; malformed parameters remain errors.
 
-If no classifier exists, derive the relevant checks from the project's instructions and actual manifest, script, or CI definitions. Follow aliases to their executable scope. Preserve project runtime versions, working directories, arguments, and required environment semantics. A short command name may run several unrelated-looking checks; report its actual coverage and select a narrower supported entrypoint only when it satisfies the task's requirements.
+Without a classifier, derive checks from project instructions and actual manifest, script, or CI definitions. Follow aliases to their executable scope; preserve runtime versions, working directories, arguments, and required environment. Report actual coverage, including bundled checks, and choose a narrower supported entrypoint only when it satisfies the task.
 
 Inspect unfamiliar entrypoints for effects before execution. A check may generate files, update snapshots, access services, or format source. Verify required runtime and tool versions before launching the dependent check. If the available version does not satisfy the project's requirement, use an already available compatible executable or report that check as blocked; do not launch it with a different version merely to obtain an exit status. Run the checks covered by the task's authorization and applicable project rules. Reuse authorized dependency preparation; when preparation or effects exceed that scope, report the exact missing prerequisite and continue independent checks. An orientation request does not authorize installation or source changes.
 
-Observe completion, exit status, and relevant output. Distinguish blocked prerequisites, failed checks, skipped checks, timeouts, and successful results. On interruption or an uncertain outcome, establish the process and effect state before retrying or cleaning up. Preserve unrelated work. Use existing runners and reports rather than adding a generic runner, configuration, or parser for this skill.
+Record completion, exit status, and relevant output, distinguishing blocked prerequisites, failure, skipped checks, timeout, and success. After interruption or uncertainty, establish process and effect state before retrying or cleaning up. Preserve unrelated work and use existing runners and reports; do not add a generic runner, configuration, or parser for this skill.
 
 ## Report evidence and limits
 

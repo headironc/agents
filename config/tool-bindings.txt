@@ -1,5 +1,5 @@
 agents-tool-bindings-v1
-binding	delivery/policy/models.md	instructions	task-temp	delivery/policy/tool-contracts.md	read-before-use	defined
+binding	delivery/policy/execution.md	instructions	task-temp	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	bash	scripts/check.ts	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	bun	scripts/check.ts	read-before-use	defined
 binding	.github/workflows/check.yml	workflow	node	scripts/check.ts	read-before-use	defined
@@ -11,8 +11,7 @@ binding	.github/workflows/check.yml	workflow	python	scripts/skill-validator.py	r
 # kind<TAB>consumer<TAB>consumer-kind<TAB>tool<TAB>owner<TAB>use<TAB>state
 binding	delivery/skills/project-guide/SKILL.md	skill	git	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	delivery/skills/project-guide/SKILL.md	skill	rg	delivery/policy/tool-contracts.md	read-before-use	defined
-binding	delivery/skills/gh-identity/SKILL.md	skill	gh	delivery/skills/gh/SKILL.md	read-before-use	defined
-binding	delivery/skills/gh-identity/references/auth-readiness.md	skill	gh	delivery/skills/gh/SKILL.md	read-before-use	defined
+binding	delivery/skills/gh/references/auth-readiness.md	skill	gh	delivery/skills/gh/SKILL.md	read-before-use	defined
 binding	scripts/install.ts	script	agents-installer	scripts/install.ts	direct-execution	defined
 binding	scripts/check-prose.mjs	script	prose-check	scripts/check-prose.mjs	direct-execution	defined
 binding	scripts/check-ids.mjs	script	id-check	scripts/check-ids.mjs	direct-execution	defined

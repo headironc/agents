@@ -39,7 +39,6 @@ export const skills = {
     "alibabacloud-find-skills",
     "alibabacloud-sms-send-short-message",
     "gh",
-    "gh-identity",
     "project-guide",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "wechatide",
@@ -48,7 +47,6 @@ export const skills = {
     "alibabacloud-find-skills",
     "alibabacloud-sms-send-short-message",
     "gh",
-    "gh-identity",
     "project-guide",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "wechatide",
@@ -57,7 +55,6 @@ export const skills = {
     "alibabacloud-find-skills",
     "alibabacloud-sms-send-short-message",
     "gh",
-    "gh-identity",
     "project-guide",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
   ],
@@ -66,6 +63,8 @@ export const policies = [
   "writing",
   "tool-contracts",
   "review",
+  "common",
+  "execution",
   "rust",
   "sql",
   "models",
@@ -76,12 +75,21 @@ export const dshPolicies = [
   "writing",
   "tool-contracts",
   "review",
+  "common",
+  "execution",
   "rust",
   "sql",
-  "models",
   "deepseek-harness",
 ];
-export const antigravityPolicies = ["writing", "tool-contracts", "review"];
+export const antigravityPolicies = [
+  "writing",
+  "tool-contracts",
+  "review",
+  "common",
+  "execution",
+  "rust",
+  "sql",
+];
 export const tools = ["check-ids.mjs", "check-prose.mjs", "task-temp.mjs"];
 // The capability category, written out here the way the installation target table names it.
 export const capability: [string, string][] = [
@@ -146,7 +154,7 @@ export function expectedTargets(
     ...dshCapability.map(([name, source]) =>
       pair(`${dsh}/capability/${name}`, `${snapshot}/${source}`),
     ),
-    pair(`${dsh}/AGENTS.md`, `${snapshot}/delivery/AGENTS.md`),
+    pair(`${dsh}/AGENTS.md`, `${snapshot}/delivery/products/dsh/AGENTS.md`),
     ...skills.dsh.map((name) =>
       pair(`${dsh}/skills/${name}`, `${snapshot}/delivery/skills/${name}`),
     ),
@@ -162,6 +170,14 @@ export function expectedTargets(
         `${snapshot}/delivery/tools/${name}`,
       ),
     ),
+    pair(
+      `${antigravity}/capability/rust-lints.toml`,
+      `${snapshot}/delivery/capability/rust-lints.toml`,
+    ),
+    pair(
+      `${home}/.gemini/AGENTS.md`,
+      `${snapshot}/delivery/products/antigravity/AGENTS.md`,
+    ),
     ...skills.antigravity.map((name) =>
       pair(
         `${antigravity}/skills/${name}`,
@@ -169,7 +185,7 @@ export function expectedTargets(
       ),
     ),
   ];
-  const roots = { codex, dsh, antigravity };
+  const roots = { codex, dsh, antigravity: `${home}/.gemini` };
   return all.filter(([target]) =>
     selected.some((product) => target.startsWith(`${roots[product]}/`)),
   );
@@ -503,6 +519,15 @@ export function legacyPlan(
   ]);
   plan.targets = plan.targets
     .flatMap((target) => {
+      if (/:(?:policy\/(?:common|execution)\.md)$/.test(target.key)) return [];
+      if (target.product === "antigravity") {
+        if (
+          target.category === "capability" ||
+          target.category === "instructions" ||
+          /:policy\/(?:rust|sql)\.md$/.test(target.key)
+        )
+          return [];
+      }
       if (target.product === "codex") {
         if (target.key === "codex:capability/dsh-headless.patch.yml") return [];
         if (target.key === "codex:policy/deepseek-harness.md") {
@@ -545,6 +570,11 @@ export function legacyPlan(
           ? null
           : path.join(plan.roots.backup.path, plan.run.id, String(order)),
     }));
+  if (plan.roots.antigravity)
+    plan.roots.antigravity.path = path.join(
+      plan.roots.antigravity.path,
+      "antigravity-cli",
+    );
   const previous = path.dirname(plan.run.source);
   const privateRun = path.join(codexRoot.path, ".agents-install", plan.run.id);
   directory(path.dirname(privateRun));
@@ -592,7 +622,11 @@ export function legacyPlan(
         ),
     ),
   ]
-    .filter((file) => !exists(file))
+    .filter(
+      (file) =>
+        !exists(file) &&
+        plan.targets.some((target) => target.path.startsWith(`${file}/`)),
+    )
     .sort();
   const { sha256: _digest, ...body } = plan;
   plan.sha256 = canonicalDigest(body);

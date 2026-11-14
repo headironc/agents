@@ -317,7 +317,7 @@ function deriveTargets(
     const key =
       member.category === "skill"
         ? path.basename(member.relative)
-        : member.relative;
+        : member.relative.replace(/^antigravity-cli\//, "");
     drafts.push({
       kind: member.category === "skill" ? "directory" : "file",
       category: member.category,
@@ -473,7 +473,8 @@ function inspectUnlisted(
         .filter((member) => member.category === "skill")
         .map((member) => path.basename(member.relative)),
     );
-    const skillDirectory = path.join(root.path, "skills");
+    const prefix = product === "antigravity" ? "antigravity-cli/" : "";
+    const skillDirectory = path.join(root.path, prefix, "skills");
     for (const name of list(skillDirectory))
       if (!members.has(name)) report(path.join(skillDirectory, name));
     // A published name may carry a directory, and a directory on the way to one is walked rather
@@ -485,7 +486,7 @@ function inspectUnlisted(
         if (name.includes("/"))
           directories.add(name.slice(0, name.lastIndexOf("/")));
       for (const directory of [...directories].sort(bytewise)) {
-        const where = path.join(root.path, relative, directory);
+        const where = path.join(root.path, prefix, relative, directory);
         for (const name of list(where)) {
           const member = directory ? `${directory}/${name}` : name;
           if (!names.includes(member) && !directories.has(member))
@@ -493,16 +494,16 @@ function inspectUnlisted(
         }
       }
     };
-    for (const directory of [
-      "policy",
-      "tools",
-      ...(product === "codex" || product === "dsh" ? ["capability"] : []),
-    ])
+    for (const directory of ["policy", "tools", "capability"])
       fixed(
         directory,
         layout
-          .filter((member) => member.relative.startsWith(`${directory}/`))
-          .map((member) => member.relative.slice(directory.length + 1)),
+          .filter((member) =>
+            member.relative.startsWith(`${prefix}${directory}/`),
+          )
+          .map((member) =>
+            member.relative.slice(prefix.length + directory.length + 1),
+          ),
       );
   }
   return reported;
@@ -865,7 +866,7 @@ export function planInstallation(
       report.report.platform,
     );
     const body = {
-      version: 7,
+      version: 8,
       createdAt,
       run,
       review: args.output,

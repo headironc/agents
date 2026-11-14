@@ -67,6 +67,60 @@ test("the CLI requires an explicit nonempty unique product selection before crea
   assert.match(help.stderr, /explicit selection required/);
 });
 
+test("merged GitHub identity ships inside gh and leaves former packages unclaimed", (t) => {
+  const f = installFixture(t);
+  const products = ["codex", "dsh", "antigravity"] as const;
+  const roots = {
+    codex: path.join(f.home, ".codex"),
+    dsh: path.join(f.home, ".dsh"),
+    antigravity: path.join(f.home, ".gemini/antigravity-cli"),
+  };
+  const previous = products.map((product) =>
+    path.join(roots[product], "skills/gh-identity"),
+  );
+  for (const directory of previous) {
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      path.join(directory, "SKILL.md"),
+      "previous identity package\n",
+    );
+  }
+  const { plan } = f.planned(
+    products.flatMap((product) => ["--product", product]),
+  );
+  for (const product of products) {
+    const gh = plan.targets.find((target) => target.key === `${product}:gh`);
+    assert.ok(gh);
+    assert.ok(
+      !plan.targets.some((target) => target.key === `${product}:gh-identity`),
+    );
+    assert.equal(
+      readFileSync(
+        path.join(gh.source, "references/auth-readiness.md"),
+        "utf8",
+      ),
+      readFileSync(
+        path.join(
+          f.checkout,
+          "delivery/skills/gh/references/auth-readiness.md",
+        ),
+        "utf8",
+      ),
+    );
+  }
+  for (const directory of previous) {
+    assert.ok(plan.reported.some((entry) => entry === directory));
+    assert.equal(
+      readFileSync(path.join(directory, "SKILL.md"), "utf8"),
+      "previous identity package\n",
+    );
+  }
+  assert.deepEqual(
+    f.gaps(f.plan(["--product", "codex", "--target", "codex:gh-identity"])),
+    [{ code: "invalid-target", key: "codex:gh-identity" }],
+  );
+});
+
 test("new Codex plans report retired session files without claiming them", (t) => {
   const f = installFixture(t);
   const keys = [
@@ -114,7 +168,7 @@ test("product roots record each explicit subset in canonical order and exclude e
     const canonical = (["codex", "dsh", "antigravity"] as const).filter(
       (product) => (selected as readonly string[]).includes(product),
     );
-    assert.equal(plan.version, 7);
+    assert.equal(plan.version, 8);
     assert.deepEqual(
       Object.keys(plan.roots).filter((key) =>
         ["codex", "dsh", "antigravity"].includes(key),
@@ -155,7 +209,7 @@ test("unselected product variables do not block planning or permit target or ado
   );
 });
 
-test("V7 records reject empty product roots, unselected targets and legacy recovery paths", (t) => {
+test("V8 records reject empty product roots, unselected targets and legacy recovery paths", (t) => {
   const f = installFixture(t, { products: ["dsh"] });
   const { plan } = f.planned();
   for (const mutate of [
@@ -183,6 +237,41 @@ test("V7 records reject empty product roots, unselected targets and legacy recov
       false,
     );
   }
+});
+
+test("V7 records retain their original Antigravity root and DSH instruction source", (t) => {
+  const f = installFixture(t);
+  const { plan } = f.planned([
+    "--product",
+    "dsh",
+    "--product",
+    "antigravity",
+    "--target",
+    "dsh:AGENTS.md",
+    "--target",
+    "antigravity:policy/writing.md",
+  ]);
+  const legacy = structuredClone(plan);
+  legacy.version = 7;
+  legacy.roots.antigravity!.path = path.join(f.home, ".gemini/antigravity-cli");
+  const instructions = legacy.targets.find(
+    (target) => target.product === "dsh",
+  )!;
+  instructions.source = path.join(legacy.run.source, "delivery/AGENTS.md");
+  const bind = (value: typeof plan) => {
+    const { sha256: _digest, ...body } = value;
+    return { ...body, sha256: canonicalDigest(body) };
+  };
+  assert.equal(InstallPlanSchema.safeParse(bind(legacy)).success, true);
+  instructions.source = path.join(
+    legacy.run.source,
+    "delivery/products/dsh/AGENTS.md",
+  );
+  assert.equal(InstallPlanSchema.safeParse(bind(legacy)).success, false);
+  const escaped = structuredClone(plan);
+  escaped.targets.find((target) => target.product === "antigravity")!.path =
+    path.join(f.home, ".gemini/policy/writing.md");
+  assert.equal(InstallPlanSchema.safeParse(bind(escaped)).success, false);
 });
 
 function installDistinctProducts(
@@ -213,8 +302,9 @@ function installDistinctProducts(
     "tools",
   ]);
   assert.deepEqual(readdirSync(path.join(dsh, "policy")).sort(), [
+    "common.md",
     "deepseek-harness.md",
-    "models.md",
+    "execution.md",
     "review.md",
     "rust.md",
     "sql.md",
@@ -247,7 +337,7 @@ function installDistinctProducts(
 test("explicit Antigravity selection contains its platform-compatible skills and dependencies", (t) => {
   const f = installFixture(t);
   const initial = f.planned().plan;
-  assert.equal(initial.version, 7);
+  assert.equal(initial.version, 8);
   assert.equal(initial.roots.antigravity, undefined);
   const unsupportedUpgrade = { ...initial, version: 6 };
   const { sha256: initialDigest, ...upgradedBody } = unsupportedUpgrade;
@@ -263,8 +353,8 @@ test("explicit Antigravity selection contains its platform-compatible skills and
     initial.targets.every((target) => target.product !== "antigravity"),
   );
   const { plan } = f.planned(["--product", "antigravity"]);
-  const root = path.join(f.home, ".gemini/antigravity-cli");
-  assert.equal(plan.version, 7);
+  const root = path.join(f.home, ".gemini");
+  assert.equal(plan.version, 8);
   assert.equal(plan.roots.antigravity?.path, root);
   const { sha256: planDigest, ...v6Body } = plan;
   assert.equal(planDigest.length, 64);
@@ -282,11 +372,16 @@ test("explicit Antigravity selection contains its platform-compatible skills and
   assert.deepEqual(
     selected.map((target) => target.key).sort(),
     [
+      "antigravity:AGENTS.md",
+      "antigravity:capability/rust-lints.toml",
       "antigravity:alibabacloud-find-skills",
       "antigravity:alibabacloud-sms-send-short-message",
       "antigravity:gh",
-      "antigravity:gh-identity",
       "antigravity:policy/review.md",
+      "antigravity:policy/common.md",
+      "antigravity:policy/execution.md",
+      "antigravity:policy/rust.md",
+      "antigravity:policy/sql.md",
       "antigravity:policy/tool-contracts.md",
       "antigravity:policy/writing.md",
       "antigravity:project-guide",
@@ -333,7 +428,7 @@ test("a plan binds both products to independent roots and shared source", (t) =>
   const f = installFixture(t);
   const { plan } = f.planned();
   const expected = expectedTargets(f.home, plan.run.source);
-  assert.equal(plan.version, 7);
+  assert.equal(plan.version, 8);
   assert.deepEqual(Object.keys(plan.roots).sort(), [
     "backup",
     "codex",

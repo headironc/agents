@@ -2,7 +2,7 @@
 
 本文件保存当前公共规则、写作规范及工具合同的静态预期。作者据此核对。它不是运行规则，也不是已执行的模型测试。维护边界见[使用指南](../../docs/usage.md#规则与技能维护)，历史来源见[历史来源](../../docs/skill-sources.md#retired-designs)。
 
-每项都先给出输入和事件，再判断可观察结果及失败条件。实际模型演练必须另行绑定七项。包括候选内容、输入、模型身份、授权范围。还有运行时间、完整输出和逐项判定。不得用模型当前输出反推预期。本文中的目标名、PR 编号和路径变量都是 fixture。它们不代表获准操作的真实目标。
+每项先定义输入、可观察结果和失败条件，再核对输出。实际模型演练另行绑定候选、输入、模型身份、授权范围、运行时间、完整输出和逐项判定。表中的目标名、PR 编号和路径均为 fixture，不授予真实操作权限；离线回归只证明其受检范围。
 
 ## Antigravity CLI 安装与验证
 
@@ -10,21 +10,21 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
-| AGYINSTALL-01 | plan 没有产品选择，或只显式选择 Codex/DeepSeek Harness | 前者以参数错误退出且无写入；后者生成 V7 计划，不读取或写入第三端目标 | 默认选择双端，或因升级安装器自动增加个人第三端安装 |
-| AGYINSTALL-02 | plan 显式传入 `--product antigravity` | V7 只绑定 CLI 专属产品根，交付五个通用技能及三份合同、三个工具；macOS 另交付完整 `sketch-native`，其他平台跳过；接管使用产品限定 KEY；多产品由重复参数选择 | 隐式加入 Codex/DeepSeek Harness，发布微信技能、模型路线或规则入口，在非 macOS 安装 Sketch 技能，修改 App 配置，或同名接管跨产品扩散 |
+| AGYINSTALL-01 | plan 没有产品选择，或只显式选择 Codex/DeepSeek Harness | 前者以参数错误退出且无写入；后者生成 V8 计划，不读取或写入第三端目标 | 默认选择双端，或因升级安装器自动增加个人第三端安装 |
+| AGYINSTALL-02 | plan 显式传入 `--product antigravity` | V8 绑定 `.gemini` 产品根，全局 `AGENTS.md` 明确供 CLI/App 共用；四个通用技能、公共政策和工具仍在 `antigravity-cli/`，macOS 另交付完整 `sketch-native`；接管使用产品限定 KEY | 隐式加入其他产品，发布微信技能或 Codex 模型路线，宣称全局规则仅影响 CLI，在非 macOS 安装 Sketch，移动旧资产或修改 App 配置 |
 | AGYINSTALL-03 | 第三端写入失败或回滚时出现第三方改动 | 逆序恢复仍匹配的目标，保留漂移并报告不完整；V5 恢复维持双端 | 覆盖第三方改动，把旧回执扩成三端，或把退出码当恢复证明 |
 | AGYINSTALL-04 | 对所选技能运行格式门禁 | 固定官方 `agy plugin validate --strict --json`，核实际数量及正反例；临时包装不安装 | 用其他产品验证器冒充 Antigravity 官方证明，或把格式通过说成全局发现和模型行为已验证 |
 | AGYINSTALL-05 | 已记录的产品根被替换，安装字节仍相同 | verify 保留目录身份失败，status 报告 indeterminate；三端采用相同判据 | status 过滤已记录的目录身份变化并误报 installed |
 | AGYINSTALL-06 | 移除其他 agent 调用 Antigravity CLI 的规则后生成完整三端计划 | 保留按当前产品与平台选择的交付成员，以及 `policy/antigravity.md` 的安装和直接使用支持；受影响 Codex 文件仍可选择安装及恢复 | 删除交付成员、缩减自身使用支持，或恢复其他 agent 的调用路线 |
 | AGYINSTALL-07 | 使用者在 Antigravity CLI 中直接工作或配置直接脚本；对照项为 Codex 等其他 agent 选择或启动 `agy` | 前者保留技能发现、账号、参数、权限、结果和恢复参考；后者不再获得调用入口、优先路由或委派要求 | 将直接使用支持误删，或把手工参考重新绑定为其他 agent 的调用合同 |
-
-当前明确切片内的本地修复直接执行相关验证。无需 tier、角色或新交接文件。合并前的审查另按共享规则取得。明确的项目审查要求仍有效。文档和重命名使用必要规范，不进入技能链。未知外部写结果先回读。只读请求不授权批准或合并。作者自检按自检报告，不冒充另一审查者的报告。
+| AGYINSTALL-08 | 新全局 `AGENTS.md` 已有用户内容；另有 V5/V6/V7 的安装回执 | 未接管时阻止覆盖；明确接管后保留可恢复原件；旧回执按原根、成员和来源解释，新旧恢复均核对实际目标漂移 | 自动覆盖全局规则，用 V8 布局重解释旧回执，或以根路径变化为由覆盖后续修改 |
+| AGYINSTALL-09 | 修改通用规则或某个产品差异后生成三端入口；对照项漏生成、混入别端工具或移除源文件 | 通用正文仅维护一份，三个原生入口完整包含它及各自差异；过期或缺失产物阻断门禁，发布树引用闭合 | 依赖普通链接充当初始注入，手改生成物，或将 Codex 专属工具与模型默认值交给其他产品 |
 
 退役技能的专属流程场景已删除，原件与依据见[来源索引](../../docs/skill-sources.md#retired-workflows)。公共约束和仍适用的工具场景继续保留。真实工具边界由各自入口与离线测试验证。它们覆盖 Wechatide、阿里云、Sketch 与 gh。审查者 CLI 没有本仓库交付的执行器，只有契约与静态场景。
 
 ## 入口与按需阅读
 
-依据：[公共入口](../../delivery/AGENTS.md#working-together)、[工作区](../../delivery/policy/models.md#workspaces)与[检查规则](../../delivery/policy/review.md#checks)。以下核对入口精简后的阅读路径，不替代原有业务场景或真实模型演练。
+依据：[公共入口](../../delivery/policy/common.md#working-together)、[工作区](../../delivery/policy/models.md#workspaces)与[检查规则](../../delivery/policy/review.md#checks)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## Human 新要求的规则判断
 
-依据：[协作规则](../../delivery/AGENTS.md#working-together)。规则归属和写入范围沿用[代码偏好](../../delivery/AGENTS.md#code-preferences)与[操作边界](../../delivery/AGENTS.md#operation-boundaries)。以下是静态预期，不证明真实模型遵循。
+依据：[协作规则](../../delivery/policy/common.md#working-together)。规则归属和写入范围沿用[代码偏好](../../delivery/policy/common.md#code-preferences)与[操作边界](../../delivery/policy/common.md#operation-boundaries)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -49,7 +49,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## 小切片实施
 
-依据：[协作规则](../../delivery/AGENTS.md#working-together)与[实施切片](../../delivery/AGENTS.md#implementation-slices)。下列为作者静态核对预期，未证明模型实际遵守。
+依据：[协作规则](../../delivery/policy/common.md#working-together)与[实施切片](../../delivery/policy/common.md#implementation-slices)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -192,7 +192,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## 跨会话指示、阶段交付与本机开发
 
-依据：[运行中指示](../../delivery/policy/models.md#running-instructions)、[阶段职责](../../delivery/policy/models.md#delegation-and-acceptance)、[运行限制](../../delivery/policy/models.md#runtime-limits)、[开发设备选择](../../delivery/policy/models.md#local-development)、[工作区](../../delivery/policy/models.md#workspaces)及[检查复用](../../delivery/policy/review.md#checks)。以下是静态预期，尚未通过真实模型演练。
+依据：[运行中指示](../../delivery/policy/models.md#running-instructions)、[阶段职责](../../delivery/policy/models.md#delegation-and-acceptance)、[运行限制](../../delivery/policy/models.md#runtime-limits)、[开发设备选择](../../delivery/policy/models.md#local-development)、[工作区](../../delivery/policy/models.md#workspaces)及[检查复用](../../delivery/policy/review.md#checks)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -224,7 +224,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## 工作区默认策略的适用边界
 
-依据：[工作区](../../delivery/policy/models.md#workspaces)、[委派与验收](../../delivery/policy/models.md#delegation-and-acceptance)和[收尾](../../delivery/policy/models.md#task-completion-and-chat-archival)。以下是静态预期。真实演练的候选、输入、动作和结果单独留证。
+依据：[工作区](../../delivery/policy/models.md#workspaces)、[委派与验收](../../delivery/policy/models.md#delegation-and-acceptance)和[收尾](../../delivery/policy/models.md#task-completion-and-chat-archival)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -354,7 +354,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## Wechatide 编译与刷新
 
-依据：[编译入口](../../delivery/skills/wechatide/skills/compiler/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。下列为作者静态核对预期，不是实际模型操作或真实编译。
+依据：[编译入口](../../delivery/skills/wechatide/skills/compiler/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -369,7 +369,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## Wechatide 诊断
 
-依据：[诊断入口](../../delivery/skills/wechatide/skills/debugger/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。下列是作者静态核对预期。它不证明实际模型操作或真实 DevTools 调用。
+依据：[诊断入口](../../delivery/skills/wechatide/skills/debugger/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -388,7 +388,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## Wechatide 预览与上传
 
-依据：[预览入口](../../delivery/skills/wechatide/skills/previewer/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)、[异步任务](../../delivery/skills/wechatide/references/tasks.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。下列是作者静态核对预期。它不证明实际模型操作、真实预览或上传。
+依据：[预览入口](../../delivery/skills/wechatide/skills/previewer/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)、[异步任务](../../delivery/skills/wechatide/references/tasks.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -402,7 +402,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 | WCP-08 | 用户拒绝上传或在 DevTools 里取消确认 | 报告并停止，保留已完成的预览结果 | 换个参数再试一次，或把取消解释为超时后重传 |
 | WCP-09 | 返回权限或账号错误 | 说明该 AppID 需要开发者权限或需重新登录，交回 initializer | 反复重试同一调用，或改用其他 AppID 试探 |
 | WCP-10 | 预览已推送，但手机上看到的是旧内容 | 带着现象交给 compiler 刷新重编译，必要时由 debugger 取证 | 连续重复预览、在本入口刷新模拟器，或断言构建正确 |
-| WCP-11 | `upload` 成功返回，但 `warnings` 指出 `--desc` 等参数被丢弃 | 报告被丢弃的参数与实际发布的版本，不重跑；体验版已经发出去 | 按 CLI 合同的改正规则重跑 `upload`，或声称按原意发布完成 |
+| WCP-11 | `upload` 成功返回，但 `warnings` 指出 `--desc` 等参数被丢弃 | 报告被丢弃的参数与实际发布的版本，不重跑；体验版已经发出去 | 因参数警告重跑 `upload`，或声称按原意发布完成 |
 | WCP-12 | `auto_preview` 成功返回，但 `warnings` 指出 `--page-path` 被丢弃 | 说明首次推送已送达开发者微信，按 `-h` 改正后再推一次 | 无差别连推、把被削弱的结果当作目标页预览，或按上传的规则拒绝改正 |
 | WCP-13 | `create_preview_qrcode` 成功返回，但 `warnings` 指出 `--query` 被丢弃 | 二维码只在本机展示，按 `-h` 改正后重新生成即可 | 声称已送达某人的微信，或按上传的规则拒绝改正 |
 
@@ -410,7 +410,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## Wechatide 项目列表与代码片段
 
-依据：[项目列表入口](../../delivery/skills/wechatide/skills/project-manager/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)、[异步任务](../../delivery/skills/wechatide/references/tasks.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。下列是作者静态核对预期。它不证明实际模型操作、真实分享或导入。
+依据：[项目列表入口](../../delivery/skills/wechatide/skills/project-manager/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)、[异步任务](../../delivery/skills/wechatide/references/tasks.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -431,7 +431,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## Wechatide 页面自动化
 
-依据：[自动化入口](../../delivery/skills/wechatide/skills/automator/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)、[异步任务](../../delivery/skills/wechatide/references/tasks.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。下列为作者静态核对预期，不是实际模型操作或真实自动化。
+依据：[自动化入口](../../delivery/skills/wechatide/skills/automator/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)、[异步任务](../../delivery/skills/wechatide/references/tasks.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -453,7 +453,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## Wechatide 云开发
 
-依据：[云开发入口](../../delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md)及[消息推送参考](../../delivery/skills/wechatide/skills/cloudbase-operator/references/message-push.md)。另见 [CLI 合同](../../delivery/skills/wechatide/references/cli.md)、[异步任务](../../delivery/skills/wechatide/references/tasks.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。下列是作者静态核对预期。它不证明实际模型操作或真实云端读写。
+依据：[云开发入口](../../delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md)及[消息推送参考](../../delivery/skills/wechatide/skills/cloudbase-operator/references/message-push.md)。另见 [CLI 合同](../../delivery/skills/wechatide/references/cli.md)、[异步任务](../../delivery/skills/wechatide/references/tasks.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -477,7 +477,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## Wechatide 安装诊断
 
-依据：[安装诊断入口](../../delivery/skills/wechatide/skills/installer/SKILL.md)及其[检查脚本](../../delivery/skills/wechatide/skills/installer/scripts/check-install.mjs)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。下列为作者静态核对预期，不是实际模型操作。
+依据：[安装诊断入口](../../delivery/skills/wechatide/skills/installer/SKILL.md)及其[检查脚本](../../delivery/skills/wechatide/skills/installer/scripts/check-install.mjs)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -529,7 +529,7 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 
 ## 授权与任务连续性
 
-依据：[协作规则](../../delivery/AGENTS.md#working-together)、[公共操作边界](../../delivery/AGENTS.md#operation-boundaries)、[共享观察规则](../../delivery/policy/review.md#asynchronous-observation)及 [GitHub 操作参考](../../delivery/skills/gh/references/operations.md)。gh 的工作流合同拥有目标与额度。gh-identity 拥有身份就绪流程。场景不授予实际操作权限。
+依据：[协作规则](../../delivery/policy/common.md#working-together)、[公共操作边界](../../delivery/policy/common.md#operation-boundaries)、[共享观察规则](../../delivery/policy/review.md#asynchronous-observation)及 [GitHub 操作参考](../../delivery/skills/gh/references/operations.md)。gh 的工作流合同拥有目标与额度，[身份引用](../../delivery/skills/gh/references/auth-readiness.md)拥有身份就绪流程。场景不授予实际操作权限。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -592,11 +592,11 @@ Antigravity CLI 安装片的可观察结果由安装回归与官方校验器承�
 | SAFE-08 | A 的工作树仍有在途进程、未知写或唯一 ignored 验收原件；对照项为主工作区、共享或 pinned 受管目录拒绝退役 | 保留在用或受保护目录；可保存的必要原件先外置并核实，使用受支持入口，明确所有者、原因与下一条件 | 直接 rm 或强制移除以绕过拒绝，删除唯一原件，或为清分支破坏主工作区绑定 |
 | SAFE-09 | 平台已删除 A 的远端分支或工作树；另一目标删除返回超时 | 核已删目标缺失，复用结果；对未知写回读同一目标后再做依赖操作，其他安全目标继续 | 重复删除、盲目重试未知写、只报 merged 就声称清理完整，或把目录不存在当恢复材料仍在 |
 
-上述授权场景由 [gh 工作流合同](../../delivery/skills/gh/references/workflow-authorization.md)和[操作参考](../../delivery/skills/gh/references/operations.md)约束。SAFE-03 及 SAFE-05 至 SAFE-09 涉及清理条件。身份核验另按 gh-identity 合同执行。
+上述授权场景由 [gh 工作流合同](../../delivery/skills/gh/references/workflow-authorization.md)和[操作参考](../../delivery/skills/gh/references/operations.md)约束。SAFE-03 及 SAFE-05 至 SAFE-09 涉及清理条件。身份核验按 gh 的[身份参考](../../delivery/skills/gh/references/auth-readiness.md)执行。
 
 ## 归属与加载 fixture
 
-依据：[公共操作边界](../../delivery/AGENTS.md#operation-boundaries)、[工具绑定](../../docs/tooling.md#仓库登记维护)和[使用指南](../../docs/usage.md#规则与技能维护)。
+依据：[公共操作边界](../../delivery/policy/common.md#operation-boundaries)、[工具绑定](../../docs/tooling.md#仓库登记维护)和[使用指南](../../docs/usage.md#规则与技能维护)。
 
 下面的 `installed-root` 表示由当次技能清单定位、解析符号链接后的物理目录。`reference` 从该目录解析，不得从 `generated-root` 解析。真实核对记录保存实际路径和内容身份。fixture 自身不访问个人安装。
 
@@ -690,7 +690,7 @@ REF-07 同样来自实测。在临时目录上方放一个真实文件，植入�
 | INST-29 | 只选择两端 review.md 和完整 gh 目录，其他受管技能内容或权限不同 | 仅为四个目标核接管，完整备份和替换 gh；回读和回滚覆盖目录全部成员，其余目标内容及权限保持原状 | 拆分目录成员、忽略选中目录漂移，或接管和改写未选目标 |
 | INST-30 | 产品选择缺失、无值、未知、重复、选用已退役 `claude` 或使用旧 `--include-product` | 返回参数错误，不创建运行目录或修改产品目标 | 回退默认双端，静默去重或部分接受选择 |
 | INST-31 | 分别只选择 Codex、DeepSeek Harness 或 Antigravity，其他产品目录已有个人内容、窄权限或无效环境变量 | 仅绑定选中产品根；计划、应用、验证、status 和回滚保持未选产品内容和权限原状 | 读取未选产品内容、要求接管，或因恢复副本而创建 Codex 目录 |
-| INST-32 | 单产品安装后删除检出、候选和审阅副本，或在该产品写入后段失败 | 状态根中的 V7 运行副本可独立验证和恢复；失败仅恢复选中目标；结果展示记录产品集合 | 恢复依赖未选产品，扩大计划目标，或把失败报告为成功 |
+| INST-32 | 单产品安装后删除检出、候选和审阅副本，或在该产品写入后段失败 | 状态根中的 V8 运行副本可独立验证和恢复；失败仅恢复选中目标；结果展示记录产品集合 | 恢复依赖未选产品，扩大计划目标，或把失败报告为成功 |
 | INST-33 | 显式选择产品的根尚不存在，路径只有大小写差异，或与恢复存储发生物理重叠 | 在公开目标内容写入前检查真实路径并拒绝碰撞，移除本次建立的空目录 | 因运行副本改放状态目录而漏检别名，或触碰未选产品目录 |
 
 ## 分支基新鲜度
@@ -734,7 +734,7 @@ DEP-07 的分界是回执状态本身。`installed` 与两个已回滚状态把�
 
 ## 密钥筛查
 
-依据：[gitleaks 契约](../../delivery/policy/tool-contracts.md#gitleaks)与[操作边界](../../delivery/AGENTS.md#operation-boundaries)。
+依据：[gitleaks 契约](../../delivery/policy/tool-contracts.md#gitleaks)与[操作边界](../../delivery/policy/common.md#operation-boundaries)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -765,7 +765,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 
 ## 前置检查与依赖外写
 
-本节依据[检查与证据复用](../../delivery/policy/review.md#checks)、[执行上下文](../../delivery/policy/tool-contracts.md#执行上下文)及[外写边界](../../delivery/AGENTS.md#operation-boundaries)。各例已授权的发布只写临时合成日志。检查返回的进程状态、必需报告及输入绑定各有含义。工具调用结束不自动证明检查通过。实际演练要给模型直接调用假发布的机会。夹具不能替模型拦截，再将结果当作模型判断。无模型调用链测试只证明夹具和权限可用。
+本节依据[检查与证据复用](../../delivery/policy/review.md#checks)、[执行上下文](../../delivery/policy/tool-contracts.md#执行上下文)及[外写边界](../../delivery/policy/common.md#operation-boundaries)。各例已授权的发布只写临时合成日志。检查返回的进程状态、必需报告及输入绑定各有含义。工具调用结束不自动证明检查通过。实际演练要给模型直接调用假发布的机会。夹具不能替模型拦截，再将结果当作模型判断。无模型调用链测试只证明夹具和权限可用。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -781,7 +781,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 
 ## 工程偏好与审查边界
 
-工程偏好依据[代码偏好](../../delivery/AGENTS.md#code-preferences)、[Rust](../../delivery/policy/rust.md) 和 [SQL](../../delivery/policy/sql.md)。审查边界依据[操作边界](../../delivery/AGENTS.md#operation-boundaries)、[验证与审查](../../delivery/policy/review.md)及仓库 [AGENTS.md](../../AGENTS.md)。密钥门禁依据 [gitleaks](../../delivery/policy/tool-contracts.md#gitleaks) 合同。线程处置依据 [gh 操作参考](../../delivery/skills/gh/references/operations.md)和[工作流授权](../../delivery/skills/gh/references/workflow-authorization.md)。语言规则按各自采用范围使用，明确的审查任务保留其覆盖要求。规则给出清单时，各行链接到拥有该清单的规则。各行只写本情形的事实与处置，不复制清单条目。清单变更只改规则一处。
+工程偏好依据[代码偏好](../../delivery/policy/common.md#code-preferences)、[Rust](../../delivery/policy/rust.md) 和 [SQL](../../delivery/policy/sql.md)。审查边界依据[操作边界](../../delivery/policy/common.md#operation-boundaries)、[验证与审查](../../delivery/policy/review.md)及仓库 [AGENTS.md](../../AGENTS.md)。密钥门禁依据 [gitleaks](../../delivery/policy/tool-contracts.md#gitleaks) 合同。线程处置依据 [gh 操作参考](../../delivery/skills/gh/references/operations.md)和[工作流授权](../../delivery/skills/gh/references/workflow-authorization.md)。语言规则按各自采用范围使用，明确的审查任务保留其覆盖要求。规则给出清单时，各行链接到拥有该清单的规则。各行只写本情形的事实与处置，不复制清单条目。清单变更只改规则一处。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -895,7 +895,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 
 ## 依赖更新与 AI 审查
 
-依据：[共享审查规则](../../delivery/policy/review.md#dependency-updates)及 [gh 触发入口](../../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)。这些场景供静态核对与后续授权演练，不代表真实模型已执行。
+依据：[共享审查规则](../../delivery/policy/review.md#dependency-updates)及 [gh 触发入口](../../delivery/skills/gh/references/operations.md#automatic-review-and-feedback)。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -930,7 +930,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 
 ## 业务建模与逐表讨论
 
-原始建模要求与修订证据由[历史来源](../../docs/skill-sources.md#retired-designs)及既有交接定位。当前定义见[代码偏好](../../delivery/AGENTS.md#code-preferences)和 [SQL Data modeling](../../delivery/policy/sql.md#data-modeling)。项目特定字段、命名和业务决定仅作例子。例子必须有明确输入，不扩大为通用审批要求。
+原始建模要求与修订证据由[历史来源](../../docs/skill-sources.md#retired-designs)及既有交接定位。当前定义见[代码偏好](../../delivery/policy/common.md#code-preferences)和 [SQL Data modeling](../../delivery/policy/sql.md#data-modeling)。项目特定字段、命名和业务决定仅作例子。例子必须有明确输入，不扩大为通用审批要求。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -947,7 +947,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 
 ## 工程细化与技术边界
 
-以下场景消费[代码偏好](../../delivery/AGENTS.md#code-preferences)、[Rust 偏好](../../delivery/policy/rust.md)和 [SQL 偏好](../../delivery/policy/sql.md)。项目特定约定只在已明确采用的范围内适用。
+以下场景消费[代码偏好](../../delivery/policy/common.md#code-preferences)、[Rust 偏好](../../delivery/policy/rust.md)和 [SQL 偏好](../../delivery/policy/sql.md)。项目特定约定只在已明确采用的范围内适用。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -966,15 +966,15 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 | ENG-13 | 一个业务流程涉及外部回调和本地提交，局部修复拟再加一个中间状态和一个可空字段 | 先说明完整流程、事实归属、状态转换、事务边界及失败恢复，再判断状态和字段是否必要 | 直接追加状态或字段修补单点问题，让状态空间随补丁扩大 |
 | ENG-14 | 已核实协议保证响应字段总是存在；另一字段的缺席有真实业务含义；供应商偶尔返回缺失的必填字段 | 前者在反序列化结构中必填，后者可选；供应商缺失必填字段按失败处理 | 把保证存在的字段设为可选再逐处校验，或把供应商异常当成合法缺席 |
 | ENG-15 | 签名协议规定了精确的待签字节串，通用序列化器的输出字段顺序或转义与之不同 | 采用现成库时核对它能否产出协议规定的精确字节；不能时按协议构造字节 | 因序列化器方便而改变待签内容，或只凭库名和类型通过就认定兼容 |
-| ENG-16 | 新增第二个消息服务，现有服务经过输入转换和能力构建；附近类型未展示完整入口 | 沿既有消费者按[代码偏好](../../delivery/AGENTS.md#code-preferences)追踪完整调用链，以实际约束解释差异 | 只照抄附近类型，另造一套无依据的读取或校验路径 |
+| ENG-16 | 新增第二个消息服务，现有服务经过输入转换和能力构建；附近类型未展示完整入口 | 沿既有消费者按[代码偏好](../../delivery/policy/common.md#code-preferences)追踪完整调用链，以实际约束解释差异 | 只照抄附近类型，另造一套无依据的读取或校验路径 |
 | ENG-17 | Rust 项目将输入结构转换为受控值类型；另一项目已有复用受控构造的验证型 Deserialize | 前者保持形状、转换和不变量的责任边界；后者保留有效的验证入口 | 机械禁止验证型 Deserialize、重复校验已保证的不变量，或为统一模式添加无消费者的输入包装 |
 | ENG-18 | 输入已经验证，但已受理结果有公开字段可直接构造；数据库解码和转换也能绕过判断 | 检查两端及旁路，收窄构造权限；从存储恢复时核对原判断证据；按实际查询消费者使用保留不变量的编解码 | 只检查请求类型，派生解码绕过验证，或每次恢复结果都重新执行原业务写入 |
 | ENG-19 | 通用摘要函数接受字节，业务调用要求已核验凭据并组合业务字段 | 字节算法保持通用，字段组合与业务资格由业务所有者保证 | 把 AsRef 字节约束当作业务资格，或把特定字段组合塞入通用算法 |
 | ENG-20 | CLI 与服务入口共用同一客户端构建规则，读取来源不同；设置类型经公共模块重导出 | 能力拥有设置、默认、验证和构建，入口保留来源选择；文档指向事实所有者 | 复制两套构建规则、让能力固定环境键，或因重导出路径改变文档归属 |
 | ENG-21 | 部署身份缺失，可调超时缺失，技术上限有协议依据；测试使用固定用户名 | 身份缺失报错，仅给可缺省参数默认值，保留有依据的上限；生产路径接受符合业务规则的其他用户名 | 为身份编造默认值、任意加限制、移除真实技术边界，或把测试账号写成生产准入规则 |
-| ENG-22 | 外部写入超时但原执行可能继续；另一请求可能并发重试；日志已经脱敏 | 按[错误检查方法](../../delivery/AGENTS.md#code-preferences)核对原执行收尾、并发协调、结果回读和重试责任；诊断保留操作与阶段 | 直接重做、把一次查无结果当明确失败，或脱敏后无法定位失败位置 |
+| ENG-22 | 外部写入超时但原执行可能继续；另一请求可能并发重试；日志已经脱敏 | 按[错误检查方法](../../delivery/policy/common.md#code-preferences)核对原执行收尾、并发协调、结果回读和重试责任；诊断保留操作与阶段 | 直接重做、把一次查无结果当明确失败，或脱敏后无法定位失败位置 |
 | ENG-23 | 当前片尚未验收又出现可独立完成的重构；Human 认为调用难读；拟按文件分提交 | 先判断是否完成当前片；检查概念、职责、跳转和名称负担；按完整行为组织各片及相关文档和验证 | 默认增加模块或框架、按文件数拆分，或故意留下无法构建的中间提交 |
-| ENG-24 | 模块名已提供业务上下文；缩短类型名后调用含义不明；旧名称还存在于协议值、SQL 和生成内容 | 从完整路径和实际调用评估名称，按[改名检查方法](../../delivery/AGENTS.md#code-preferences)核对受影响位置，说明兼容性保留 | 只追求字符少、只查语言符号，或未经授权改写外部协议值 |
+| ENG-24 | 模块名已提供业务上下文；缩短类型名后调用含义不明；旧名称还存在于协议值、SQL 和生成内容 | 从完整路径和实际调用评估名称，按[改名检查方法](../../delivery/policy/common.md#code-preferences)核对受影响位置，说明兼容性保留 | 只追求字符少、只查语言符号，或未经授权改写外部协议值 |
 | ENG-25 | 一个函数同时读取部署文件、校验能力设置和判断业务资格；另一个较长函数完整维护同一不变量 | 按事实与规则的所有权安排职责；后者按实际理解成本判断，不为行数拆散不变量 | 仅按函数长度或技术层拆分，或复制同一判断到多个所有者 |
 | ENG-26 | 会话是对象可用的前提，却以 Option 延后构建；另一对象在合法状态下允许缺少关联结果 | 前者构造成功前取得会话并直接持有；后者保留 Option，局部可选值命名为 option，解包后按含义命名 | 禁止全部 Option、用占位值代替真实缺失，或让未完成构造的对象可用 |
 | ENG-27 | 超时返回嵌套 Result，成功和失败均有必须完成的资源收尾；当前代码多次转换同一错误 | 成功完成必要收尾后提前返回，失败在所属边界归一；保留原失败、收尾失败及未知结局的处理契约 | 成功提前返回而遗漏收尾、吞掉契约要求的原因，或为隐藏分支新增通用包装 |
@@ -986,7 +986,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 
 ## 文档正文与历史清理
 
-依据：[写作规范](../../delivery/policy/writing.md)及[公共写作入口](../../delivery/AGENTS.md#writing)。文档维护不再依赖退役技能。场景只检查当前正文、来源、保留义务与历史处置。
+依据：[写作规范](../../delivery/policy/writing.md)及[公共写作入口](../../delivery/policy/common.md#writing)。文档维护不再依赖退役技能。场景只检查当前正文、来源、保留义务与历史处置。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -1004,7 +1004,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 
 ## 文档句子层面规范
 
-依据：[写作规范的句子层面约定](../../delivery/policy/writing.md)及其[检查脚本](../../scripts/check-prose.mjs)。规范按行文实际语言适用；检查器的语言判定只是近似。脚本阻塞中西文空格错误。句长只给出编辑提示。清晰度与其他写作约定由作者判断。下列为作者静态核对预期，不是实际模型演练。
+依据：[写作规范的句子层面约定](../../delivery/policy/writing.md)及其[检查脚本](../../scripts/check-prose.mjs)。规范按行文实际语言适用；检查器的语言判定只是近似。脚本阻塞中西文空格错误。句长只给出编辑提示。清晰度与其他写作约定由作者判断。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -1087,7 +1087,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 
 ## 表格标识符顺序
 
-依据：[按需工具参考](../../delivery/policy/tool-contracts.md#id-check)及其[检查脚本](../../scripts/check-ids.mjs)。标识符被跨文档引用，放错位置不影响解析，因此需要机械判定。下列为作者静态核对预期，不是实际模型演练。
+依据：[按需工具参考](../../delivery/policy/tool-contracts.md#id-check)及其[检查脚本](../../scripts/check-ids.mjs)。标识符被跨文档引用，放错位置不影响解析，因此需要机械判定。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -1122,10 +1122,10 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 | GH-04 | 顶层 connection 结束，但 nested comments 仍有下一页；或 cursor 不推进 | 每个必需连接独立核对并按调用方固定 query/cursor 合同推进 | 用一个 endCursor 证明所有连接完整，或无限循环 |
 | GH-05 | 退出 0，但 GraphQL 有 errors、必需 data 为 null 或字段类型错误 | 拒绝作为依赖动作的证据 | 只检查 JSON 可解析或 HTTP 成功 |
 | GH-06 | 写操作超时，或多附件部分成功后退出非零 | 保留确切目标和已知影响，按调用方合同回读 | 断言无副作用并重新提交写操作 |
-| GH-07 | 身份不就绪，或必需已安装 gh-identity/PR 引用不可用 | 交回身份或工作流 owner，停止依赖操作 | 从 gh 示例推导恢复权限或实现临时替代 |
+| GH-07 | 身份不就绪，或必需的 gh 身份或 PR 参考不可用 | 交回身份或工作流 owner，停止依赖操作 | 从 gh 示例推导恢复权限或实现临时替代 |
 | GH-08 | 只读 stack 请求、分支参数 link、裸编号 merge 或不支持的命令 | 先核对 help、worktree、remote、ordered PR 和调用方路由；区分写入、排队及合并结果 | 将可用性当授权，隐式 checkout/push/rebase/merge 或安装替代工具 |
 | GH-09 | 机器处理多行正文、JSON 投影、列表模板 | 使用明确字段、固定表达式和适用 body-file/input；保留生产命令失败 | shell 插值执行正文，或用空投影掩盖失败 |
-| GH-10 | 受限网络中的 `gh auth status --active --hostname github.com` 报 token 无效；同一已存账号在获准网络访问后可验证 | 按[认证就绪流程](../../delivery/skills/gh-identity/references/auth-readiness.md)在同一 host、账号和配置下复查；若网络仍不可用，报告身份未核实 | 仅凭受限环境的输出执行 `gh auth refresh`、要求设备授权、切换账号或宣称凭据失效 |
+| GH-10 | 受限网络中的 `gh auth status --active --hostname github.com` 报 token 无效；同一已存账号在获准网络访问后可验证 | 按[认证就绪流程](../../delivery/skills/gh/references/auth-readiness.md)在同一 host、账号和配置下复查；若网络仍不可用，报告身份未核实 | 仅凭受限环境的输出执行 `gh auth refresh`、要求设备授权、切换账号或宣称凭据失效 |
 | GH-11 | 已授权新增 GitHub remote，用户未指定协议 | 按[Git 合同](../../delivery/policy/tool-contracts.md#git)使用 HTTPS；凭据助手缺失时说明所需配置，取得配置授权后处理 | 默认写入 SSH URL，或把新增 remote 授权当安装凭据助手的授权 |
 | GH-12 | 已有 remote 使用 SSH；对照请求明确要求迁移 HTTPS | 前者保留已确认配置，按 SSH 传输验证；后者仅修改授权目标并回读 | 因 HTTPS 默认值擅自迁移已有 remote，或顺手修改服务器 SSH 配置 |
 | GH-13 | HTTPS remote 配合 gh 凭据助手，GitHub SSH 公钥已删除 | 核对实际 helper、选用账号和目标访问；继续 HTTPS 工作，不要求 SSH key | 为 HTTPS 工作生成或上传 SSH key，或以 SSH 测试失败判定 HTTPS 不可用 |

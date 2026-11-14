@@ -1,15 +1,13 @@
 # Repository Instructions
 
-- Before repository work, read [Codex rules](delivery/AGENTS.md). Load only the task-relevant sections of [README](README.md), [usage contracts](docs/usage.md), and [tooling contracts](docs/tooling.md) via heading lookup rather than reading whole files upfront.
-- Keep active session context below the 150K-token ceiling (avoiding long-context latency and 272K tiered-pricing cliffs). Filter search and diff outputs before loading them into context, and hand off cross-session or heavy-context tasks through a compact `progress.md` or `spec.md` anchor (under 100 lines).
+- Before repository work, read the [shared rules](delivery/policy/common.md) and the matching product adapter under `delivery/rules/`. Load only the task-relevant sections of [README](README.md), [usage contracts](docs/usage.md), and [tooling contracts](docs/tooling.md) via heading lookup rather than reading whole files upfront.
+- Apply the shared [context and continuity rules](delivery/policy/execution.md#continuity-and-evidence) to source reads, output collection, and handoffs.
 - Use README for current delivery status and follow [execution-record navigation](README.md#执行记录) when exact task evidence is needed.
-- Load [Rust](delivery/policy/rust.md) or [SQL](delivery/policy/sql.md) preferences only under their stated adoption scope and the selected review contract's required sections.
-- Keep work within the authorized scope and branch. Reassess a design when implementation changes its agreed boundaries.
+- Keep work within the authorized scope and branch; reassess a design when implementation changes its agreed boundaries. Load professional preferences under the shared [adoption rules](delivery/policy/common.md#code-preferences) and the selected review contract's required sections.
 - Use historical source as migration and recovery evidence, not as an implicit target design.
 - Preserve `.git`, history, other worktrees, unrelated changes, and external recovery and deployed snapshots.
-- Resolve tool references from their physical installed directories; apply [operation boundaries](delivery/AGENTS.md#operation-boundaries).
 - For this repository, use [tool contracts](delivery/policy/tool-contracts.md) and [writing conventions](delivery/policy/writing.md) from the delivery source. Run the repository copies of `scripts/check-prose.mjs` and `scripts/check-ids.mjs`.
-- Use `apply_patch` for manual edits and do not hand-edit bundled tools.
+- Do not hand-edit bundled tools or generated product instructions; use their generators. Manual edits follow the current product adapter and host tools.
 - For new structured checks and installation logic, use TypeScript with the pinned Node runtime.
 - Keep the tool-download bootstrap in Bash; keep delivered tool bundles reproducible.
 - Preserve pinned upstream Python validators and adopted skill tools instead of rewriting them for language uniformity.
@@ -19,9 +17,8 @@
 - Read [tool prerequisites and validation](docs/tooling.md); prepare tools with `bash scripts/install-tools.sh` and locked dependencies with `.cache/agents-tools/bin/bun install --frozen-lockfile --ignore-scripts`.
 - Run `umask 077`, `.cache/agents-tools/bin/bun run build:install`, and `bash scripts/check.sh all` for final source or executable-configuration validation, including rule behavior changes.
 - Use `bash scripts/check.sh docs` for documentation-only changes.
-- Keep applicable [behavior scenarios](tests/scenarios/rules.md) in sync with current rules and tools.
+- Keep applicable [behavior scenarios](tests/scenarios/rules.md) in sync with rules and tools. Distinguish static scenarios from authorized model runs, local gates from GitHub CI, and design review from current implementation review.
 - For this repository's review and merge, follow [the project contract](docs/review-gate.md), including its [rebuild-period override](docs/review-gate.md#重建期交付规则) for agents main. That override does not apply to other repositories or targets. Local implementation does not authorize remote setup, approval writes, or protection changes.
-- Distinguish static scenario checks from authorized actual model runs, local gates from GitHub CI, and design review from current implementation review.
 - When acceptance depends on Codex behavior, obtain model and material authorization and test the affected [scenarios](tests/scenarios/rules.md) in a real session. If that check cannot run, report behavior unverified; the no-model loader check does not prove behavior.
 - Keep substantive execution evidence and remaining limits in the existing task record; ordinary edits need no additional ledger.
 - Use [the usage guide](docs/usage.md) for delivered capabilities and snapshot transition limits.

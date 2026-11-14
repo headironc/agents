@@ -1,6 +1,18 @@
 # Agents
 
-本仓库维护可复用的代理规则、技能和配套工具。Skills 从一个源码位置按产品交付。安装时必须显式选择产品。可选择 Codex、DeepSeek Harness (`dsh`) 和 Antigravity CLI 中的一个或多个。Codex 与 DeepSeek Harness 接收规则入口 `AGENTS.md`、政策、工具、推荐配置及适用 Skills；Antigravity CLI 接收所选 Skills 及必要依赖。PR 模型审查由仓库外的提供方执行；本地与原生 CI 复用完整检查入口。技能成员以[技能清单](config/personal-skills.txt)为准，源码交付不代表个人环境已经启用。
+本仓库维护可复用的代理规则、技能和配套工具。安装时显式选择 Codex、DeepSeek Harness (`dsh`) 或 Antigravity。三端共享通用规则，各自由原生 `AGENTS.md` 入口加载产品适配。Antigravity 的全局规则同时作用于 CLI 和 App，技能与工具保留现有 CLI 安装位置。技能成员以[技能清单](config/personal-skills.txt)为准；源码交付不代表个人环境已经启用。
+
+## 规则与交付架构
+
+| 层次 | 权威来源 | 消费方式 |
+| --- | --- | --- |
+| 通用规则 | [协作与操作边界](delivery/policy/common.md)、[执行与资源生命周期](delivery/policy/execution.md) | 通用正文组装进原生入口；详细执行要求按需读取 |
+| 产品差异 | `delivery/rules/{codex,dsh,antigravity}.md` | 仅向对应产品加入工具、会话和发现约定 |
+| 主题政策与技能 | `delivery/policy/`、`delivery/skills/` | 各自拥有完整规则与操作流程，引用通用规则而非产品入口 |
+| 生成与交付 | [指令构建器](scripts/build-instructions.ts)、[交付清单](scripts/delivery.ts) | 固定组装三份入口，再按显式产品选择生成安装目标 |
+| 验证与恢复 | [检查合同](docs/tooling.md)、[安装合同](docs/usage.md#产品选择与安装) | 检查生成物新鲜度、产品引用闭包、安装和旧记录恢复 |
+
+只修改手工源，不维护三份相同正文。生成入口包含完整通用规则，不依赖模型跟随普通链接完成初始加载。产品原生位置与历史计划兼容由安装器拥有；配置、规则和技能仍分别管理。
 
 ## 当前能力
 
@@ -8,18 +20,18 @@
 
 | 能力 | 入口 | 使用边界 |
 | --- | --- | --- |
-| Codex 规则与专业偏好 | [Codex 规则](delivery/AGENTS.md)、[写作规范](delivery/policy/writing.md)、[Rust](delivery/policy/rust.md)、[SQL](delivery/policy/sql.md) | 专业偏好由项目明确采用 |
-| 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 采用快慢三级路由（`Architect/Debugger`、`Coder/Reviewer` 日常 `low` 档位、`Runner/Explorer` 极速 `low` 档位）与 150K Token 上下文护栏；开发设备由 Human 明确选择，普通单会话任务直接完成，多切片任务通过 `progress.md` / `spec.md` 锚点推进；能力与限制见[使用说明](docs/usage.md#mac-与-dev-的结果回传)及[验证边界](docs/usage.md#验证能说明什么) |
-| 总协调启动提示词 | [通用启动模板](docs/prompts/coordinator.md) | 明确启用后，总协调保持极简上下文（目标 `<50K Token`）负责拆分、派发、跟进和精简证据接纳，执行会话默认按 `Coder/Reviewer low` 高速完成编码验证与 PR，实现多切片全自动连续推进；普通文档，不安装 |
+| 通用规则与专业偏好 | [通用规则](delivery/policy/common.md)、[写作规范](delivery/policy/writing.md)、[Rust](delivery/policy/rust.md)、[SQL](delivery/policy/sql.md) | 三端共用；专业偏好由项目明确采用 |
+| 任务组织、模型路线、会话与 Goal | [任务起点](delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](delivery/policy/models.md) | 按任务读取模型、工作区与协作规则；[使用说明](docs/usage.md#mac-与-dev-的结果回传)保留跨端示例，[验证边界](docs/usage.md#验证能说明什么)区分源码与实际行为 |
+| 总协调启动提示词 | [通用启动模板](docs/prompts/coordinator.md) | 明确启用后用于多切片协调；普通文档，不安装 |
 | 本机协作提醒 | [使用与恢复](docs/usage.md#本机协作提醒) | 本机可选配置，独立于源码交付；启用状态与授权按实际环境核对 |
-| DeepSeek Harness (`dsh`) 委派与调用 | [分工与授权](delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](delivery/policy/deepseek-harness.md) | 按任务与能力适配选用（连接本合同定义的 OpenCode Go 或 DeepSeek 官方路由，日常默认 `deepseek-v4.1-flash` 显式 `low` 档位）；提供无密钥 `headless` 凭据与路由片段 [`dsh-headless.patch.yml`](delivery/capability/dsh-headless.patch.yml)；负责人判断与验收；未接入 CI 或审查关卡 |
+| DeepSeek Harness (`dsh`) 委派与调用 | [分工与授权](delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](delivery/policy/deepseek-harness.md) | 按任务与能力适配选用；无密钥配置片段见 [`dsh-headless.patch.yml`](delivery/capability/dsh-headless.patch.yml)，未接入 CI 或审查关卡 |
 | 设计稿与看图验收 | [sketch-native](delivery/skills/sketch-native/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Sketch 原生技能限 macOS 安装与运行；保留可编辑结果与真实像素验收；验证范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
-| 产品指令 | [交付目录](docs/usage.md#交付目录) | 直接维护与安装位置相同的源码布局 |
+| 产品指令 | [交付目录](docs/usage.md#交付目录) | 从通用规则与产品差异生成原生入口 |
 | 文档检查器 | [工具契约](delivery/policy/tool-contracts.md) | 提示中文句长，阻塞混排空格及表格编号错误 |
-| 任务临时目录与遗留扫描 | [生命周期](delivery/policy/models.md#task-temporary-directories)、[调用入口](delivery/policy/tool-contracts.md#task-temp) | 前台命令使用私有 scratch 并收尾；遗留扫描只读，历史目录不自动删除 |
+| 任务临时目录与遗留扫描 | [生命周期](delivery/policy/execution.md#task-temporary-directories)、[调用入口](delivery/policy/tool-contracts.md#task-temp) | 前台命令使用私有 scratch 并收尾；遗留扫描只读，历史目录不自动删除 |
 | 官方 Codex 跨设备协作 | [协作规则](delivery/policy/models.md#official-codex-coordination-across-devices)、[Mac 与 dev 示例](docs/usage.md#mac-与-dev-的结果回传) | 用官方交互会话满足跨端可见性；绑定各端授权、回报路径及现任协调者 |
 | 推荐配置 | [配置说明](delivery/capability/README.md) | 提供片段，由使用者合并到自己的配置 |
-| GitHub 操作 | [gh](delivery/skills/gh/SKILL.md)、[gh-identity](delivery/skills/gh-identity/SKILL.md) | 分别负责调用与工作流合同、身份就绪 |
+| GitHub 操作 | [gh](delivery/skills/gh/SKILL.md)、[身份就绪](delivery/skills/gh/references/auth-readiness.md) | 调用、工作流与按需身份恢复由同一技能拥有 |
 | 项目导航与验证 | [project-guide](delivery/skills/project-guide/SKILL.md) | 共享技能；发现项目版本、权威资料与原生检查，报告实际证据；演练范围见[来源登记](docs/skill-sources.md#project-guide) |
 | 原生 CI 与交付 | [运行合同](docs/tooling.md#ci-与审查边界)、[实例与证据边界](docs/review-gate.md#实例与证据边界) | 两平台复用完整检查；实际配置、运行与独立审查分别绑定实例验证 |
 | 阿里云技能发现与短信 | [技能发现](delivery/skills/alibabacloud-find-skills/SKILL.md)、[短信](delivery/skills/alibabacloud-sms-send-short-message/SKILL.md) | 发现、安装及发送遵循各自授权 |
@@ -33,7 +45,7 @@
 | 位置 | 职责 |
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | 本仓库维护要求 |
-| [delivery/](delivery/README.md) | 唯一交付源；成员由交付模块选择产品，`tools/` 为生成产物 |
+| [delivery/](delivery/README.md) | 通用规则、产品适配和技能源；三份原生指令及 `tools/` 为生成产物 |
 | `scripts/` | 检查、工具准备、打包与安装恢复实现 |
 | `config/` | 技能成员与工具归属、消费者绑定清单 |
 | `tests/` | 仓库自动回归与静态行为场景；技能专属测试随技能保留 |
@@ -53,9 +65,9 @@
 | 检查执行与报告 | [check.ts](scripts/check.ts)、[check-report.ts](scripts/check-report.ts)、`check-*.ts` | 本地 `check.sh` 与安装计划 |
 | 安装命令与计划 | [install.ts](scripts/install.ts) | `install.sh` 与独立安装器产物 |
 | 安装执行与恢复 | [install-apply.ts](scripts/install-apply.ts)、[install-current.ts](scripts/install-current.ts) | 安装命令与状态查询 |
-| 安装记录与目标状态 | [install-records.ts](scripts/install-records.ts)、[install-legacy.ts](scripts/install-legacy.ts)、[install-state.ts](scripts/install-state.ts) | 安装计划、执行、验证、恢复及历史 V5/V6 回执兼容 |
+| 安装记录与目标状态 | [install-records.ts](scripts/install-records.ts)、[install-legacy.ts](scripts/install-legacy.ts)、[install-state.ts](scripts/install-state.ts) | V8 安装与历史 V5/V6/V7 回执恢复 |
 | 源码快照与身份 | [source.ts](scripts/source.ts) | 检查报告、成员校验与安装计划 |
-| 产物构建与工具准备 | [bundle-tools.ts](scripts/bundle-tools.ts)、[build-install.ts](scripts/build-install.ts)、[install-tools.sh](scripts/install-tools.sh) | 交付检查器、独立安装器与本地门禁 |
+| 产物构建与工具准备 | [build-instructions.ts](scripts/build-instructions.ts)、[bundle-tools.ts](scripts/bundle-tools.ts)、[build-install.ts](scripts/build-install.ts)、[install-tools.sh](scripts/install-tools.sh) | 原生指令、交付检查器、独立安装器与本地门禁 |
 
 `check.sh` 调度验证并生成源码报告；`install.sh` 消费受检源码和报告，生成计划后执行安装或恢复。交付检查器由工具打包器生成。维护脚本和检查报告不随规则安装到使用项目。
 

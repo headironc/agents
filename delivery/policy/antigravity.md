@@ -1,12 +1,14 @@
-# Antigravity CLI 使用支持
+# Antigravity 使用支持
 
-本文供使用者直接使用 Antigravity CLI 时参考，保留安装、技能发现和直接使用支持。其他 agent 不从本文取得调用或委派 Antigravity CLI 的路线。Codex 的模型选择仍由[模型政策](models.md)拥有。
+本文说明 Antigravity 的全局规则入口，并供使用者直接使用 CLI 时参考。其他 agent 不从本文取得调用或委派 Antigravity CLI 的路线。授权与操作边界由[公共规则](common.md)拥有，工作区与能力核对由[执行规则](execution.md)拥有。
 
 ## 安装与技能发现
 
-Antigravity CLI 保留为可选安装产品。仓库交付通用 Skills、必要合同和工具，不安装 CLI、账号、密钥或个人设置。具体技能入口见[交付内容](../README.md)。安装目标、格式校验与个人环境中的实际发现分别验收。
+Antigravity 保留为可选安装产品。仓库交付原生全局规则入口、通用 Skills、必要合同和工具，不安装 CLI、账号、密钥或个人设置。具体交付入口见[交付内容](../README.md)。安装目标、格式校验与个人环境中的实际发现分别验收。
 
-CLI 从其专属技能根发现已安装技能。使用者通过 `/skills` 核对实际来源；同名共享技能可能影响优先级。安装清单、目标根与恢复操作由仓库安装合同维护，不从 Codex 模型路线推导。
+原生全局规则使用 `~/.gemini/AGENTS.md`，供 App 与 CLI 共享。[官方规则发现说明](https://antigravity.google/docs/customization-discovery/)也列出 `~/.gemini/GEMINI.md`；不要把两者作为互不相关的规则安装位置。仓库将入口引用的共享政策、技能和工具保留在 `~/.gemini/antigravity-cli/`，这只是交付资产根，不是独立的原生全局规则根。
+
+CLI 技能通过 `/skills` 核对实际来源；同名共享技能可能影响优先级。安装清单、目标根与恢复操作由仓库安装合同维护。静态交付闭包不证明 App 或 CLI 在个人环境中的实际发现。
 
 ## 直接使用与账号
 

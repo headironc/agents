@@ -1,8 +1,8 @@
 # GitHub authentication readiness
 
-Read the available `gh` skill by installed name before CLI use. Read its [invocation contract](../../gh/SKILL.md). Use tool `gh` with the exact host and selected profile under the caller's authorization.
+Read the [GitHub CLI invocation contract](../SKILL.md) before CLI use. Use tool `gh` with the exact host and selected profile under the caller's authorization.
 
-The caller owns workflow authorization under gh's [workflow contract](../../gh/references/workflow-authorization.md). This reference owns only identity readiness and credential recovery.
+The caller owns authorization under the [workflow contract](workflow-authorization.md). Resolve the host and authorized identity operation before using this reference to select or recover the human profile. It owns identity readiness and credential recovery, not repository selection, permission grants, PR inspection, or PR, release, or Git mutations.
 
 Use this reference before the first GitHub network command in a workflow that names a profile. That includes a `gh` request and an HTTPS Git command that depends on the selected GitHub credential.
 
@@ -35,7 +35,7 @@ Leave the selected profile active. Do not restore an earlier account.
 
 ## Human profile: `headironc`
 
-`headironc` is the only supported profile for GitHub workflows and [gh operations](../../gh/references/operations.md) (opening, reviewing, merging PRs, and publishing releases). No GitHub App, bot profile (`cladiron[bot]`), installation token, or separate credential provider is used; a workflow that cannot proceed under `headironc` stops and reports that gap.
+`headironc` is the only supported profile for GitHub workflows and [gh operations](operations.md) (opening, reviewing, merging PRs, and publishing releases). No GitHub App, bot profile (`cladiron[bot]`), installation token, or separate credential provider is used; a workflow that cannot proceed under `headironc` stops and reports that gap.
 
 Unless the initial status check already verifies the active account as `headironc`, first try the fixed account selection:
 
