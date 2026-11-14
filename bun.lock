@@ -10,6 +10,7 @@
       "devDependencies": {
         "@openai/codex": "0.160.0",
         "@types/node": "26.6.4",
+        "fast-check": "4.10.2",
         "js-yaml": "5.4.2",
         "markdownlint": "0.41.1",
         "markdownlint-cli2": "0.23.3",
@@ -414,6 +415,13 @@
       "",
       {},
       "sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==",
+    ],
+
+    "fast-check": [
+      "fast-check@4.10.2",
+      "",
+      { "dependencies": { "pure-rand": "^8.0.0" } },
+      "sha512-iK2f+YrcmoeGqk6fA0ea2bptcu/itMIm4NfEozq6N25+aG6h7s5HZbB/k1aV7b5w5sFLMCbbtRUsTVR+BgC3xw==",
     ],
 
     "fast-glob": [
@@ -1340,6 +1348,13 @@
       "",
       {},
       "sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==",
+    ],
+
+    "pure-rand": [
+      "pure-rand@8.4.2",
+      "",
+      {},
+      "sha512-vvuOGgcuPJAirlHvuQw1TrOiw7ptaIXXmIbNuiNOY6lNGJJH49PQ1Kj4nd783nPdQhQdicgOjVI2yI/9BD6/Ng==",
     ],
 
     "queue-microtask": [

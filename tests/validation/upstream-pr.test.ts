@@ -213,7 +213,13 @@ test("the scheduled workflow runs only on main with bounded publishing permissio
   const job = wf.jobs.sources;
   assert.deepEqual(job.strategy, {
     "fail-fast": false,
-    matrix: { source: ["modern-web-guidance", "rust-api-guidelines"] },
+    matrix: {
+      source: [
+        "modern-web-guidance",
+        "rust-api-guidelines",
+        "property-based-testing",
+      ],
+    },
   });
   assert.equal(
     job.if,

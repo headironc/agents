@@ -52,7 +52,7 @@ export function updateServer(update: PreparedUpdate, fault = "") {
           {
             state: "open",
             draft: update.draft,
-            head: { sha: head, repo: { id: repositoryId } },
+            head: { sha: head, ref: branch, repo: { id: repositoryId } },
             base: { ref: "main" },
             html_url: "https://github.com/headironc/agents/pull/999",
           },

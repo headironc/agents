@@ -46,6 +46,8 @@ const expectedTestPaths = {
     "tests/validation/modern-web-runtime.test.ts",
     "tests/validation/upstream-pr.test.ts",
     "tests/validation/rust-api-source.test.ts",
+    "tests/validation/property-testing.test.ts",
+    "tests/validation/source-properties.test.ts",
     "tests/validation/pre-commit.test.ts",
     "delivery/skills/alibabacloud-sms-send-short-message/tests/send-sms.test.mjs",
     "delivery/skills/wechatide/tests/call.test.mjs",
@@ -99,6 +101,9 @@ const required = [
     "upstream-publish.ts",
     "upstream-rust-api.ts",
     "rust-api-source.ts",
+    "upstream-git.ts",
+    "property-testing-source.ts",
+    "upstream-property-testing.ts",
     "check-skills.ts",
     "check-tool-contracts.ts",
     "pre-commit.ts",
@@ -139,6 +144,18 @@ const required = [
   "docs/skill-sources.md",
   "config/modern-web-guidance-source.json",
   "config/rust-api-guidelines-source.json",
+  "config/property-testing-source.json",
+  "delivery/skills/property-based-testing/SKILL.md",
+  "delivery/skills/property-based-testing/LICENSE.txt",
+  ...[
+    "generating",
+    "interpreting-failures",
+    "libraries",
+    "refactoring",
+    "reviewing",
+  ].map(
+    (name) => `delivery/skills/property-based-testing/references/${name}.md`,
+  ),
   "delivery/skills/modern-web-guidance/SKILL.md",
   "delivery/skills/modern-web-guidance/references/cli.md",
   "delivery/policy/writing.md",
@@ -273,7 +290,7 @@ test("Codex loader accepts a temporary root reached through a symlink", (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(
     result.stdout,
-    /Codex loaded AGENTS\.md and 16 delivered skills; model policy is available on demand/,
+    /Codex loaded AGENTS\.md and 17 delivered skills; model policy is available on demand/,
   );
 });
 
@@ -618,9 +635,9 @@ test("repository and all gates register each official product validator", async 
   ] as const) {
     const specs = await checkSpecs([...groups], "all");
     for (const [product, name] of [
-      ["codex", "Codex skill validation: 16 entries"],
-      ["dsh", "DeepSeek Harness skill validation: 16 entries"],
-      ["antigravity", "Antigravity skill validation: 6 entries"],
+      ["codex", "Codex skill validation: 17 entries"],
+      ["dsh", "DeepSeek Harness skill validation: 17 entries"],
+      ["antigravity", "Antigravity skill validation: 7 entries"],
     ]) {
       const selected = specs.filter((spec) => spec.name === name);
       assert.equal(selected.length, 1);
