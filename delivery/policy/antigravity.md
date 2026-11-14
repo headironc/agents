@@ -26,7 +26,7 @@ Antigravity 没有自由文本隐式 `memory` 工具，持久化均走显式 Rul
 
 Antigravity 存在三类原生多代理通道：`invoke_subagent`（及 `/boost` 多阶段子代理）通过点对点 `send_message` 异步回传结果；`swarm` 通过全员可见的共享留言板（`post_message` / `read_board`）协作；`run_workflow` 由 Python 脚本编排 `agent` 并经 `finish` 返回结构化结果。其中 `send_message` 单条消息具有 `20,480` UTF-8 字节硬上限，超出即在传输层截断为 `<truncated ... bytes>`；子代理的 `write_file` 仅可写入子代理自身的 `<appDataDir>/brain/<self-conversation-id>/scratch/`，无法写入父会话或其他会话的 `brain/` 目录。
 
-当子代理具备写工具权限，且产出的报告或分析结果预计接近或超过 `send_message` 上限（如大于 `16 KB` UTF-8）时，子代理必须将完整未删减内容写入自身的 `<appDataDir>/brain/<self-conversation-id>/scratch/` 文件。随后通过 `send_message` 回传文件绝对路径与精炼结论摘要，由父会话收到路径后调用 `read_file` 读取全文（`swarm` 成员产出长篇报告时同样写入文件并在留言板仅发路径与精炼摘要，避免全员上下文膨胀）。禁止要求子代理写入父会话 `brain/` 目录；禁止为硬塞单条消息在循环中反复调用 `python3`、`wc -c` 等命令测算字节数，或反复破坏性删减正文。
+当子代理具备写工具权限，且产出的报告或分析结果预计接近或超过 `send_message` 上限（如大于 `16 KB` UTF-8）时，子代理必须将完整未删减内容写入自身的 `<appDataDir>/brain/<self-conversation-id>/scratch/` 普通文件。随后通过 `send_message` 回传文件绝对路径与精炼结论摘要（`swarm` 成员产出长篇报告时同样写入自身会话 `scratch/` 普通文件并在留言板仅发路径与精炼摘要，避免全员上下文膨胀）。父会话或协调器调用 `read_file` 读取回传路径前，必须先校验解析后的真实路径、文件类型与归属：确认规范化路径严格位于对应子会话的 `<appDataDir>/brain/<child-conversation-id>/scratch/` 前缀下，属于当前用户拥有的普通非符号链接文件；凡越出该子会话 `scratch/` 边界、含符号链接逃逸或无法核实边界的路径一律拒绝读取。禁止要求子代理写入父会话 `brain/` 目录；禁止为硬塞单条消息在循环中反复调用 `python3`、`wc -c` 等命令测算字节数，或反复破坏性删减正文。
 
 当子代理处于无写工具只读沙箱（如内置 `research`）或遇到宿主写入拒绝时，保留拒绝事实，按紧凑结构或有序分段一次回传，不做无界重算。协调器派发长篇推演或深度审查子任务时，应在授权范围内选用具备写工具的子代理，并在派发简报中写明子代理自身 `brain/<self-conversation-id>/scratch/` 回传路径与受检仓库只读边界。父会话消费完 `read_file` 内容后，再执行相关的子代理收尾或演练清理。
 
