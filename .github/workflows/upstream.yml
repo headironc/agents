@@ -1,0 +1,43 @@
+# - Read [publisher](../../scripts/upstream-pr.ts). Use tool `upstream-pr`.
+name: Official upstream updates
+on:
+  schedule:
+    - cron: "17 2 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: official-upstream-updates
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash --noprofile --norc -euo pipefail {0}
+jobs:
+  modern-web:
+    if: github.repository_id == '1437099348' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Prepare trusted tools
+        run: |
+          umask 077
+          bash scripts/install-tools.sh
+          .cache/agents-tools/bin/bun install --frozen-lockfile --ignore-scripts
+      - name: Prepare official content without executing it
+        run: |
+          umask 077
+          .cache/agents-tools/bin/node scripts/upstream-pr.ts prepare "$RUNNER_TEMP/modern-web-update.json"
+      - name: Create update PR when needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .cache/agents-tools/bin/node scripts/upstream-pr.ts publish "$RUNNER_TEMP/modern-web-update.json"
+      - name: Remove disposable update plan
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/modern-web-update.json"

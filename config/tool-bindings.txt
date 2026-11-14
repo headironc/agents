@@ -1,4 +1,5 @@
 agents-tool-bindings-v1
+binding	.github/workflows/upstream.yml	workflow	upstream-pr	scripts/upstream-pr.ts	read-before-use	defined
 binding	delivery/skills/modern-web-guidance/SKILL.md	skill	modern-web-guidance	delivery/skills/modern-web-guidance/references/cli.md	read-before-use	defined
 binding	delivery/skills/modern-web-guidance/references/cli.md	skill	task-temp	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	delivery/policy/execution.md	instructions	task-temp	delivery/policy/tool-contracts.md	read-before-use	defined

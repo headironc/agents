@@ -18,6 +18,7 @@ test("core inventory has the independently expected delivered subjects and valid
     "task-temp",
     "aliyun-sms",
     "modern-web-guidance",
+    "upstream-pr",
     "wechatide",
     "wechatide-call",
     "wechatide-install-check",
@@ -57,6 +58,7 @@ test("core inventory has the independently expected delivered subjects and valid
 
 test("every delivered consumer has its independently expected binding and declared uses cannot disappear", (t) => {
   const expected: Record<string, string[]> = {
+    ".github/workflows/upstream.yml": ["upstream-pr"],
     ".github/workflows/check.yml": [
       "bash",
       "bun",

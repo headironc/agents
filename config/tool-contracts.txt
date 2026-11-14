@@ -1,4 +1,5 @@
 agents-tool-contracts-v1
+contract	upstream-pr	service-interface	conditional	scripts/upstream-pr.ts	comment-subject	upstream-pr
 # kind<TAB>subject<TAB>category<TAB>loading<TAB>owner<TAB>proof<TAB>value
 contract	agents-installer	platform-interface	conditional	scripts/install.ts	comment-subject	agents-installer
 contract	prose-check	platform-interface	conditional	scripts/check-prose.mjs	comment-subject	prose-check
