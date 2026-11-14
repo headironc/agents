@@ -20,6 +20,8 @@ The installed public implementation's `y[o] || o || NSSaveAsOperation` fallback 
 
 Use the main skill's read-only duplicate-ID check and native reopen acceptance, subject to safe closure above. Trace the registered source and affected consumers; saving a source does not prove consumer synchronization. Report the verified consumer scope without claiming coverage of undiscovered external consumers.
 
+At coherent batch boundaries, verify persisted results independently of the mutation call. An immediate in-memory read and a synchronous save return do not prove that the file contains the change. A native-observed recovery for one persistence discrepancy was to finish the edits, read back in the next native call, save separately, and then verify in another call and after reopening; compare file digests when file-change evidence is required. The cause of that discrepancy is unconfirmed. Use this as a recovery and verification sequence, not a claim that every combined edit/save fails or a requirement to save every property separately.
+
 ## Library import identity
 
 Locate the concrete importable reference within the verified Library. A name is a lookup aid only when unique there; same-name Libraries are not interchangeable. `ImportableObject.id` can map to a new local ID during `import()`. Retain the reference and cache the returned object, using its actual `symbolId` or `id` for subsequent work. Do not repeatedly look up imports by a recorded source ID or assume `ref.id` remains unchanged.
