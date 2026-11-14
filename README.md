@@ -28,7 +28,7 @@
 | 设计稿与看图验收 | [sketch-native](delivery/skills/sketch-native/SKILL.md)、[模型路线](delivery/policy/models.md#current-defaults) | Sketch 原生技能限 macOS 安装与运行；保留可编辑结果与真实像素验收；验证范围及限制见[验证边界](docs/usage.md#验证能说明什么) |
 | 产品指令 | [交付目录](docs/usage.md#交付目录) | 从通用规则与产品差异生成原生入口 |
 | 文档检查器 | [工具契约](delivery/policy/tool-contracts.md) | 提示中文句长，阻塞混排空格及表格编号错误 |
-| 任务临时目录与遗留扫描 | [生命周期](delivery/policy/execution.md#task-temporary-directories)、[调用入口](delivery/policy/tool-contracts.md#task-temp) | 前台命令使用私有 scratch 并收尾；遗留扫描只读，历史目录不自动删除 |
+| 任务临时资源与演练清理 | [目录生命周期](delivery/policy/execution.md#task-temporary-directories)、[演练清理](delivery/policy/execution.md#test-and-exercise-cleanup)、[调用入口](delivery/policy/tool-contracts.md#task-temp) | 演练结束清理本次临时资源与无用记录；保留在用资源、当前安装及必要恢复材料 |
 | 官方 Codex 跨设备协作 | [协作规则](delivery/policy/models.md#official-codex-coordination-across-devices)、[Mac 与 dev 示例](docs/usage.md#mac-与-dev-的结果回传) | 用官方交互会话满足跨端可见性；绑定各端授权、回报路径及现任协调者 |
 | 推荐配置 | [配置说明](delivery/capability/README.md) | 提供片段，由使用者合并到自己的配置 |
 | GitHub 操作 | [gh](delivery/skills/gh/SKILL.md)、[身份就绪](delivery/skills/gh/references/auth-readiness.md) | 调用、工作流与按需身份恢复由同一技能拥有 |
