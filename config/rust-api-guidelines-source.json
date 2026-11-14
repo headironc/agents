@@ -49,8 +49,8 @@
     }
   ],
   "assessment": {
-    "revision": "f90deb77959af37e0bc72604fb8a5efe9b97dd20",
-    "policySha256": "bf569712f318c8d45783b4bb15829fa313fc4757a2778887a633aedfeda24902",
+    "revision": "97a0969cb07fe4cabb0eed8a56234053f47d83dc",
+    "policySha256": "2d39908f085f599a7bc78af00746b4a26528a69b2999fb5f13bd7337c8aaeba1",
     "decisions": [
       {
         "source": "LICENSE-APACHE",
@@ -75,7 +75,7 @@
       {
         "source": "src/naming.md",
         "decision": "retained",
-        "reason": "C-CASE, C-CONV and C-GETTER agree with the adopted naming rules. Keep local query and Option naming choices. Iterator and feature naming guidance is reference material, not a new universal requirement."
+        "reason": "The only selected upstream change replaces the obsolete Unique::get_mut example with Pin::get_mut in C-GETTER. This repairs a reference link without changing the recommendation. Retain existing getter and mutable-getter rules, local query and Option naming choices, and the previous conditional scope for iterator and feature names."
       },
       {
         "source": "src/type-safety.md",

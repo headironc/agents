@@ -125,7 +125,7 @@ Within a file, keep a type definition and its associated `impl` blocks together.
 
 These references provide background for Rust conventions. The preference statements above define the choices adopted here.
 
-The Rust API Guidelines chapters below were assessed at [revision f90deb7](https://github.com/rust-lang/api-guidelines/tree/f90deb77959af37e0bc72604fb8a5efe9b97dd20). Upstream changes require a new assessment against these local choices; a newer reference alone does not change this policy.
+The Rust API Guidelines chapters below were assessed at [revision 97a0969](https://github.com/rust-lang/api-guidelines/tree/97a0969cb07fe4cabb0eed8a56234053f47d83dc). Upstream changes require a new assessment against these local choices; a newer reference alone does not change this policy.
 
 - [Rust API Guidelines: naming](https://rust-lang.github.io/api-guidelines/naming.html)
 - [Rust API Guidelines: type safety](https://rust-lang.github.io/api-guidelines/type-safety.html)
