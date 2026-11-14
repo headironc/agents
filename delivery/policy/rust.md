@@ -10,6 +10,7 @@ These requirements remain applicable when a consuming project has not enabled th
 - During iterative coding and refactoring, run fast incremental checks (`cargo check -p <package>` and targeted `cargo test -p <package> <test_name>`) to avoid workspace-wide feature-unification recompilation thrashing, reusing valid results while inputs remain unchanged.
 - Before publication or when dependency features change, build each workspace package's normal delivered library and binary targets per package and run per-package tests alongside the consuming project's required Clippy, rustdoc, and formatting checks (keeping exact commands, feature selections, warning policies, and toolchain versions in that project). Workspace-wide builds, `--all-targets`, or test builds do not substitute for per-package delivery builds because `dev-dependencies` or other workspace packages can implicitly enable features. Expand validation to affected consumers for shared changes, including delivered binaries and test fixture packages.
 - When a package directly uses a dependency feature, declare that feature in the consuming package's dependency specification. Do not rely on another workspace package to enable it.
+- Design public library features to compose additively on their supported platforms. Enabling a feature must not remove a public item or invalidate a supported combination; declare required feature dependencies. Keep exceptional platform or backend restrictions explicit in the crate contract and verify the supported combinations with the project's commands.
 - Keep test fixtures, test-only embedded databases and other test tools out of application packages' normal and build dependency graphs. Applications consume fixture libraries through `dev-dependencies`; test-only fixture packages may use normal dependencies to implement those libraries. An embedded database used as production storage remains a normal application dependency.
 - Keep deployment and migration dependencies in the packages that own those operations. Check production dependency boundaries through the project's CI and preserve those gates when the scope changes.
 - Before database tests, read the project's database safety and verification requirements for isolation, migrations, runtime identity, fixture lifecycle and host requirements. Apply the [shared validation boundary](review.md#checks).
@@ -121,11 +122,25 @@ Within a file, keep a type definition and its associated `impl` blocks together.
 - Provide a direct semantic accessor such as `as_bytes()` when actual callers need that view repeatedly, rather than requiring them to navigate representation conversions at each use.
 - Keep semantic value types at business API boundaries where their invariants are required; implementing a conversion trait does not justify weakening those inputs to arbitrary strings. A representation bound such as `AsRef<[u8]>` proves access to bytes, not that a value has the business qualification required by the operation. Check input and result types against that qualification rather than relying on the trait bound alone.
 
+## Safety and FFI
+
+- Prefer an established safe abstraction. Introduce `unsafe` only for a justified boundary that safe code cannot express or for a demonstrated performance need; keep that boundary small. Document the preconditions and why each unsafe operation satisfies them, including validity, aliasing, lifetimes, initialization, and thread access where relevant. Do not use `unsafe` merely to silence a lifetime or `Send`/`Sync` error.
+- A safe public API must preserve memory safety for every permitted safe call, including unusual inputs, reentrancy, and panic paths. Keep the fields and constructors that protect this invariant inside its owning boundary. If a caller must uphold an unenforceable memory-safety precondition, expose and document an unsafe API rather than a safe wrapper that relies on convention.
+- Keep FFI translation and ownership rules separate from business logic. Specify allocation and release ownership, pointer validity and lengths, error representation, and unwind behavior at each foreign boundary. Use the project's interop facilities and delivery units; this separation does not require creating a new crate for every adapter.
+- Validate unsafe abstractions against their safety argument and adversarial cases. Run Miri where the selected code and target are supported, along with applicable project checks; report unsupported operations and remaining coverage. Passing tools do not prove soundness, and unavailable tools do not waive the safety argument.
+
+## Performance and asynchronous work
+
+- Establish a representative workload and baseline before a performance-driven change. Measure the relevant latency, throughput, CPU or allocation behavior using the project's optimized build and benchmark setup, then compare equivalent runs. A clone, allocation, dynamic dispatch, or hasher choice alone does not establish a bottleneck; preserve security and API requirements during optimization.
+- Keep blocking I/O and long CPU work from starving an asynchronous executor. Use the runtime's supported blocking or compute facility, or bounded work with explicit cooperative yield points where appropriate. An `.await` that is immediately ready need not yield; do not assume every I/O loop is fair. Choose work limits from the actual workload rather than a universal microsecond threshold.
+
 ## References
 
 These references provide background for Rust conventions. The preference statements above define the choices adopted here.
 
 The Rust API Guidelines chapters below were assessed at [revision 97a0969](https://github.com/rust-lang/api-guidelines/tree/97a0969cb07fe4cabb0eed8a56234053f47d83dc). Upstream changes require a new assessment against these local choices; a newer reference alone does not change this policy.
+
+Selected Microsoft Pragmatic Rust Guidelines were assessed at [revision 9585e28](https://github.com/microsoft/rust-guidelines/tree/9585e288d21d2da994a0550c926a09b62d79f8bd): M-UNSAFE, M-UNSOUND, M-FFI-TRANSLATES, M-FEATURES-ADDITIVE, M-HOTPATH, and M-YIELD-POINTS. They inform the scoped statements above; unselected recommendations and the upstream agent entrypoint are not adopted.
 
 - [Rust API Guidelines: naming](https://rust-lang.github.io/api-guidelines/naming.html)
 - [Rust API Guidelines: type safety](https://rust-lang.github.io/api-guidelines/type-safety.html)

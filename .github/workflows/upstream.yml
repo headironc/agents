@@ -21,7 +21,12 @@ jobs:
       fail-fast: false
       matrix:
         source:
-          [modern-web-guidance, rust-api-guidelines, property-based-testing]
+          [
+            modern-web-guidance,
+            rust-api-guidelines,
+            property-based-testing,
+            microsoft-rust-guidelines,
+          ]
     permissions:
       contents: write
       pull-requests: write

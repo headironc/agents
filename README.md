@@ -14,7 +14,7 @@
 
 只修改手工源，不维护三份相同正文。生成入口包含完整通用规则，不依赖模型跟随普通链接完成初始加载。产品原生位置与历史计划兼容由安装器拥有；配置、规则和技能仍分别管理。
 
-上游维护与产品交付分别归属。来源准备器检测变化并生成候选，本地能力维护者决定适配和采用。通过审查与检查后，安装器消费受检源码。每周任务覆盖 Modern Web Guidance 和 Rust API Guidelines；职责与扩展顺序见[维护架构](docs/tooling.md#上游内容维护架构)。
+上游维护与产品交付分别归属。来源准备器检测变化并生成候选，本地能力维护者决定适配和采用。通过审查与检查后，安装器消费受检源码。每周任务覆盖 Modern Web Guidance、Rust API Guidelines、Microsoft Rust Guidelines 和属性测试；职责与扩展顺序见[维护架构](docs/tooling.md#上游内容维护架构)。
 
 ## 当前能力
 
@@ -37,7 +37,7 @@
 | 项目导航与验证 | [project-guide](delivery/skills/project-guide/SKILL.md) | 共享技能；发现项目版本、权威资料与原生检查，报告实际证据；演练范围见[来源登记](docs/skill-sources.md#project-guide) |
 | 浏览器开发与审查 | [modern-web-guidance](delivery/skills/modern-web-guidance/SKILL.md) | 三端共享；使用同一官方 npm 发布包的 CLI、索引和指南；保留项目兼容要求与只读边界 |
 | 属性测试 | [property-based-testing](delivery/skills/property-based-testing/SKILL.md) | 三端共享；从独立性质设计生成器、审查测试并诊断反例；保留项目依赖选择与只读边界 |
-| 官方内容更新 | [每周更新流程](docs/tooling.md#官方内容自动更新) | Modern Web 发布包、Rust API Guidelines 参考章节与属性测试技能分别创建更新 PR；参考评估和技能适配完成后才能交付 |
+| 上游内容更新 | [每周更新流程](docs/tooling.md#官方内容自动更新) | Modern Web 发布包、两组 Rust 参考章节与属性测试技能分别创建更新 PR；参考评估和技能适配完成后才能交付 |
 | 原生 CI 与交付 | [运行合同](docs/tooling.md#ci-与审查边界)、[实例与证据边界](docs/review-gate.md#实例与证据边界) | 两平台复用完整检查；实际配置、运行与独立审查分别绑定实例验证 |
 | 阿里云技能发现与短信 | [技能发现](delivery/skills/alibabacloud-find-skills/SKILL.md)、[短信](delivery/skills/alibabacloud-sms-send-short-message/SKILL.md) | 发现、安装及发送遵循各自授权 |
 | 微信开发者工具 | [wechatide](delivery/skills/wechatide/SKILL.md) | 九个子入口已交付；实际 DevTools 操作限 macOS |
