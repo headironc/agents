@@ -10,6 +10,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { load } from "js-yaml";
+import { updateServer } from "./upstream-fixtures.ts";
+import { modernWebUpdate } from "../../scripts/upstream-modern-web.ts";
 import { changes, publish, repositoryId } from "../../scripts/upstream-pr.ts";
 import type { Api, UpdatePlan } from "../../scripts/upstream-pr.ts";
 import {
@@ -20,8 +22,7 @@ import {
 import { repositoryRoot } from "./fixtures.ts";
 import { applyModernWebImport } from "../../scripts/update-modern-web-guidance.ts";
 
-const base = "a".repeat(40),
-  head = "b".repeat(40);
+const base = "a".repeat(40);
 const source = modernWebSourceSchema.parse(
   JSON.parse(readFileSync(path.join(repositoryRoot, modernWebLock), "utf8")),
 );
@@ -52,127 +53,7 @@ function next(previous = original): UpdatePlan {
   return plan;
 }
 function server(plan: UpdatePlan, fault = "", root = repositoryRoot) {
-  const writes: string[] = [];
-  const calls: string[] = [];
-  const expected = changes(root, plan);
-  const branch = `codex/update-modern-web-guidance-${plan.source.version}`;
-  let committed = false,
-    opened = false;
-  const api: Api = async (method, endpoint, body?: any) => {
-    calls.push(method + " " + endpoint);
-    if (method !== "GET") {
-      writes.push(endpoint);
-      if (endpoint === "/graphql") {
-        assert.equal(body.variables.input.expectedHeadOid, base);
-        assert.equal(body.variables.input.branch.branchName, branch);
-        assert.deepEqual(body.variables.input.fileChanges, {
-          additions: expected.additions,
-          deletions: expected.deletions,
-        });
-        committed = true;
-      }
-      if (endpoint.endsWith("/pulls")) {
-        assert.equal(body.base, "main");
-        assert.equal(body.draft, false);
-        opened = true;
-      }
-      if (fault === "lost-write") throw new Error("response lost");
-      if (
-        (fault === "lost-commit" && endpoint === "/graphql") ||
-        (fault === "lost-pr" && endpoint.endsWith("/pulls"))
-      )
-        throw new Error("response lost after mutation");
-      return {};
-    }
-    if (endpoint.endsWith("/agents"))
-      return {
-        id: repositoryId,
-        full_name: "headironc/agents",
-        default_branch: "main",
-        archived: false,
-        disabled: false,
-      };
-    if (endpoint.includes("/pulls?")) {
-      if (fault === "list-failed") throw new Error("incomplete page");
-      if (opened)
-        return [
-          {
-            state: "open",
-            draft: false,
-            head: { sha: head, repo: { id: repositoryId } },
-            base: { ref: "main" },
-            html_url: "https://github.com/headironc/agents/pull/999",
-          },
-        ];
-      if (fault === "closed")
-        return [
-          {
-            state: "closed",
-            head: {
-              repo: { id: repositoryId },
-              ref: branch,
-            },
-          },
-        ];
-      if (fault === "pending" && endpoint.includes("state=open"))
-        return [
-          {
-            head: {
-              repo: { id: repositoryId },
-              ref: "codex/update-modern-web-guidance-0.0.0",
-            },
-          },
-        ];
-      return [];
-    }
-    if (endpoint.includes("matching-refs"))
-      return fault === "orphan" ? [{ ref: `refs/heads/${branch}` }] : [];
-    if (endpoint.endsWith("/heads/main"))
-      return { object: { sha: fault === "base-drift" ? head : base } };
-    if (endpoint.includes("/git/ref/"))
-      return {
-        ref: `refs/heads/${branch}`,
-        object: { sha: committed ? head : base },
-      };
-    if (endpoint.includes("/git/commits/"))
-      return {
-        parents: [{ sha: base }],
-        message: `chore(upstream): update modern-web-guidance to ${plan.source.version}`,
-        verification: { verified: fault !== "unsigned" },
-      };
-    if (endpoint.includes("/git/trees/")) {
-      const tree: any[] = [
-        { path: "README.md", type: "blob", mode: "100644", sha: "unchanged" },
-      ];
-      if (endpoint.includes(head))
-        tree.push(
-          ...expected.additions.map((file, i) => ({
-            path: file.path,
-            type: "blob",
-            mode: "100644",
-            sha: String(i),
-          })),
-        );
-      if (fault === "unrelated" && endpoint.includes(head))
-        tree.push({
-          path: "extra",
-          type: "blob",
-          mode: "100644",
-          sha: "extra",
-        });
-      return { truncated: fault === "truncated", tree };
-    }
-    if (endpoint.includes("/git/blobs/"))
-      return {
-        encoding: "base64",
-        content:
-          fault === "bad-blob"
-            ? "eA=="
-            : expected.additions[Number(endpoint.split("/").at(-1))]!.contents,
-      };
-    throw new Error("Unexpected API call " + endpoint);
-  };
-  return { api, writes, calls };
+  return updateServer(modernWebUpdate(root, plan), fault);
 }
 
 test("no update performs no API calls; drift and malformed plans fail before writing", async () => {
@@ -329,7 +210,11 @@ test("the scheduled workflow runs only on main with bounded publishing permissio
     workflow_dispatch: null,
   });
   assert.equal(wf.concurrency["cancel-in-progress"], false);
-  const job = wf.jobs["modern-web"];
+  const job = wf.jobs.sources;
+  assert.deepEqual(job.strategy, {
+    "fail-fast": false,
+    matrix: { source: ["modern-web-guidance", "rust-api-guidelines"] },
+  });
   assert.equal(
     job.if,
     "github.repository_id == '1437099348' && github.ref == 'refs/heads/main'",

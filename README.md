@@ -14,6 +14,8 @@
 
 只修改手工源，不维护三份相同正文。生成入口包含完整通用规则，不依赖模型跟随普通链接完成初始加载。产品原生位置与历史计划兼容由安装器拥有；配置、规则和技能仍分别管理。
 
+上游维护与产品交付分别归属。来源准备器检测变化并生成候选，本地能力维护者决定适配和采用。通过审查与检查后，安装器消费受检源码。每周任务覆盖 Modern Web Guidance 和 Rust API Guidelines；职责与扩展顺序见[维护架构](docs/tooling.md#上游内容维护架构)。
+
 ## 当前能力
 
 本内容源保留可交付规则、技能、工具及原生检查入口，不继承旧仓库的 Git 历史或平台证据。[原生 CI 源码](.github/workflows/check.yml)为 Linux/macOS 调用完整 `all`。实例身份、配置与运行的验证边界由[项目约定](docs/review-gate.md#实例与证据边界)维护；旧系统来源见[退役说明](docs/admission-controller.md)。
@@ -34,7 +36,7 @@
 | GitHub 操作 | [gh](delivery/skills/gh/SKILL.md)、[身份就绪](delivery/skills/gh/references/auth-readiness.md) | 调用、工作流与按需身份恢复由同一技能拥有 |
 | 项目导航与验证 | [project-guide](delivery/skills/project-guide/SKILL.md) | 共享技能；发现项目版本、权威资料与原生检查，报告实际证据；演练范围见[来源登记](docs/skill-sources.md#project-guide) |
 | 浏览器开发与审查 | [modern-web-guidance](delivery/skills/modern-web-guidance/SKILL.md) | 三端共享；使用同一官方 npm 发布包的 CLI、索引和指南；保留项目兼容要求与只读边界 |
-| 官方内容更新 | [每周更新流程](docs/tooling.md#官方内容自动更新) | 首项接入 Modern Web Guidance；自动创建更新 PR，继续按现有流程审查和合并 |
+| 官方内容更新 | [每周更新流程](docs/tooling.md#官方内容自动更新) | Modern Web 发布包与 Rust API Guidelines 参考章节分别创建更新 PR；Rust 候选完成政策评估后才能交付 |
 | 原生 CI 与交付 | [运行合同](docs/tooling.md#ci-与审查边界)、[实例与证据边界](docs/review-gate.md#实例与证据边界) | 两平台复用完整检查；实际配置、运行与独立审查分别绑定实例验证 |
 | 阿里云技能发现与短信 | [技能发现](delivery/skills/alibabacloud-find-skills/SKILL.md)、[短信](delivery/skills/alibabacloud-sms-send-short-message/SKILL.md) | 发现、安装及发送遵循各自授权 |
 | 微信开发者工具 | [wechatide](delivery/skills/wechatide/SKILL.md) | 九个子入口已交付；实际 DevTools 操作限 macOS |
@@ -69,6 +71,7 @@
 | 安装执行与恢复 | [install-apply.ts](scripts/install-apply.ts)、[install-current.ts](scripts/install-current.ts) | 安装命令与状态查询 |
 | 安装记录与目标状态 | [install-records.ts](scripts/install-records.ts)、[install-legacy.ts](scripts/install-legacy.ts)、[install-state.ts](scripts/install-state.ts) | V9 安装与历史 V5/V6/V7/V8 回执恢复 |
 | 源码快照与身份 | [source.ts](scripts/source.ts) | 检查报告、成员校验与安装计划 |
+| 上游原件与更新 PR | [Modern Web 来源](scripts/modern-web-source.ts)、[Rust 来源](scripts/rust-api-source.ts)、[调度入口](scripts/upstream-pr.ts)、[公共发布器](scripts/upstream-publish.ts) | 来源准备与变更分别由两端适配器拥有；公共发布器负责签名提交、去重、并发与回读 |
 | 产物构建与工具准备 | [build-instructions.ts](scripts/build-instructions.ts)、[bundle-tools.ts](scripts/bundle-tools.ts)、[build-install.ts](scripts/build-install.ts)、[install-tools.sh](scripts/install-tools.sh) | 原生指令、交付检查器、独立安装器与本地门禁 |
 
 `check.sh` 调度验证并生成源码报告；`install.sh` 消费受检源码和报告，生成计划后执行安装或恢复。交付检查器由工具打包器生成。维护脚本和检查报告不随规则安装到使用项目。
@@ -80,9 +83,9 @@
 | 入口 | 当前用途 |
 | --- | --- |
 | [使用指南](docs/usage.md) | 交付目录、技能闭包、安装目标与恢复合同 |
-| [工具说明](docs/tooling.md) | 工具准备、完整门禁及源码身份 |
+| [工具说明](docs/tooling.md) | 工具准备、完整门禁、源码身份及上游维护架构 |
 | [静态场景](tests/scenarios/rules.md) | 从规则推导的行为预期，区别于真实模型测试 |
-| [技能来源](docs/skill-sources.md) | 上游身份、许可、采用范围及历史设计入口 |
+| [技能来源](docs/skill-sources.md) | 上游身份、许可、采用范围、质量能力候选取舍及历史设计入口 |
 | [安装快照过渡](docs/usage.md#既有安装快照过渡) | 既有安装来源和新版切换限制 |
 
 维护时先读取项目指令及受影响的合同。规则变化同步相关场景，生成物由对应生成器更新。完整验证运行 `bash scripts/check.sh all`，前置和参数见工具说明。提交或发布前保留各项检查的实际范围与结果。

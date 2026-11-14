@@ -13,10 +13,14 @@ defaults:
   run:
     shell: bash --noprofile --norc -euo pipefail {0}
 jobs:
-  modern-web:
+  sources:
     if: github.repository_id == '1437099348' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [modern-web-guidance, rust-api-guidelines]
     permissions:
       contents: write
       pull-requests: write
@@ -33,11 +37,11 @@ jobs:
       - name: Prepare official content without executing it
         run: |
           umask 077
-          .cache/agents-tools/bin/node scripts/upstream-pr.ts prepare "$RUNNER_TEMP/modern-web-update.json"
+          .cache/agents-tools/bin/node scripts/upstream-pr.ts prepare "${{ matrix.source }}" "$RUNNER_TEMP/upstream-update.json"
       - name: Create update PR when needed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: .cache/agents-tools/bin/node scripts/upstream-pr.ts publish "$RUNNER_TEMP/modern-web-update.json"
+        run: .cache/agents-tools/bin/node scripts/upstream-pr.ts publish "${{ matrix.source }}" "$RUNNER_TEMP/upstream-update.json"
       - name: Remove disposable update plan
         if: always()
-        run: rm -f -- "$RUNNER_TEMP/modern-web-update.json"
+        run: rm -f -- "$RUNNER_TEMP/upstream-update.json"
