@@ -42,6 +42,8 @@ const expectedTestPaths = {
     "tests/validation/tool-bootstrap.test.ts",
     "tests/validation/tool-contracts.test.ts",
     "tests/validation/skills.test.ts",
+    "tests/validation/modern-web-source.test.ts",
+    "tests/validation/modern-web-runtime.test.ts",
     "tests/validation/pre-commit.test.ts",
     "delivery/skills/alibabacloud-sms-send-short-message/tests/send-sms.test.mjs",
     "delivery/skills/wechatide/tests/call.test.mjs",
@@ -82,11 +84,14 @@ const required = [
     "delivery.ts",
     "source.ts",
     "check-docs.ts",
+    "check-markdown.ts",
     "check-secrets.ts",
     "install-tools.sh",
     "tool-bootstrap.sh",
     "tool-versions.json",
     "skills.ts",
+    "modern-web-source.ts",
+    "update-modern-web-guidance.ts",
     "check-skills.ts",
     "check-tool-contracts.ts",
     "pre-commit.ts",
@@ -125,6 +130,9 @@ const required = [
     "tool-bindings",
   ].map((name) => `config/${name}.txt`),
   "docs/skill-sources.md",
+  "config/modern-web-guidance-source.json",
+  "delivery/skills/modern-web-guidance/SKILL.md",
+  "delivery/skills/modern-web-guidance/references/cli.md",
   "delivery/policy/writing.md",
   "delivery/policy/models.md",
   "delivery/policy/review.md",
@@ -256,7 +264,7 @@ test("Codex loader accepts a temporary root reached through a symlink", (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(
     result.stdout,
-    /Codex loaded AGENTS\.md and 15 delivered skills; model policy is available on demand/,
+    /Codex loaded AGENTS\.md and 16 delivered skills; model policy is available on demand/,
   );
 });
 
@@ -471,6 +479,10 @@ function ensureCheckFixtureTemplate(): string {
     path.join(directory, "scripts/check-docs.ts"),
     'console.log("document fixture completed");\n',
   );
+  writeFileSync(
+    path.join(directory, "scripts/check-markdown.ts"),
+    'import { listSourcePaths } from "./source.ts";\nexport function editableMarkdown(root) { return listSourcePaths(root).filter(file => file.endsWith(".md")); }\n',
+  );
   // The sentence and identifier checks read the same Markdown inventory the linter does, so the
   // minimal repository carries one document and a stub for each checker. Without the document the
   // group refuses to plan at all, which is the empty-inventory guard rather than a fixture detail.
@@ -597,9 +609,9 @@ test("repository and all gates register each official product validator", async 
   ] as const) {
     const specs = await checkSpecs([...groups], "all");
     for (const [product, name] of [
-      ["codex", "Codex skill validation: 15 entries"],
-      ["dsh", "DeepSeek Harness skill validation: 15 entries"],
-      ["antigravity", "Antigravity skill validation: 5 entries"],
+      ["codex", "Codex skill validation: 16 entries"],
+      ["dsh", "DeepSeek Harness skill validation: 16 entries"],
+      ["antigravity", "Antigravity skill validation: 6 entries"],
     ]) {
       const selected = specs.filter((spec) => spec.name === name);
       assert.equal(selected.length, 1);

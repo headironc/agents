@@ -18,6 +18,50 @@ const root = path.resolve(import.meta.dirname, "../..");
 const scanner = path.join(root, ".cache/agents-tools/bin/gitleaks");
 const entry = path.join(root, "scripts/check-secrets.ts");
 
+test("the official algorithm name is allowed while a credential in the same guide is detected", (t) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "agents-secret-guide-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const guide = readFileSync(
+    path.join(
+      root,
+      "delivery/skills/modern-web-guidance/upstream/guides/security/client-side-encryption.md",
+    ),
+    "utf8",
+  );
+  const candidate = path.join(directory, "guide.md");
+  writeFileSync(candidate, guide);
+  const scan = () =>
+    spawnSync(
+      scanner,
+      [
+        "dir",
+        directory,
+        "--no-banner",
+        "--redact",
+        "--ignore-gitleaks-allow",
+        "--config",
+        path.join(root, ".gitleaks.toml"),
+      ],
+      { encoding: "utf8", timeout: 30_000 },
+    );
+  const original = scan();
+  assert.ifError(original.error);
+  assert.equal(original.status, 0, original.stderr);
+  const alphabet =
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const token =
+    "ghp_" +
+    Array.from(
+      { length: 36 },
+      (_, i) => alphabet[(i * 17 + 3) % alphabet.length],
+    ).join("");
+  writeFileSync(candidate, guide + `\nconst access_token = "${token}";\n`);
+  const injected = scan();
+  assert.ifError(injected.error);
+  assert.equal(injected.status, 1, injected.stderr);
+  assert.ok(!(injected.stdout + injected.stderr).includes(token));
+});
+
 test("screening refuses a clean copy of a source that still contains a secret", (t) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "agents-secret-race-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));

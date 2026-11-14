@@ -1,0 +1,2 @@
+# Preserve the exact, integrity-checked upstream release bytes and its whitespace.
+delivery/skills/modern-web-guidance/upstream/** -text -whitespace

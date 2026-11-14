@@ -44,6 +44,7 @@ import {
 } from "./source.ts";
 import type { SourceIdentity } from "./source.ts";
 import { CheckReportSchema } from "./check-report.ts";
+import { editableMarkdown } from "./check-markdown.ts";
 import type { CheckReportV1, CheckResult } from "./check-report.ts";
 export { CheckReportSchema } from "./check-report.ts";
 import {
@@ -314,9 +315,7 @@ export async function checkSpecs(
       ],
     );
     if (docs !== "links") {
-      const markdown = listSourcePaths(root).filter((file) =>
-        file.endsWith(".md"),
-      );
+      const markdown = editableMarkdown(root);
       if (markdown.length === 0) throw new Error("Empty Markdown inventory");
       add(
         "Prose conventions",

@@ -11,6 +11,8 @@ import type { Configuration } from "markdownlint";
 import jsoncParse from "markdownlint-cli2/parsers/jsonc";
 import { listSourcePaths, readSourceIdentity } from "./source.ts";
 import { generatedInstructionPaths } from "./build-instructions.ts";
+import { editableMarkdown } from "./check-markdown.ts";
+export { editableMarkdown } from "./check-markdown.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 
@@ -62,6 +64,7 @@ export function checkDocuments(
   if (process.versions.node !== manifest.engines.node)
     throw new Error("Pinned Node is required");
   const files = listMarkdown(root);
+  const editable = editableMarkdown(root, files);
   checkMachinePaths(root, listSourcePaths(root));
   function run(command: string, args: string[]): void {
     const result = spawnSync(command, args, {
@@ -75,7 +78,9 @@ export function checkDocuments(
         `Document check failed (${result.signal ?? result.status})`,
       );
   }
-  console.log(`Checking ${files.length} Markdown files with explicit paths.`);
+  console.log(
+    `Checking ${files.length} Markdown files; ${editable.length} locally maintained documents receive style checks.`,
+  );
   if (mode !== "links") {
     const location = path.join(
       toolsRoot,
@@ -96,7 +101,7 @@ export function checkDocuments(
         [jsoncParse],
       );
       const results = lint({
-        files: files.map((file) => path.join(root, file)),
+        files: editable.map((file) => path.join(root, file)),
         config: options.config as Configuration,
         noInlineConfig: true,
       });
@@ -107,7 +112,7 @@ export function checkDocuments(
         path.resolve(path.dirname(location), executable),
         "--config",
         path.join(toolsRoot, ".markdownlint-cli2.jsonc"),
-        ...markdownlintArguments(files),
+        ...markdownlintArguments(editable),
       ]);
   }
   if (mode !== "markdown") {

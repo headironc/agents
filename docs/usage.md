@@ -142,6 +142,12 @@
 
 合并遵循目标项目的有效合同（本仓库采用[重建期规则](review-gate.md#重建期交付规则)，其他目标按[通用合并准入规则](../delivery/policy/review.md#merge-admission)核对）。已采用的上游工具不为统一语言而改写；无实际调用方的历史脚本不自动恢复；实际服务、模型与个人安装分别取得授权并回读。
 
+### Modern Web Guidance
+
+[modern-web-guidance](../delivery/skills/modern-web-guidance/SKILL.md) 随 Codex、DSH 和 Antigravity 安装。编写或审查浏览器端 HTML、CSS、JavaScript 前，按具体能力查询官方指南。纯后端、基础设施、非 Web 原生界面和技能自身维护不触发查询。
+
+CLI、搜索索引与指南来自同一固定 npm 发布包，运行时查询本地语料。它不依赖浮动版本下载，也不代表实时在线文档。项目的浏览器支持矩阵优先；技能不会自行改写 `.mwgrc`。本地入口与[调用合同](../delivery/skills/modern-web-guidance/references/cli.md)负责授权、遥测关闭和临时输出清理。原件、许可与精确来源见[来源登记](skill-sources.md#modern-web-guidance)。
+
 ## 任务临时目录与收尾
 
 [生命周期](../delivery/policy/execution.md#task-temporary-directories)拥有任务临时资源的归属和收尾责任。[调用合同](../delivery/policy/tool-contracts.md#task-temp)拥有参数、清理边界及错误处理。入口随各产品工具交付，不安装定时任务或个人配置。以下命令从仓库运行；安装后使用[交付目录](#交付目录)列出的对应工具路径，并使用兼容 Node。
