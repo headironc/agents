@@ -1,127 +1,157 @@
 ---
 name: sketch-native
-description: MUST load before any .sketch inspection, diagnosis, creation, editing, or review on macOS. Routes all .sketch work through Sketch 2026.3+ MCP tools and sketchtool CLI; strictly forbids offline Python/ZIP archive synthesis.
+description: MUST load before any .sketch inspection, diagnosis, creation, editing, or review on macOS. Use Sketch 2026.3+ MCP and sketchtool, require reusable Library consumption for UI designs, and forbid offline .sketch archive access.
 metadata:
-  short-description: Native Sketch 2026.3+ MCP workflow with libraries, Stacks, symbols, and visual verification
+  short-description: Native Sketch workflow with required Library reuse and visual verification
 ---
 
 # Sketch Native Workflow (`sketch-native`)
 
-Shared macOS skill routing `.sketch` work through Sketch 2026.3+ MCP and `sketchtool` across Codex, DeepSeek Harness, and Antigravity CLI (skipped off macOS; never writes MCP registration or Sketch preferences).
+Shared macOS skill for native `.sketch` work through Sketch 2026.3+ MCP and the bundled `sketchtool`, delivered to Codex, DeepSeek Harness, and Antigravity CLI. It is skipped off macOS. Never read, synthesize, or modify `.sketch` ZIP/JSON archives through Python, Node/Bun, shell archive tools, or other offline scripts.
 
-In Codex routing, use `gpt-6.1-sol` (`medium`; `high` only for complex multi-state layouts) for page/component/Stack composition, `gpt-6.1-sol` or `gpt-6-luna` (`low`) for incremental `run_code` edits, and `gpt-6.1-terra` (`low`) for screenshot checks.
+Follow the host's adopted model and collaboration policy. In Codex, the installed `policy/models.md` owns design and screenshot-review routing; this skill does not redefine that route or extend it to other products.
 
-## 0. Required Official and Project Library Preflight
+## 0. Scope and Required Reusable Library
 
-Before `.sketch` work, check `get_libraries` or `sketch.Library.getLibraries()` and verify `~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/` installs and enables:
+### Bind the Project Contract and Operation
 
-1. **Project Design-System Library** (such as `bencao.sketch`).
-2. **`Apple iOS 27 UI Kit`** (iOS and Mini Program status bars, Home Indicator safe areas, system controls).
-3. **Sketch Official `Default Templates` and `Inspire UI Kit`** (when present locally).
+Resolve the target document, current candidate, authorized operation, and applicable project rules before work. Project and task contracts own Library selection, visual tokens, platforms, themes, viewports, business flows, canvas organization, delivery paths, performance budgets, and acceptance gates. Keep adopted requirements in force within their scope; do not apply one project's choices to another.
 
-In read-only mode, report missing, unregistered, or disabled Libraries without modifying host state. When authorized, enable via `const lib = sketch.Library.getLibraryForDocumentAtPath('/abs/path/to/library.sketch'); lib.enabled = true;` and verify `lib.enabled === true`, reporting any disk or authorization gap first.
+Read-only review checks the same requirements and reports gaps without modifying documents or host state. Do not install, register, enable, synchronize, repair, migrate, clean up, or save during that review. Resolve unknown write outcomes by reading the same target before retrying. Host configuration and external writes retain their existing authorization boundaries; this skill never writes MCP registration or Sketch preferences.
 
-## 1. Sketch MCP 8 Tools and Invocation Sequence
+### Require Actual Library Consumption
 
-Sketch 2026.3+ ships built-in guides and eight MCP tools (`get_guide`, `get_document_info`, `get_layer_tree_summary`, `get_libraries`, `get_design_assets`, `get_symbol_overrides`, `run_code`, `get_screenshot`):
+Creating or modifying a deliverable Sketch UI design **must use an applicable reusable foundation Library**. “Reusable” means its foundational components, variables, and styles can serve real consumers. The Library may come from an official, team, or project-adopted design system; no single name, component namespace, physical file, or directory is universal. A project-specific foundation Library can satisfy this requirement without a second physical Library.
 
-### Preload Built-In MCP Guides (`get_guide`)
+1. Resolve source, path or remote origin, registration, Library ID, compatible version, and target-document association from project rules, the task, and actual dependencies. Inspect `get_libraries` or `sketch.Library.getLibraries()` and document imports. A display name alone does not establish identity; distinguish missing, inaccessible, disabled, stale, and same-name/different-ID resources.
+2. Verify real consumption: applicable shared components, color variables, and text or layer styles use native Library references. Trace imported assets and their instances or style assignments to the selected Library. Merely listing or installing it, importing unrelated assets, using an empty Library, or copying layers that lose their references does not satisfy the requirement.
+3. Reuse suitable existing components before drawing the same foundation again in a business document. Discover the selected Library's actual names and structure rather than requiring predetermined prefixes or variant organization.
+4. Without a project-specific Library, select a suitable existing reusable Library. If none is applicable and accessible, report the concrete missing dependency. Within effective authorization, connect a suitable resource or add only the minimum shared assets needed by the current real consumer. Do not silently fall back to local clones, create an empty compliance Library, or prebuild a complete design system. Missing authorization stops only dependent operations; continue unaffected preparation and report incomplete acceptance honestly.
+5. Use a compatible official platform Library when the target needs system components. Resolve the platform and version from the target contract. Apple UI resources are not a dependency of non-iOS work merely because they are installed. Default Templates and Inspire UI Kit are candidate resources, not mandatory companions for every task.
 
-1. Call `get_guide({ topic: "mcp" })` before the first MCP call, and `get_guide({ topic: "use" })` before reading, creating, laying out, styling, exporting, or wiring prototypes.
-2. Load subtopics on demand: `layout` (`StackLayout`, `FlexSizing`, Pin), `styling` (`Swatch`, `SharedStyle`, per-side borders, concentric corners, blurs, `Tint`), `symbols` (`SymbolMaster`, `SymbolInstance`, nested/image overrides), `assets` (`sketch.export`, `sketch.createLayerFromData`), `prototyping` (`flow`, `flowStartPoint`, `HotSpot`), and `troubleshooting` (`run_code` diagnosis before retries).
+When Library registration or enabling is authorized, use the supported native API, for example `sketch.Library.getLibraryForDocumentAtPath('/absolute/path/to/foundation.sketch')` and `lib.enabled = true`. The path is illustrative. Verify the resulting identity, enabled state, document association, and actual consumption; do not assume a fixed `Libraries/` mirror is required.
 
-### Document Lifecycle (`No current Sketch document`)
+## 1. Native MCP Workflow
 
-- Inspection, asset, override, and screenshot tools require an open document's `targetDocumentID`; when closed, never parse `.sketch` ZIPs offline—resolve `doc.id` in `run_code` via `sketch.Document.getDocuments()` or `sketch.Document.open('/abs/path/to/file.sketch', (err, doc) => { ... })`.
-- After edits and screenshot acceptance, save via `doc.save()` (`doc.close()` on inactive files), confirm `0` duplicate IDs with `sketchtool duplicates <file>`, and run `find design -name '.DS_Store' -delete` before directory-walking preview or MIME tests.
+### Load the Built-In Guides
 
-### Read-Only Inspection First
+Load `get_guide({ topic: "mcp" })` before other MCP tools and `get_guide({ topic: "use" })` before reading, creating, laying out, styling, exporting, or wiring documents. Load relevant subtopics on demand: `layout`, `styling`, `symbols`, `assets`, `prototyping`, and `troubleshooting`. Use the installed application's guides to verify current API support, parameter semantics, and limitations before relying on them.
 
-- Call `get_document_info({ targetDocumentID })` for document ID, Pages, layer counts, and frame bounds, and `get_layer_tree_summary({ targetDocumentID, layerID, depth: 1..10 })` for subtree hierarchy, text, Stack hints, and override counts.
-- Reserve `sketch.find(predicate, root)` (`#uuid`, `Frame`, `SymbolMaster`, `SymbolInstance`, `Text`, `[name~*="keyword"]`, `[frame.x>=24]`, `:not-hidden`) for single-root/UUID lookups; across many Frames in `run_code`, recurse `node.layers` in plain JS (`< 50ms`) instead of `sketch.find('*', frame)` (`60`–`90s` Cocoa predicates).
-- Check `layer.isGraphicFrame` first and `layer.isFrame` second: nested Frames, Graphics, and plain Groups all report `layer.type === 'Group'`, while Graphics report both flags `true`.
+The native MCP tools are `get_guide`, `get_document_info`, `get_layer_tree_summary`, `get_libraries`, `get_design_assets`, `get_symbol_overrides`, `run_code`, and `get_screenshot`.
 
-### Library and Asset Discovery
+### Resolve the Document and Inspect Before Editing
 
-- Call `get_libraries({ targetDocumentID })` for enabled Libraries (`bencao`, `Apple iOS 27 UI Kit`) and `get_design_assets({ targetDocumentID, kind, nameContains, sourceLibraryID })` for `symbol`, `swatch`, `textStyle`, `layerStyle`, `frameTemplate`, and `graphicTemplate` assets.
-- Import and assign cross-library references inline (`var inst = ref.import().createNewInstance()` or `override.swatchValue = swatchRef.import()`) so references persist.
-- Before overriding an instance, call `get_symbol_overrides({ targetDocumentID, symbolInstanceID, kind })` (`kind`: `'text' | 'color' | 'image' | 'all'`, never `layerID`) to get `commonOverrideIDPrefix`.
+- Inspection, asset, override, and screenshot tools take an open document's `targetDocumentID`. Resolve it through `sketch.Document.getDocuments()` or open the exact file with `sketch.Document.open('/absolute/path/to/design.sketch', (err, doc) => { ... })` in `run_code`. Never substitute offline archive parsing when no document is open.
+- Use `get_document_info({ targetDocumentID })` for Pages, counts, and frame bounds, then `get_layer_tree_summary({ targetDocumentID, layerID, depth })` for the relevant subtree (`depth`: `1..10`).
+- Reserve `sketch.find(predicate, root)` for targeted type, UUID, or property queries. For multi-frame scans, recurse cached `node.layers` in JavaScript rather than repeatedly invoking `sketch.find('*', frame)` over large trees.
+- Check `layer.isGraphicFrame` before `layer.isFrame`: Frames, Graphics, and plain Groups all report `type === 'Group'`, and Graphics report both flags as true.
 
-### `run_code` Execution Rules
+### Discover Assets and Overrides
 
-- Start scripts with `const sketch = require('sketch')` using public JS APIs only (no `sketchObject`, Obj-C selectors, or Node `fs`); never write comments (`//` or `/* */`), minify to one line, or redeclare a `function` in scope.
-- Never compare layer wrappers with `===` or `!==`: `layer.parent` allocates a fresh wrapper per access (`cur !== rootFrame` stays `true`), walking past `Artboard` into `Page`/`Document`. Compare `.id` and bound walks with `cur && cur.id !== rootFrame.id && cur.type === 'Group'`.
-- Snapshot `.layers` and `.frame` once before indexed loops or `O(N^2)` checks (`const arr = page.layers; const rects = arr.map(x => x.frame);`, `< 5ms`): reading `page.layers[i]` or `group.layers[i]` in loops re-bridges `MSLayerArray -> JSWrapperMap` without draining the autorelease pool, spiking RAM past `50GB+` and freezing Sketch.
-- Never scan `instance.overrides` across `200+`-Frame files: reading `.overrides` on thousands of composite instances (`Shell/Header`, `Navigation/Item`) expands Cocoa trees (`95%+` CPU, `3m0s` timeout). Filter `instance.master && instance.master.name` prefix first (`/Feedback/`, `/Data/`, `/Button/`) or run one `Page` per call.
-- Run one atomic action per call, re-resolve `doc` and IDs, and emit one final `console.log(JSON.stringify({ ok: true, ... }))` line (never `return` or `sketch.UI.message`).
+- Use `get_libraries({ targetDocumentID })` and `get_design_assets({ targetDocumentID, kind, nameContains, sourceLibraryID })`. Supported asset kinds include `symbol`, `swatch`, `textStyle`, `layerStyle`, `frameTemplate`, and `graphicTemplate`. Bind filters to discovered Library and asset identities.
+- Import and assign native references, for example `const inst = ref.import().createNewInstance()` or `override.swatchValue = swatchRef.import()`. Confirm that the consumer retains the reference.
+- Before overriding an instance, call `get_symbol_overrides({ targetDocumentID, symbolInstanceID, kind })` and obtain `commonOverrideIDPrefix`. Here `kind` is `'text' | 'color' | 'image' | 'all'`; do not pass `layerID` in place of `symbolInstanceID`.
 
-### Visual Acceptance and Export (`get_screenshot` vs `sketch.export`)
+### `run_code` Safety and Performance
 
-- After every visual or layout edit, call `get_screenshot({ targetDocumentID, layerID })` to verify hierarchy, alignment, spacing, unclipped text, and bounds.
-- Export slices via `sketch.export(layer, { output: '/abs/dir', filename: 'name.png', formats: ['png'], scales: ['2.0'], overwriting: true })` (`output`: absolute directory, never `false`).
+- Start with `const sketch = require('sketch')` and use public JavaScript APIs only, without `sketchObject`, Objective-C selectors, or Node `fs`. Follow the MCP execution format: no comments, no one-line minification, no redeclaring a function in scope, and one final `console.log(JSON.stringify({ ok: true, ... }))` result rather than top-level `return` or `sketch.UI.message`.
+- Keep each call bounded to one coherent action, re-resolve document and layer IDs, and verify the result. A failed call is not proof that all preceding mutations rolled back; inspect before retrying.
+- Compare layer wrappers by `.id`, never object identity. Parent access can allocate fresh wrappers. Bound a parent walk, for example with `cur && cur.id !== rootFrame.id && cur.type === 'Group'`, so it cannot pass its intended root.
+- Cache `.layers` and `.frame` before indexed or pairwise loops: `const arr = page.layers; const rects = arr.map(x => x.frame)`. Repeated `page.layers[i]` or `group.layers[i]` access re-bridges native arrays and can exhaust memory.
+- Filter relevant instances by discovered master IDs or names before reading `.overrides`; batch by Page or a bounded instance set. Large composite trees can make unfiltered override expansion stall Sketch. Batch size follows observed cost, not a universal frame-count threshold.
 
-## 2. Bundled `sketchtool` CLI Toolchain
+## 2. Bundled `sketchtool` and File Boundaries
 
-Prefer `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool` before GUI open for multi-file inventory, large-archive triage, duplicate-ID repair, migration, and batch export, then use Sketch MCP for edits, Library bindings, Stack layout, overrides, `get_screenshot`, and `doc.save()`:
+Use `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool` for native inventory and exports. Check the installed subcommand's help before invoking repair or migration.
 
-- `sketchtool metadata <file>` and `sketchtool list pages|artboards|layers <file>`: headless structure inspection.
-- `sketchtool duplicates <file>`: repair duplicate IDs before open and verify `0` duplicates post-save.
-- `sketchtool migrate <file>`: native migration and collaboration-patch cleanup.
-- `sketchtool export preview|artboards|layers|pages <file> --output=/abs/dir`: headless batch export.
+| Operation | Effect and authorization |
+| --- | --- |
+| `metadata <file>`; `list pages\|artboards\|layers <file>` | Read document structure without editing the source. |
+| `duplicates <file> --no-fix` | Inspect duplicate IDs without repair. Require zero duplicates for a completed edited candidate; report findings in read-only review. |
+| `duplicates <file> --fix` | Attempts to modify the document to repair duplicate IDs; not a read-only check and not all duplicate types are repairable. |
+| `migrate <file> --output=<path>` | Opens and saves a migrated document and discards cached collaboration patches. Bind the exact source, output, recovery needs, and edit authorization first. |
+| `export preview\|artboards\|layers\|pages <file> --output=<directory>` | Writes preview artifacts to the task's authorized output directory without treating them as source edits. |
 
-Never synthesize or mutate `.sketch` ZIP/JSON archives via Python, Node, or shell scripts.
+Deliver documents at project-defined paths. Bind temporary artifacts to actual task-owned locations and the existing [temporary-directory contract](../../policy/tool-contracts.md#task-temp). Do not recursively clean a presumed project directory or delete files or layers by broad name matching. Read-only review performs no cleanup. Preserve unrelated files, documents, and open unsaved work.
 
-## 3. Native Component Architecture, Overrides, and Modern Layout
+## 3. Components, Library Updates, and Native Layout
 
-### Single Symbol Master Home and Cross-Library Sync
+### One Master Home and Explicit Consumer Updates
 
-- Place every `SymbolMaster` at the top level of `Symbols` (`sketch.Page.getSymbolsPage(doc)`), never on a regular page or nested inside an `Artboard` or `Group`.
-- Bind shared components (`foreignSymbols`), color variables (`foreignSwatches`), and styles (`sharedTextStyles`, `sharedLayerStyles`) via Sketch Libraries rather than local copies.
-- Saving an in-repo Library (`bencao.sketch`) neither updates `~/Library/Application Support/com.bohemiancoding.sketch3/Libraries/` nor refreshes consumer `foreignSymbols`. After saving a shared Library, sync the registered `Libraries/` copy when authorized, then in open consumers call `syncWithLibrary()` on affected imported `SymbolMaster` (`instance.master`), `Swatch`, and `SharedStyle` entries plus `instance.resizeWithSmartLayout()` before `get_screenshot` and `doc.save()`.
+Keep shared master components in their owning Library. Within a document that owns masters, use the top level of its Symbols page (`sketch.Page.getSymbolsPage(doc)`), with instances on showcase or business pages. Avoid duplicate masters and repeated clones; discover actual component and variant organization from the selected Library.
 
-### Full Override-Driven States (No Arbitrary `detach()`)
+Use native imported symbols, swatches, and shared text/layer styles. Saving a Library source does not prove that its registered resource or any consumer has updated. Trace the actual source-to-registration-to-consumer relationship; some setups use a separate registered copy, others do not.
 
-Drive variations via `commonOverrideIDPrefix + '_' + property` rather than `detach()`: `stringValue`, `symbolID`, `isVisible`, `preservesSpaceWhenHidden`, `swatchValue` / `color:fill-N` / `color:border-N` / `textColor` / `fillColor`, `textStyle`, `layerStyle`, `horizontalSizing`, `verticalSizing`, `image` / `imageResizeBehavior` (`2` Fit, `3` Fill), and `flowDestination` (same-track Frame ID or `'back'`, `sketch.Flow.BackTarget`). When swapping a nested `<prefix>_symbolID` (e.g., `AccountTrigger/Default` to `AccountTrigger/Focus` in `Shell/Header`), clear stale child overrides under `<prefix>/` keyed to the former master's inner UUIDs—or `duplicate()` a clean template instance—so archives retain zero dangling `unresolvedOverrides`.
+For an authorized shared change, identify affected consumers and validate a representative consumer before wider propagation. Update the registered resource only where the actual setup requires it and authorization covers it. In affected consumers, call `syncWithLibrary()` on the changed imported `SymbolMaster`, `Swatch`, or `SharedStyle`, and `resizeWithSmartLayout()` on affected instances as appropriate. Verify references, layout, screenshots, and saved results. Do not blanket-sync unrelated consumers. Batch order, parallelism, and Human acceptance follow the existing project delivery policy and effective authorization; this skill adds no file-count trigger or approval gate.
 
-### Modern Containers, Stack Layout, and Native Styling
+### Native Overrides and Reference Integrity
 
-- Build UI containers (screens, sections, cards, lists, rows, form groups, toolbars, dialogs, and transparent wrappers with `background: { enabled: false }`) as `sketch.Group.Frame`, and proportional icons/illustrations as `sketch.Group.Graphic`. Never call `new sketch.Group(...)` or `group.convertToGroup()` (overriding plain-Group `get_guide` examples), or add child `Rectangle`/`ShapePath` layers to fake fills, borders, dividers, shadows, focus rings, or corners.
-- Audit plain groups (`!layer.isFrame && !layer.isGraphicFrame`) and existing Frames (`layer.isFrame && !layer.isGraphicFrame`) so files neither trigger `could be upgraded to Frames` nor keep fake-upgraded child chrome:
-  - In read-only mode, report plain groups, leftover backdrop/divider shapes, external `*-focus` rectangles, ancestor `clipsContents === true` clipping `Focus` instances, `Direction.Row` icons using `FlexSizing.Fill` or wrapped/clipped button and pill labels, dangling `unresolvedOverrides`, single-char `Text` pseudo-icons, sibling AABB overlaps, child bounds overflow, clipped multi-line `Text`, light surfaces in `Dark` Frames, or broken tree connectors without mutating the file.
-  - When editing is authorized, keep `Graphic` containers (`isGraphicFrame === true`), upgrade proportional icon roots via `group.convertToGraphic()`, and upgrade UI groups via `group.convertToFrame()` (`group.background.enabled = false` on transparent wrappers).
-  - Migrate child backdrops (`surface`, `disclosure-surface`, `bg`, `backdrop`, `*底板`, `*底面`) and dividers (`separator`, `rule`, `divider`, `*分隔线`, `*分割线`, including `1px` cross-axis rules) onto parent `sharedStyle` and `Swatch`-linked `style.fills`, `style.borders`, `border.sides = { top: 0, right: 0, bottom: 1, left: 0 }`, `shadows`, and `corners`, reconcile `clipsContents`, delete redundant shapes, and verify via `get_screenshot`.
-  - Never stack external `*-focus` rectangles; use `Focus` variants (`*/Focus/*`) or native `borders`/`shadows`. Because `*/Focus/*` rings extend `-5px` outside bounds (`3px` offset + `2px` outline), set `clipsContents = false` on parent/ancestor `Group.Frame` layers wrapping `Focus` instances (except scroll viewports with `>= 6px` inner padding) so rings are never clipped.
-- Build UI icons (`chevron-down`, `chevron-right`, `chevron-left`, `check`, `close`, `search`, `alert`, `info`) with Library icon instances or `ShapePath.fromSVGPath` (`1.5px` stroke, round caps/joins, centered in a fixed-size `Group.Graphic` or `Group.Frame`), never single-char `Text` (`⌄`, `›`, `‹`, `✓`, `✕`, `×`) or assembled rectangles.
-- Default page body wrappers, content cards, form sections, and action bars to `stackLayout` (`Direction.Row` / `Direction.Column`, `gap`, `padding`, `wraps`, `bordersAffectLayout`) so content growth automatically reflows siblings without overlapping controls below. Highest `parent.layers` index renders leftmost/topmost; reorder via `layer.index = n` then `stackLayout.apply()`, never `parent.layers = [...]`. Pair `stackLayout` with `FlexSizing` (`Fixed`, `Fit`, `Fill`, `Relative`, `minSize`, `maxSize`): in `Direction.Row` stacks (buttons, badges, filter pills, menu/nav items), lock fixed-size icons, avatars, spinners, and dots to `FlexSizing.Fixed` on both axes (never `Fill`, which splits width and wraps `48px` buttons to `68px`–`70px`), set single-line button/pill labels to `FlexSizing.Fit` (`Text` `Fill` wrapping allowed only in multi-line narrow columns `>= 220px` wide), and call `instance.resizeWithSmartLayout()` after longer `_stringValue` overrides.
-- After deleting shapes or changing card/text heights in legacy non-Stack outer `Group.Frame` containers, recompute bounds bottom-up (`inner card -> section Frame -> body wrapper -> footer Y -> top-level Artboard height`) to prevent footer overlap or dead gaps.
-- Maintain zero unintended AABB overlap among visible siblings (`layer.isVisible === true`) in non-overlay containers. For tree connectors (`branch`, `branch-joint`, `expand`/`collapse` buttons), enforce four invariants: (1) align parent button center `X` with child vertical `branch` `X`, ending `branch-joint` `>= 4px` before child button left edge; (2) span an ancestor's vertical trunk across `y: 0..rowHeight` of expanded descendants while following visible siblings exist; (3) end the last visible child's vertical `branch` in an `L` at `height = rowCenterY` with zero tail; and (4) inset or omit row dividers across the left connector gutter.
-- Keep visible children in nested `Frame` layers within parent bounds (except `-5px` `Focus` rings under `clipsContents = false`), size multi-line `Text` for full wrapped lines without bottom clipping, bind `Dark` Frame backgrounds and nested card/panel/drawer/row fills to `Dark` semantic surface `Swatch` variables (no light inner surfaces), and use `CornerStyle.Smooth` / `corners.concentric = true` and `style.tint = { swatch }`, calling `doc.processPendingChanges()` after swatch, shared-style, or concentric-corner updates.
+Drive supported variations with `commonOverrideIDPrefix + '_' + property`, without arbitrary `detach()`. Relevant properties include `stringValue`, `symbolID`, `isVisible`, `preservesSpaceWhenHidden`, `swatchValue`, `color:fill-N`, `color:border-N`, `textColor`, `fillColor`, `textStyle`, `layerStyle`, `horizontalSizing`, `verticalSizing`, `image`, `imageResizeBehavior`, and `flowDestination`. Preserve API semantics, such as image resize values `2` for Fit and `3` for Fill, as defined by the installed guide; these are not visual tokens.
 
-## 4. Orthogonal Organization, Spatial Zoning, and Breakpoints
+After swapping a nested `<prefix>_symbolID`, clear stale overrides under that prefix that refer to the former master's child IDs, or duplicate a clean compatible template instance and reapply intended values. For example, `Control/Rest` to `Control/Focused` is an illustrative swap, not a required naming scheme. Preserve unrelated overrides and verify zero dangling `unresolvedOverrides` and no broken imported references.
 
-Organize deliverables by cohesive module (`design/current/<domain>/<module>.sketch`):
+### Editable Containers, Styles, and Reflow
 
-- **Exemplar-First Gate**: When a shared Library change or cross-module layout/prototype refactor affects `>= 3` business `.sketch` files, converge the Library plus `1` exemplar module through `get_screenshot` and Human visual sign-off before batch rollout or parallel PRs (unless batch execution is authorized upfront).
-- **Consolidated Library & Module Scale**: Keep `bencao.sketch` consolidated into showcase/spec pages (`SymbolInstance` layers only) plus `Symbols` (never triplicate `Core/Light/Dark` masters). Partition each module by core sub-flow into `2`–`8` business Pages plus `1` `Symbols` Page (never `viewport width × theme`), targeting `<= 250` Frames and `<= 50,000` layers per module (`<= 250` Frames/Page) under a ceiling of `<= 12` Pages, `<= 1,200` Frames, and `<= 200,000` layers (honoring explicit project thresholds in read-only audits free of Cartesian duplication).
-- **Viewports & Three-Band Zoning**: Cover Light/Dark on primary viewports (`1440`, `390`), adding secondary widths from `{1200, 834, 768, 320}` only on real structural reflow (sidebar collapse, table-to-card, toolbar wrap) without cloning micro-states across `state × width × theme`. Arrange Frames along `X` (`120`–`160px` gutters) across three `Y` bands (`360`–`480px` gaps) synced to `frame.index` (`Band 1 -> Band 2 -> Band 3`):
-  1. **Band 1 (Top — Representative Golden-Path Interactive Graph)**: Primary Light/Dark rows covering the core progression and representative single-step UI branches—entry-screen top-bar account menu toggle (`01 <-> 02`), single-dimension filter/role options, explicit pagination switches on Console tables and multi-page web directories, row drill-downs across distinct business statuses into detail/edit/confirm views, and unsaved-form `Cancel` dialogs—named with step prefixes (`01 · Invitation List · 1440 · Light`). Wire representative primary journeys (Golden Path) returning via `'back'` (`sketch.Flow.BackTarget`) or a single post-action list state rather than $2^N$ multi-step state subset lattices; for mobile/Mini Program feeds and personal self-service record streams using scroll-bottom auto-loading, show the loaded stream with a muted bottom status line (`已显示全部 N 条记录`) and zero `加载更多` buttons or cloned `更多记录` Frames.
-  2. **Band 2 (Middle — Server & Boundary Contracts)**: Primary Light/Dark pairs aligned under parent Band 1 steps (`02a · ...`), limited to states unreachable via normal clicks alone: loading skeletons, scroll-bottom loading (`正在加载更多…`) and retryable scroll-load failure (`加载更多失败，点击重试`), API read failures, empty states, `401`/`403` blocks, validation errors, `409` conflicts, `429` cooldowns, unknown-outcome recovery, and `64`-char overflow contracts (never stranding enabled selectable options here).
-  3. **Band 3 (Bottom — Responsive Reflows)**: Real-data layout-reflow Frames (`R1 · Invitation List · 768 · Light`).
-  - Enforce four anti-bloat bans: (1) no Frame clones solely for post-dialog focus return; (2) no conflicting duplicate primary lists in sub-flow Pages or fake cross-slice Frames (`衔接目标`, `关联切片`, `片外入口`); (3) no loading skeletons (`正在读取`, `初始读取中`, `加载中`) in Band 3; and (4) no $2^N$ multi-step subset lattices (such as sequential combinations of cancelled/deleted records) or multi-field Cartesian screen permutations (`field A × field B × crop ratio`).
+- Build UI containers with `sketch.Group.Frame` and proportional icons or illustrations with `sketch.Group.Graphic`. Do not create legacy plain Groups or convert Frames to them. During authorized edits, use `convertToFrame()` or `convertToGraphic()` according to the layer's role; preserve existing Graphics. Use `background: { enabled: false }` for transparent wrappers.
+- Apply container fills, borders, dividers, shadows, and corners through native styles, including `sharedStyle`, Swatch-linked `style.fills`, `style.borders`, and per-side `border.sides`. When a child shape merely duplicates container chrome, transfer its intended styling before removing that specific redundant layer by ID. Keep independent vector artwork, masks, and other shapes with a real design purpose. A name such as `background` or `divider` is a search clue, never sufficient evidence for deletion.
+- Prefer the selected Library's focus treatment or native borders/shadows over redundant external focus rectangles. Measure the actual ring and ancestor clipping. Adjust clipping or available inset as appropriate, while preserving intentional scroll clipping; verify the whole focus indicator remains visible. No universal ring offset, padding, or variant name applies.
+- Reuse Library icons where suitable. For missing icons within scope, use editable vector geometry such as `ShapePath.fromSVGPath` in a Graphic, with the Library's stroke, caps, joins, size, and alignment. Do not substitute an arbitrary single-character Text glyph for a UI icon. Intentional text or symbols remain text when that is their actual semantic role.
+- Default flow-based UI regions to `stackLayout` (`Direction.Row` / `Direction.Column`, `gap`, `padding`, `wraps`, `bordersAffectLayout`) so content changes reflow siblings. Use fixed positioning for genuinely fixed or overlapping compositions, verifying the required variants. Highest `parent.layers` index renders first in a Stack; reorder through `layer.index = n` and `stackLayout.apply()`, not `parent.layers = [...]`.
+- Use `FlexSizing.Fixed`, `Fit`, `Fill`, `Relative`, `minSize`, and `maxSize` according to the component's geometry. Lock genuinely fixed-size icons, avatars, and indicators on both axes; do not let `Fill` stretch them or force accidental wrapping. Fit single-line labels and allow multiline text to fill its intended available width without an arbitrary minimum-width rule. Run `resizeWithSmartLayout()` after relevant text overrides.
+- After changing text or child geometry, recompute legacy non-Stack ancestor bounds from the inner container outward. Verify subsequent controls and the outer frame still fit. Text must show all intended lines; siblings must have no unintended overlap, and child overflow must match an explicit design purpose such as focus, overlays, or scrolling. Bounding-box collisions are diagnostic candidates, not proof that intentional overlap is wrong.
+- For trees and other connectors, verify the intended parent/child relationship, endpoint alignment, spacing, continuity, and termination at the last visible descendant. Avoid crossings through controls or dividers. Derive geometry from actual rows and the component contract rather than prescribing a gap or an L-shaped ending.
+- Resolve theme surfaces by semantic role, contrast, and design intent, including nested containers. A dark theme may intentionally use a light emphasis surface. Use `CornerStyle.Smooth`, `corners.concentric = true`, or `style.tint = { swatch }` only when the chosen design calls for them. Process pending changes with `doc.processPendingChanges()` after relevant Swatch, shared-style, or corner updates, then inspect the result.
 
-## 5. Prototype Convergence, Context-Preserving Flows, and UI Purity
+## 4. Pages, States, and Canvas Organization
 
-- **Converged Start Points & 100% Band 1 Reachability**: Set `frame.flowStartPoint = true` only on the step `01` entry Frame of each Band 1 primary `viewport × theme` track (`2` per desktop Page, or up to `4` with mobile tracks), and `false` elsewhere. Every Band 1 Frame must be `100%` BFS-reachable from its track's `flowStartPoint` with `outgoingFlows > 0` (zero dead ends).
-- **Same-Track Flows, Context-Preserving Menus, and Record Continuity**:
-  - Restrict full-screen `layer.flow` and `flowDestination` links to top-level Frames with matching `frame.width` and `Light`/`Dark` theme, or `sketch.Flow.BackTarget` (`'back'`); allow pre-existing GUI Overlays to keep intrinsic sizes on the same track/theme, and never wire cross-viewport (`390` to `1440`) or cross-theme jumps.
-  - Because Sketch's public JS API does not expose Prototype Overlay settings, never route top-bar menus/popovers from filtered, detail, or form Frames to a shared entry menu Frame (`02`) that loses active context: default to demonstrating shared top-bar menus (such as `AccountMenu`) at most once per desktop Page on the step `01` entry Frame (`01 <-> 02` via `sketch.Flow.AnimationType.none` instant cut), keeping the visual header shell on inner filtered, detail, form, and modal-scrim Frames without top-bar menu `HotSpot` layers or `1:1` menu-open clones (while honoring existing modules that already pair `1:1` context-preserving `S <-> M(S)` non-modal Frames with scrim Frames stripped of background `HotSpot` triggers).
-  - Preserve end-to-end business record identity (entity name, role, quota, status, and timestamps) and a single consistent logged-in persona across connected Pages, list drill-downs, detail views, edit forms, and confirmation modals—never funneling distinct records into one generic sample modal/detail Frame or mixing conflicting user personas across linked sub-flows. Post-action receipt views return via `'back'` or to a single-action updated list without requiring $2^N$ sequential multi-record combinations.
-  - Clear outgoing links on Band 2 and Band 3 Frames (`layer.flow = undefined` and every `SymbolInstance` `flowDestination` override set to `""`) so Sketch creates zero implicit prototype roots.
-  - Eliminate direct (`targetId === currentFrame.id`) and semantic active-nav self-loops: on any Frame showing an item's primary list/directory view (expanded, filtered, paginated, empty, cancel-return, or post-submit list), clear `layer.flow = undefined` and `_flowDestination = ""` on the active item (`Current`, `Active`, `Selected`), allowing sidebar return only from drill-down detail or standalone create/edit views. Keep sibling-module nav items visible in shared `Shell` chrome with cleared `flow`/`_flowDestination` rather than hijacking them to placeholder Frames.
-  - Probe each Page's prototype graph in `run_code`: verify `layer.flow.isValidConnection()` plus same-track target resolution (`target`, `targetId`, or `isBackAction()`), verify string `flowDestination` overrides against an existing same-track Frame or `'back'`, and verify `100%` Band 1 BFS reachability.
-- **Production UI Purity, Copy Hygiene, and Single-Source Controls**:
-  - Across `layer.name`, `Text` content, and `SymbolInstance` `_stringValue` overrides, never expose: (a) prototype helpers, branch switchers, or banners (`Prototype Demo: ...`, `*示例`, `原型核对`, `原型分支核对栏`, `原型快捷入口`, `原型分支入口`, `原型过渡说明`, `演示分支`, `模拟读取失败`, `查看…异常/故障/拦截态`, `返回原型页面`) or hijacked business buttons (`返回修改`, `关闭`); (b) engineering IDs or slugs (`（D3）`, `PATH-xx`, `save-refresh-failed`, `DemoOnly_...`); (c) interaction/a11y spec notes (`初始焦点位于…`, `默认聚焦…`, `按 Escape 关闭`, `确认弹窗不显示明文…`, `零截断`, `示例名称完整展示`, `测试专用`); (d) API write or state-machine internals (`仅提交已修改的字段`, `不重复写入旧值`, `刚刚重读`, `读回`, `终态`, `单事务`, `共有底座`, `权限子集铁律`); or (e) raw integer/type boundaries and storage jargon (`2147483647`, `int32`/`int64`, `原码` for `raw code`, `受权`, or doubled replacement tokens).
-  - Never add hidden, off-control, or corner-anchored synthetic `sketch.HotSpot` layers (`__cross_page_flow__` at `(0, 0, 48×48)`) or hidden error-jump overlays; wire transitions to visible UI controls (`Navigation/Item`, header back controls, filter/pagination controls, row actions, primary CTAs), allowing a `1:1` exact-bounds `sketch.HotSpot` over a visible sub-control only on non-modal Frames when a composite `Shell` `SymbolMaster` (such as a header account trigger) exposes no nested `flowDestination` slot.
-  - Never place manual refresh buttons (`刷新`, `刷新列表`, `刷新资料`, `刷新记录`, `刷新最新状态`, `Refresh`, `refresh`) on normal Band 1 list, detail, overview, or tree views (including normal `暂不可用` business-status views, never confused with `服务暂不可用` API failures) unless polling/sync is an explicit requirement. On Band 2 unknown-outcome (`提交结果未明`) Frames, place at most one neutral recovery button (`刷新当前状态` or `刷新列表`), never outcome-spoiling buttons (`刷新见已生效`, `刷新见仍为原顺序`, `刷新读取失败`, `刷新列表（已删除）`, `刷新列表（仍存在）`).
-  - Retain at most `1` page-level `返回` or breadcrumb-back entry per Frame, placed only in the top bar or page header; never duplicate `返回` across page header, card header, and bottom bar (form footers keep only `Cancel` and one primary submit CTA).
-- **Read-Only Audit Parity**: In read-only mode, report excess `flowStartPoint` flags, unreachable or dead-end Band 1 Frames, unwired single-step selectable options, cross-screen context loss or record/persona mismatches, Band 1/2/3 misclassifications or bloat, modal-scrim `HotSpot` leaks, cross-track/broken flows, active-nav self-loops, synthetic `HotSpot` layers, copy leaks, unauthorized `Refresh` or spoiler buttons, or duplicate `返回` controls without mutating the file—accepting entry-only (`01 <-> 02`) top-bar menu demonstration (without requiring inner-Frame menu `HotSpot` or `1:1` menu clones) and representative Golden-Path transitions (without demanding $2^N$ multi-step state lattices).
+Organize files and Pages by responsibilities and coherent flows. Keep master ownership unique and avoid meaningless duplicates. A simple design may use one business Page; no minimum page count or universal Page/frame/layer ceiling applies. Read project hard limits where present. If opening, editing, rendering, or tool calls slow down, measure the actual problem and reduce redundant content, partition by responsibility, or batch inspection while preserving required coverage. Do not describe a project budget or local measurement as a Sketch technical limit.
+
+Choose platforms, themes, viewports, breakpoints, frame names, ordering, and spacing from the current contract. Cover the required primary states and real layout reflows separately; avoid multiplying every state by every width and theme without a reason. Retain combinations that the business or accessibility contract actually requires.
+
+One optional canvas arrangement is three bands: primary interactive journeys, exceptional/boundary states, and responsive reflows. Use it only when suitable or project-adopted. It dictates neither fixed dimensions nor numbering, and band membership alone does not decide whether a frame is interactive. Keep canvas and layer-list order understandable under the chosen organization.
+
+Derive main paths, single-step branches, errors, boundaries, and meaningful combinations from the business contract. That contract owns pagination versus incremental loading, loading/retry/recovery behavior, status codes, field lengths, cancel/delete behavior, and multistep form combinations. Avoid exhaustive combinations with no distinct outcome, but do not omit a required combination to reduce frame count. Examples from another product are not acceptance requirements.
+
+## 5. Prototype Behavior and Visible Content
+
+### Verify the Intended Graph
+
+Identify intended entry points, paths promised to be interactive, static reference frames, and legitimate terminal states. Set `flowStartPoint` accordingly, without a fixed number or naming prefix. Check every promised path for reachability from its intended entry, and report unintended dead ends and self-loops. A completion frame may have no outgoing flow; a static reference does not need invented interaction.
+
+Resolve `layer.flow` targets and `flowDestination` overrides to actual valid frames or `sketch.Flow.BackTarget` (`'back'`). Use `layer.flow.isValidConnection()`, target IDs, and `isBackAction()` as applicable; graph traversal must reflect the intended scope and actual back behavior. Confirm the important transitions in the native prototype, since a valid target ID alone does not prove interaction behavior. Clear stale unintended flows during authorized edits, not all links in a category of frames.
+
+Report accidental theme or device jumps; preserve explicit theme switching, device handoff, and appropriately sized overlays. Current-navigation clicks, cross-module entries, and return behavior follow the product contract and prototype scope. Do not hijack a real control to a placeholder destination or remove a required link merely to satisfy a generic graph check. If a required destination is unavailable, report that coverage gap.
+
+### Preserve Context and Use Real Interaction Targets
+
+Menus, dialogs, and transitions must preserve the applicable filters, form state, record context, and unchanged identity. Use capabilities verified in the installed prototyping guide and actual document. If the API lacks a needed overlay operation, choose an authorized supported implementation or report the limitation; do not turn a tool workaround into a product-wide menu restriction. Context-preserving paired frames, native overlays, and other supported approaches follow the actual requirement.
+
+Keep the same record's fields and the unchanged logged-in identity consistent across connected views. Explicit account switching and legitimate business-state transitions may change them. After an action, use the destination and recovery path required by the business flow, including completion pages or continued work where appropriate.
+
+Wire visible controls or other genuine interaction targets. A `sketch.HotSpot` may match a visible sub-control when a composite instance lacks a suitable nested flow override; a dismissible scrim may itself be a real target. Verify bounds, stacking, modal blocking, and resulting behavior. Never add hidden corner hotspots, off-control targets, or concealed error jumps to fabricate reachability.
+
+### Review User Copy Separately from Metadata
+
+Inspect rendered Text and instance string overrides as user content. Treat layer names, tracking IDs, and design annotations according to their audience; internal identifiers are not copy leaks unless rendered or otherwise exposed to the user. Do not apply one blacklist to all three categories.
+
+User-facing screens must not accidentally expose irrelevant debugging controls, internal workflow notes, or predetermined results. Judge technical terms, examples, help text, and keyboard instructions by context: developer tools and help pages may legitimately display them. Verify the final pixels as well as the source text.
+
+Refresh, retry, recovery, back navigation, draft saving, cancel, and submit actions follow the product contract. Keep actions real and results accurate; button labels must not reveal a presumed outcome before it is known. Avoid purposeless duplicate actions without imposing universal button counts, footer layouts, or wording.
+
+## 6. Screenshot, Save, and Final Acceptance
+
+After each visual or layout change, use `get_screenshot({ targetDocumentID, layerID })` on the affected result. Check hierarchy, alignment, spacing, complete text, focus visibility, intended theme roles, connectors, and bounds. Inspect affected instances after Library changes as well as the Library source. Keep screenshots tied to the exact candidate and layer IDs; old screenshots do not validate subsequent edits.
+
+Export durable previews to the authorized location when required. For example, `sketch.export(layer, { output: '/absolute/output/directory', filename: 'preview.png', formats: ['png'], scales: ['2.0'], overwriting: true })` uses an absolute directory, not `output: false`. These path, filename, and scale values illustrate invocation, not delivery policy; permit overwrite only for the bound output.
+
+For edited candidates, save with `doc.save()`, verify the saved path and zero duplicate IDs using `sketchtool duplicates <file> --no-fix`, then reopen the saved candidate through native tools. Verify Library references, overrides, layout, required interactions, and screenshots of affected content after reopening. Close only task-owned documents when safe, preserving unrelated unsaved work. For read-only review, report the observed candidate and any limits without save, repair, or host changes.
+
+Final review must cover:
+
+- Required Library identity, actual native consumption, and affected consumer synchronization.
+- Unique master ownership, editable Frame/Graphic structure, native styles, valid overrides, reflow, complete text, visible focus, and no unintended overlaps or broken references.
+- Project-required themes, widths, states, organization, scale limits, and business combinations.
+- Intended prototype entries, reachability, legitimate endings, real interaction targets, context continuity, and audience-appropriate copy.
+- Candidate-bound screenshots, saved/reopened results for edits, and applicable project acceptance gates.
+
+Report gaps and unverified behavior explicitly. Skill-format checks, document lint, and static scenarios do not establish real model behavior or native Sketch acceptance. Distinguish a validated target graph, actual prototype interaction, saved-file verification, and Human visual acceptance rather than claiming one proves the others.
