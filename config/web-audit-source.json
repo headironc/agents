@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "repository": "addyosmani/web-quality-skills",
+  "repositoryId": 1136782037,
+  "branch": "main",
+  "revision": "afa8da942115f2961fdbfa80807ea0b232ff6c00",
+  "files": [
+    {
+      "source": "LICENSE",
+      "target": "config/upstream/web-quality-audit/LICENSE.txt",
+      "bytes": 1068,
+      "sha256": "c122223ac43e86421958e18623979942c21b642951e2e3736dcb63eff13587c3",
+      "blob": "90715bb429f374dcc4e05c35535b049d3c077313"
+    },
+    {
+      "source": "skills/web-quality-audit/SKILL.md",
+      "target": "config/upstream/web-quality-audit/SKILL.md.txt",
+      "bytes": 10450,
+      "sha256": "1903cfb4dcba987d50dc7a51f6c19ec43830ff924c2c8f78979d8775fbe20f91",
+      "blob": "581ec7c5e8e05e6ac93d99d872906595581efc42"
+    },
+    {
+      "source": "skills/performance/references/MEASUREMENT.md",
+      "target": "config/upstream/web-quality-audit/MEASUREMENT.md.txt",
+      "bytes": 7371,
+      "sha256": "128f6f20c6c8fb55fcccd8b259cf680811022cf262dc55b03e9d623bcb555a99",
+      "blob": "1b15702d186016b9f0cf8e77cdff2c2d836e2313"
+    }
+  ],
+  "adaptation": {
+    "revision": "afa8da942115f2961fdbfa80807ea0b232ff6c00",
+    "files": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "c122223ac43e86421958e18623979942c21b642951e2e3736dcb63eff13587c3"
+      },
+      {
+        "path": "SKILL.md",
+        "sha256": "19a7193c11dccb9eac6cde74180f04bcad3087625f7c4b088f3958e945de55ce"
+      },
+      {
+        "path": "references/measurement.md",
+        "sha256": "d98247190d5160b97d507eabe93a1df5ef496fe237e838e3130db58e423cf364"
+      },
+      {
+        "path": "references/checks.md",
+        "sha256": "cb44c45107edc1541c20fe6afb3f2dd970740b652cc3a5f09cf1a0f5d02a26d8"
+      }
+    ],
+    "decisions": [
+      {
+        "source": "LICENSE",
+        "decision": "retained",
+        "reason": "Retain the complete MIT license and Addy Osmani copyright notice; explicitly identify this as an unofficial community adaptation without Google endorsement."
+      },
+      {
+        "source": "skills/web-quality-audit/SKILL.md",
+        "decision": "adapted",
+        "reason": "Adopt the scoped live-evidence audit workflow with actual capabilities and host authorization. Replace sibling category/analyzer dependencies with local references and maintained Modern Web Guidance; reject blanket severity, deployment, source-map, target-size and SEO prescriptions."
+      },
+      {
+        "source": "skills/performance/references/MEASUREMENT.md",
+        "decision": "adapted",
+        "reason": "Preserve field/lab/static distinctions, comparable measurements, unavailable CrUX and state-aware navigation. Bound external data disclosure and setup authority, use real tool modes, and retain only evidence still needed by its consumers."
+      }
+    ]
+  }
+}

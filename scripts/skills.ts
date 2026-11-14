@@ -12,6 +12,7 @@ const requiredSkills = [
   { path: "modern-web-guidance", target: "codex,dsh,antigravity" },
   { path: "property-based-testing", target: "codex,dsh,antigravity" },
   { path: "rust-risk-review", target: "codex,dsh,antigravity" },
+  { path: "web-quality-audit", target: "codex,dsh,antigravity" },
   { path: "alibabacloud-find-skills", target: "codex,dsh,antigravity" },
   {
     path: "alibabacloud-sms-send-short-message",

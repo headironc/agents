@@ -19,6 +19,7 @@ export const testPaths = {
     "tests/validation/microsoft-rust.test.ts",
     "tests/validation/property-testing.test.ts",
     "tests/validation/rust-risk.test.ts",
+    "tests/validation/web-audit.test.ts",
     "tests/validation/source-properties.test.ts",
     "tests/validation/pre-commit.test.ts",
     "delivery/skills/alibabacloud-sms-send-short-message/tests/send-sms.test.mjs",
@@ -82,6 +83,7 @@ export const requiredRepositoryPaths = [
     "adapted-source.ts",
     "upstream-adapted.ts",
     "rust-risk-source.ts",
+    "web-audit-source.ts",
     "check-skills.ts",
     "check-tool-contracts.ts",
     "pre-commit.ts",
@@ -125,6 +127,12 @@ export const requiredRepositoryPaths = [
   "config/microsoft-rust-source.json",
   "config/property-testing-source.json",
   "config/rust-risk-source.json",
+  "config/web-audit-source.json",
+  "delivery/skills/web-quality-audit/SKILL.md",
+  "delivery/skills/web-quality-audit/LICENSE.txt",
+  ...["measurement", "checks"].map(
+    (name) => `delivery/skills/web-quality-audit/references/${name}.md`,
+  ),
   "delivery/skills/rust-risk-review/SKILL.md",
   "delivery/skills/rust-risk-review/LICENSE.txt",
   ...["async-and-threads", "unsafe-and-ffi", "resources-and-files"].map(

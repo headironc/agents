@@ -44,6 +44,7 @@ export const skills = {
     "property-based-testing",
     "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
+    "web-quality-audit",
     "wechatide",
   ],
   dsh: [
@@ -55,6 +56,7 @@ export const skills = {
     "property-based-testing",
     "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
+    "web-quality-audit",
     "wechatide",
   ],
   antigravity: [
@@ -66,6 +68,7 @@ export const skills = {
     "property-based-testing",
     "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
+    "web-quality-audit",
   ],
 };
 export const policies = [
