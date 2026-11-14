@@ -5,6 +5,7 @@ sketch-native	codex,dsh,antigravity
 gh	codex,dsh,antigravity
 project-guide	codex,dsh,antigravity
 modern-web-guidance	codex,dsh,antigravity
+property-based-testing	codex,dsh,antigravity
 alibabacloud-find-skills	codex,dsh,antigravity
 alibabacloud-sms-send-short-message	codex,dsh,antigravity
 wechatide	shared

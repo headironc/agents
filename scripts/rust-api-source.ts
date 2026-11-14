@@ -1,8 +1,16 @@
-import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
+import {
+  digest,
+  gitBlob,
+  readGitBytes,
+  readGitSource,
+} from "./upstream-git.ts";
+import type { ReadSource } from "./upstream-git.ts";
+export { digest, gitBlob } from "./upstream-git.ts";
+export type { ReadSource } from "./upstream-git.ts";
 
 export const rustRepository = "rust-lang/api-guidelines";
 export const rustRepositoryId = 81125442;
@@ -31,8 +39,6 @@ export const rustInputs = [
 ] as const;
 export const rustTarget = (source: string) =>
   `${rustRoot}/${source.replaceAll("/", "-")}.txt`;
-export const digest = (bytes: Buffer | string) =>
-  createHash("sha256").update(bytes).digest("hex");
 const oid = z.string().regex(/^[a-f0-9]{40}$/);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const fileSchema = z.strictObject({
@@ -87,7 +93,6 @@ export const rustSourceSchema = z
   });
 export type RustSource = z.infer<typeof rustSourceSchema>;
 export type RustImport = { source: RustSource; files: Map<string, Buffer> };
-export type ReadSource = (url: string, limit: number) => Promise<Buffer>;
 
 function regular(root: string, relative: string): Buffer {
   let current = root;
@@ -144,108 +149,32 @@ export function verifyRustSource(root: string, reviewed = true): RustSource {
   return source;
 }
 
-export const gitBlob = (bytes: Buffer) =>
-  createHash("sha1")
-    .update(`blob ${bytes.length}\0`)
-    .update(bytes)
-    .digest("hex");
-
-export const readRustBytes: ReadSource = async (url, limit) => {
-  const parsed = new URL(url);
-  if (
-    !["https://api.github.com", "https://raw.githubusercontent.com"].includes(
-      parsed.origin,
-    ) ||
-    parsed.username ||
-    parsed.password ||
-    parsed.hash
-  )
-    throw new Error("Unexpected Rust source host");
-  const response = await fetch(parsed, {
-    redirect: "error",
-    signal: AbortSignal.timeout(60_000),
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!response.ok || !response.body)
-    throw new Error(`Rust source HTTP ${response.status}`);
-  const reader = response.body.getReader(),
-    chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > limit) throw new Error("Rust source exceeds size limit");
-      chunks.push(value);
-    }
-  } finally {
-    await reader.cancel();
-  }
-  return Buffer.concat(chunks);
-};
+export const readRustBytes = readGitBytes;
 
 export async function planRustImport(
   previous: RustSource | null,
   read: ReadSource = readRustBytes,
   revision?: string,
 ): Promise<RustImport> {
-  const api = `https://api.github.com/repos/${rustRepository}`;
-  const json = async (url: string) =>
-    JSON.parse((await read(url, 2 * 1024 * 1024)).toString("utf8"));
-  const repo = await json(api);
-  if (
-    repo.id !== rustRepositoryId ||
-    repo.full_name !== rustRepository ||
-    repo.default_branch !== "master" ||
-    repo.archived ||
-    repo.disabled
-  )
-    throw new Error("Rust repository identity changed");
-  const commit = await json(
-    `${api}/commits/${revision ? oid.parse(revision) : "master"}`,
+  const {
+    revision: next,
+    entries,
+    files,
+  } = await readGitSource(
+    {
+      name: "Rust",
+      repository: rustRepository,
+      repositoryId: rustRepositoryId,
+      branch: "master",
+      files: rustInputs.map((x) => ({
+        source: x.source,
+        target: rustTarget(x.source),
+      })),
+    },
+    previous?.revision ?? null,
+    read,
+    revision,
   );
-  const next = oid.parse(commit.sha);
-  if (revision && next !== revision) throw new Error("Rust revision differs");
-  if (previous && next !== previous.revision) {
-    const comparison = await json(
-      `${api}/compare/${previous.revision}...${next}`,
-    );
-    if (
-      comparison.status !== "ahead" ||
-      comparison.merge_base_commit?.sha !== previous.revision
-    )
-      throw new Error("Rust upstream history diverged or regressed");
-  }
-  const tree = await json(`${api}/git/trees/${next}?recursive=1`);
-  if (tree.truncated || !Array.isArray(tree.tree))
-    throw new Error("Incomplete Rust source tree");
-  const files = new Map<string, Buffer>();
-  const entries: RustSource["files"] = [];
-  for (const input of rustInputs) {
-    const matches = tree.tree.filter((x: any) => x.path === input.source);
-    if (
-      matches.length !== 1 ||
-      matches[0].type !== "blob" ||
-      matches[0].mode !== "100644"
-    )
-      throw new Error(`Missing or unsafe Rust reference: ${input.source}`);
-    const bytes = await read(
-      `https://raw.githubusercontent.com/${rustRepository}/${next}/${input.source}`,
-      512 * 1024,
-    );
-    if (gitBlob(bytes) !== oid.parse(matches[0].sha))
-      throw new Error("Rust blob identity differs");
-    const target = rustTarget(input.source);
-    files.set(target, bytes);
-    entries.push({
-      source: input.source,
-      target,
-      bytes: bytes.length,
-      sha256: digest(bytes),
-      blob: gitBlob(bytes),
-    });
-  }
   const source = rustSourceSchema.parse({
     schemaVersion: 1,
     repository: rustRepository,

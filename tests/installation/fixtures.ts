@@ -41,6 +41,7 @@ export const skills = {
     "gh",
     "modern-web-guidance",
     "project-guide",
+    "property-based-testing",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "wechatide",
   ],
@@ -50,6 +51,7 @@ export const skills = {
     "gh",
     "modern-web-guidance",
     "project-guide",
+    "property-based-testing",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "wechatide",
   ],
@@ -59,6 +61,7 @@ export const skills = {
     "gh",
     "modern-web-guidance",
     "project-guide",
+    "property-based-testing",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
   ],
 };

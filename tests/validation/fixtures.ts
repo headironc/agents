@@ -174,6 +174,7 @@ export function fixtureRepository(t: TestContext) {
         "gh\tcodex,dsh,antigravity\nalibabacloud-find-skills\tcodex,dsh,antigravity\nalibabacloud-sms-send-short-message\tcodex,dsh,antigravity\nwechatide\tshared\nwechatide/skills/automator\tshared\nwechatide/skills/cloudbase-operator\tshared\nwechatide/skills/compiler\tshared\nwechatide/skills/debugger\tshared\nwechatide/skills/initializer\tshared\nwechatide/skills/installer\tshared\nwechatide/skills/previewer\tshared\nwechatide/skills/project-config\tshared\nwechatide/skills/project-manager\tshared\n" +
         "project-guide\tcodex,dsh,antigravity\n" +
         "modern-web-guidance\tcodex,dsh,antigravity\n" +
+        "property-based-testing\tcodex,dsh,antigravity\n" +
         additional,
     );
   function commitBaseline() {
