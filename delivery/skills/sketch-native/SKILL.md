@@ -67,10 +67,12 @@ Use `/Applications/Sketch.app/Contents/Resources/sketchtool/bin/sketchtool` for 
 | Operation | Effect and authorization |
 | --- | --- |
 | `metadata <file>`; `list pages\|artboards\|layers <file>` | Read document structure without editing the source. |
-| `duplicates <file> --no-fix` | Inspect duplicate IDs without repair. Require zero duplicates for a completed edited candidate; report findings in read-only review. |
+| `duplicates <file>` | Inspect duplicate IDs with the default repair-disabled behavior. Require zero duplicates for a completed edited candidate; report findings in read-only review. |
 | `duplicates <file> --fix` | Attempts to modify the document to repair duplicate IDs; not a read-only check and not all duplicate types are repairable. |
 | `migrate <file> --output=<path>` | Opens and saves a migrated document and discards cached collaboration patches. Bind the exact source, output, recovery needs, and edit authorization first. |
 | `export preview\|artboards\|layers\|pages <file> --output=<directory>` | Writes preview artifacts to the task's authorized output directory without treating them as source edits. |
+
+For read-only audits, omit repair options: `--no-fix` may be rejected, while `-E NO`, `--fix=NO`, or other Boolean aliases may enable repair. Check stderr and the reported operation, not just exit zero. Compare file digests before and after when nonmutation evidence is required.
 
 Deliver documents at project-defined paths. Bind temporary artifacts to actual task-owned locations and the existing [temporary-directory contract](../../policy/tool-contracts.md#task-temp). Do not recursively clean a presumed project directory or delete files or layers by broad name matching. Read-only review performs no cleanup. Preserve unrelated files, documents, and open unsaved work.
 
@@ -144,7 +146,7 @@ After each visual or layout change, use `get_screenshot({ targetDocumentID, laye
 
 Export durable previews to the authorized location when required. For example, `sketch.export(layer, { output: '/absolute/output/directory', filename: 'preview.png', formats: ['png'], scales: ['2.0'], overwriting: true })` uses an absolute directory, not `output: false`. These path, filename, and scale values illustrate invocation, not delivery policy; permit overwrite only for the bound output.
 
-For edited candidates, save with `doc.save()`, verify the saved path and zero duplicate IDs using `sketchtool duplicates <file> --no-fix`, then reopen the saved candidate through native tools. Verify Library references, overrides, layout, required interactions, and screenshots of affected content after reopening. Close only task-owned documents when safe, preserving unrelated unsaved work. For read-only review, report the observed candidate and any limits without save, repair, or host changes.
+For edited candidates, save with `doc.save()`, verify the saved path and zero duplicate IDs using `sketchtool duplicates <file>` without repair options, then reopen the saved candidate through native tools. Verify Library references, overrides, layout, required interactions, and screenshots of affected content after reopening. Close only task-owned documents when safe, preserving unrelated unsaved work. For read-only review, report the observed candidate and any limits without save, repair, or host changes.
 
 Final review must cover:
 
