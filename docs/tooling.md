@@ -137,6 +137,18 @@ bash scripts/check.sh all --report .cache/reports/check.json
 
 这个身份记录受检内容与执行环境。它不能证明未来文件不会改变，也不授予安装或发布权限。不同平台的依赖与工具可能不同，不要求它们产生相同源码摘要。
 
+## 官方内容自动更新
+
+[upstream 工作流](../.github/workflows/upstream.yml)每周一 UTC 02:17（北京时间 10:17）检查官方发布，也支持从 `main` 手动运行。当前只接入 Modern Web Guidance 的 npm 稳定版本。[发布器](../scripts/upstream-pr.ts)复用原件导入校验，完整更新 CLI、索引、指南和许可证。版本、来源或内容不匹配时失败退出，不执行下载包。
+
+无更新时不创建分支或空 PR。每个版本使用独立分支；同版本已有任何状态的 PR 时不再创建。已有其他版本待审时先等待。遗留分支、基线变化或写入结果未知均停止，由维护者核对原对象后恢复。自动化不覆盖人工提交、不重开已关闭 PR、不强推，也不自动合并或安装。
+
+本仓库的 `GITHUB_TOKEN` 是此工作流专用的机器人身份例外，仅允许固定仓库内创建受管更新分支、签名提交及 PR。交互式 `gh` 的人类身份合同保持有效。工作流只在发布步骤传入令牌；回读签名、父提交、完整变更字节及 PR 目标。未获信任的新上游执行器只作为数据进入 PR，后续验证沿现有隔离 CI 和审查边界。
+
+启用时由获授权的配置所有者打开仓库 Actions 创建 PR 所需设置，保留默认只读令牌权限及既有保护。GitHub 将创建 PR 与批准 PR 合并在同一设置中；本工作流不调用批准接口。默认令牌创建的 PR 可能要求维护者先批准运行 CI，见 [GitHub 说明](https://docs.github.com/en/actions/concepts/security/github_token)。随后按[仓库审查流程](review-gate.md)完成检查、独立审查、发现处置和获授权合并。指南与执行器更新不属于仅版本清单的审查豁免。
+
+首次真实运行区分“官方当前无更新”与“已创建更新 PR”。本地模拟覆盖新版本、并发变化、历史 PR、未知写入和回读失败；没有官方新发布时，不伪造版本或制造空 PR 来声称线上写入已验证。35 MiB 的请求大小限制是本发布器的防护，并非 GitHub 平台容量承诺。超限时停止，不拆成半完成提交。
+
 ## CI 与审查边界
 
 原生 [checks](../.github/workflows/check.yml) 监听发往 `main` 的 `pull_request` 和 `main` push。PR 事件包括 opened、synchronize、reopened、ready_for_review 和 edited。草稿及元数据编辑也执行两个平台，没有路径或 job 条件跳过。PR 检查本次平台 merge SHA；push 检查本次 push SHA。checkout 固定为 `github.sha`，Action 使用完整 commit pin，并关闭凭据持久化。

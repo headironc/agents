@@ -7,6 +7,7 @@ subject	ref-check	core	platform-interface	active	defined
 subject	task-temp	core	platform-interface	active	defined
 subject	aliyun-sms	core	cli	active	defined
 subject	modern-web-guidance	core	cli	active	defined
+subject	upstream-pr	core	service-interface	active	defined
 subject	wechatide	core	cli	active	defined
 subject	wechatide-call	core	platform-interface	active	defined
 subject	wechatide-install-check	core	platform-interface	active	defined

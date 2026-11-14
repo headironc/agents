@@ -34,6 +34,7 @@
 | GitHub 操作 | [gh](delivery/skills/gh/SKILL.md)、[身份就绪](delivery/skills/gh/references/auth-readiness.md) | 调用、工作流与按需身份恢复由同一技能拥有 |
 | 项目导航与验证 | [project-guide](delivery/skills/project-guide/SKILL.md) | 共享技能；发现项目版本、权威资料与原生检查，报告实际证据；演练范围见[来源登记](docs/skill-sources.md#project-guide) |
 | 浏览器开发与审查 | [modern-web-guidance](delivery/skills/modern-web-guidance/SKILL.md) | 三端共享；使用同一官方 npm 发布包的 CLI、索引和指南；保留项目兼容要求与只读边界 |
+| 官方内容更新 | [每周更新流程](docs/tooling.md#官方内容自动更新) | 首项接入 Modern Web Guidance；自动创建更新 PR，继续按现有流程审查和合并 |
 | 原生 CI 与交付 | [运行合同](docs/tooling.md#ci-与审查边界)、[实例与证据边界](docs/review-gate.md#实例与证据边界) | 两平台复用完整检查；实际配置、运行与独立审查分别绑定实例验证 |
 | 阿里云技能发现与短信 | [技能发现](delivery/skills/alibabacloud-find-skills/SKILL.md)、[短信](delivery/skills/alibabacloud-sms-send-short-message/SKILL.md) | 发现、安装及发送遵循各自授权 |
 | 微信开发者工具 | [wechatide](delivery/skills/wechatide/SKILL.md) | 九个子入口已交付；实际 DevTools 操作限 macOS |

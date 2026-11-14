@@ -238,6 +238,7 @@ test("the unified CI gate checks the real workflow, shell blocks and project reg
   assert.deepEqual(workflowPaths, [
     ".github/workflows/check.yml",
     ".github/workflows/lock-pr.yml",
+    ".github/workflows/upstream.yml",
   ]);
   const specs = await checkSpecs(["ci"], "all");
   assert.ok(

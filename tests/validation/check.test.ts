@@ -44,6 +44,7 @@ const expectedTestPaths = {
     "tests/validation/skills.test.ts",
     "tests/validation/modern-web-source.test.ts",
     "tests/validation/modern-web-runtime.test.ts",
+    "tests/validation/upstream-pr.test.ts",
     "tests/validation/pre-commit.test.ts",
     "delivery/skills/alibabacloud-sms-send-short-message/tests/send-sms.test.mjs",
     "delivery/skills/wechatide/tests/call.test.mjs",
@@ -92,6 +93,7 @@ const required = [
     "skills.ts",
     "modern-web-source.ts",
     "update-modern-web-guidance.ts",
+    "upstream-pr.ts",
     "check-skills.ts",
     "check-tool-contracts.ts",
     "pre-commit.ts",
@@ -188,6 +190,7 @@ const required = [
   ".github/CODEOWNERS",
   ".github/workflows/check.yml",
   ".github/workflows/lock-pr.yml",
+  ".github/workflows/upstream.yml",
 ];
 function verifyStructure(directory: string): void {
   for (const file of required) {
