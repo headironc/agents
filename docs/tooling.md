@@ -139,7 +139,7 @@ bash scripts/check.sh all --report .cache/reports/check.json
 
 ## 上游内容维护架构
 
-维护流程连接上游来源、本地能力、候选验证和产品安装。每周任务已接入 Modern Web Guidance 发布包、Rust API Guidelines 参考章节和属性测试技能。三者分别覆盖保留原件、参考评估及本地适配。现有执行入口见[官方内容自动更新](#官方内容自动更新)。其他来源按下述职责与实际消费者扩展。
+维护流程连接上游来源、本地能力、候选验证和产品安装。每周任务已接入 Modern Web Guidance 发布包、Rust API Guidelines 与 Microsoft Rust Guidelines 参考章节，以及属性测试技能，覆盖保留原件、参考评估及本地适配。现有执行入口见[官方内容自动更新](#官方内容自动更新)。其他来源按下述职责与实际消费者扩展。
 
 ### 维护对象与归属
 
@@ -201,16 +201,17 @@ bash scripts/check.sh all --report .cache/reports/check.json
 | --- | --- | --- |
 | 已有基础 | Modern Web Guidance 更新 PR 和三端交付 | 保留现有来源准备、每周任务、审查及安装流程 |
 | 首个 Git 来源 | Rust API Guidelines 到现有 `rust.md` 的更新与评估 | 来源锁、固定章节、Git 准备器、草稿 PR 与评估检查同属一个消费者；继续复用产品安装与公共发布器 |
+| 第二个 Rust 参考 | Microsoft 指南补齐安全、FFI、feature 与性能建议 | 两个参考来源共用获取与评估实现，分别锁定章节并创建更新 PR；同一政策变化后重新核对两份评估 |
 | 首个适配技能 | Trail of Bits 属性测试到三端技能，并用于安装记录摘要测试 | 保留七份原件和完整许可，绑定本地七份文件与逐项适配结论；更新候选保持草稿，复用 Git 获取与公共发布器 |
 | 后续来源 | Web、小程序等实际选定项沿同一职责接入 | 按来源与消费者补充准备及验收；复用稳定部分，不预建通用插件平台 |
 
 ## 官方内容自动更新
 
-本节描述已实现的三个来源。职责划分见[上游内容维护架构](#上游内容维护架构)。
+本节描述已实现的四个来源。职责划分见[上游内容维护架构](#上游内容维护架构)。
 
-[upstream 工作流](../.github/workflows/upstream.yml)每周一 UTC 02:17（北京时间 10:17）检查官方来源，也支持从 `main` 手动运行。矩阵独立处理三个来源，关闭 fail-fast。一个来源失败不取消其他来源，运行仍保留失败结果。[调度入口](../scripts/upstream-pr.ts)仅接受固定来源名；准备步骤不传入发布令牌。
+[upstream 工作流](../.github/workflows/upstream.yml)每周一 UTC 02:17（北京时间 10:17）检查已采用来源，也支持从 `main` 手动运行。矩阵独立处理四个来源，关闭 fail-fast。一个来源失败不取消其他来源，运行仍保留失败结果。[调度入口](../scripts/upstream-pr.ts)仅接受固定来源名；准备步骤不传入发布令牌。
 
-Modern Web 的 npm 准备器完整更新 CLI、索引、指南和许可证。Rust 与属性测试复用 [Git 获取器](../scripts/upstream-git.ts)，固定仓库身份、前向提交和已选文件，核对 Git blob 与文件摘要。下载内容不执行。[Modern Web 适配器](../scripts/upstream-modern-web.ts)、[Rust 适配器](../scripts/upstream-rust-api.ts)与[属性测试适配器](../scripts/upstream-property-testing.ts)分别产生受限变更，再交给[公共发布器](../scripts/upstream-publish.ts)。
+Modern Web 的 npm 准备器完整更新 CLI、索引、指南和许可证。两个 Rust 参考与属性测试复用 [Git 获取器](../scripts/upstream-git.ts)，固定仓库身份、前向提交和已选文件，核对 Git blob 与文件摘要。下载内容不执行。[Modern Web 适配器](../scripts/upstream-modern-web.ts)、[Rust 参考适配器](../scripts/upstream-reference.ts)与[属性测试适配器](../scripts/upstream-property-testing.ts)分别产生受限变更，再交给[公共发布器](../scripts/upstream-publish.ts)。Microsoft 的固定来源与章节由[来源模块](../scripts/microsoft-rust-source.ts)拥有。
 
 无相关更新时不创建分支或空 PR。每个来源版本使用独立分支；同版本已有任何状态的 PR 时不再创建。同一来源已有其他版本待审时先等待。遗留分支、基线变化或写入结果未知均停止，由维护者核对原对象后恢复。自动化不覆盖人工提交、不重开已关闭 PR、不强推，也不自动合并或安装。
 
@@ -224,10 +225,12 @@ Modern Web 的 npm 准备器完整更新 CLI、索引、指南和许可证。Rus
 
 [来源锁](../config/rust-api-guidelines-source.json)中的 `revision` 表示候选原件提交，`assessment.revision` 表示已评估提交。自动准备保留旧评估，因此草稿 PR 的当前来源检查预期失败。不得靠删除检查、伪造结论或标记 ready 绕过评估。
 
+本流程也适用于 [Microsoft 来源锁](../config/microsoft-rust-source.json)，其范围为六个映射章节与 MIT 许可证。两个来源分别创建草稿，但都绑定同一 `rust.md`。修改政策后须对照两组已采用章节重新评估，再更新各自摘要；不能只重算摘要掩盖语义冲突。无关章节更新不会自动扩大采用范围。
+
 1. 核对 PR 的固定上游比较链接、变更原件和许可。范围是命名、类型安全、灵活性、互操作性四章及两份许可证。准备器的章节映射指向受影响 `rust.md` 段落。
 2. 对照现有政策，决定采纳、保留或不适用。只实施已确定的本地规则变化；保留项目采用范围、业务值类型与调用方控制等既有边界。
 3. 将 `rust.md` 的已评估引用更新到该上游提交。编辑来源锁的 `assessment`，填写同一提交、每个选中输入的明确结论及理由，并绑定最终政策的 SHA-256。无规则变化时仍说明原因。
-4. 运行 `.cache/agents-tools/bin/node scripts/rust-api-source.ts --check`，再执行本节约定的完整门禁。政策的任意后续编辑都会使旧摘要失效；原件变更不能沿用旧提交的评估。
+4. 运行 `.cache/agents-tools/bin/node scripts/rust-api-source.ts --check` 与 `.cache/agents-tools/bin/node scripts/microsoft-rust-source.ts --check`，再执行本节约定的完整门禁。政策的任意后续编辑都会使旧摘要失效；原件变更不能沿用旧提交的评估。
 5. 完成评估后将草稿标记 ready，按正常代码审查、所需安全审查、CI 和获授权合并执行。合并后从受检版本更新本机并回读；评估原件不安装到产品目录。
 
 政策摘要可用以下只读命令计算。写回评估仍是维护者明确完成的动作。

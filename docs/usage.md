@@ -140,7 +140,7 @@
 
 工具技能按完整单元交付。入口、引用、必要资产、执行器、测试与许可证共同验收。来源记录保留原件身份和采用范围。跨技能调用使用可用安装名。内部引用从物理安装目录解析，保持完整可达。清单决定成员与产品，不授予业务权限。新增入口同步登记、反例与完整门禁。不得删减清单来绕过缺失能力。
 
-Rust、专项审查与测试、Web 和小程序源码质量的候选取舍见[来源登记](skill-sources.md#code-quality-maintenance)。来源准备、本地适配、更新 PR 与安装的分工见[维护架构](tooling.md#上游内容维护架构)。每周任务覆盖 Modern Web Guidance 发布包、Rust API Guidelines 参考章节和属性测试技能原件。Rust 更新须[完成评估](tooling.md#rust-api-guidelines-评估)，属性测试更新须[完成适配](tooling.md#属性测试技能适配)，草稿候选才可交付。
+Rust、专项审查与测试、Web 和小程序源码质量的候选取舍见[来源登记](skill-sources.md#code-quality-maintenance)。来源准备、本地适配、更新 PR 与安装的分工见[维护架构](tooling.md#上游内容维护架构)。每周任务覆盖 Modern Web Guidance 发布包、Rust API Guidelines 与 Microsoft Rust Guidelines 参考章节，以及属性测试技能原件。Rust 更新须[完成评估](tooling.md#rust-api-guidelines-评估)，属性测试更新须[完成适配](tooling.md#属性测试技能适配)，草稿候选才可交付。
 
 合并遵循目标项目的有效合同（本仓库采用[重建期规则](review-gate.md#重建期交付规则)，其他目标按[通用合并准入规则](../delivery/policy/review.md#merge-admission)核对）。已采用的上游工具不为统一语言而改写；无实际调用方的历史脚本不自动恢复；实际服务、模型与个人安装分别取得授权并回读。
 

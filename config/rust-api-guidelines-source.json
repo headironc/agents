@@ -50,7 +50,7 @@
   ],
   "assessment": {
     "revision": "97a0969cb07fe4cabb0eed8a56234053f47d83dc",
-    "policySha256": "2d39908f085f599a7bc78af00746b4a26528a69b2999fb5f13bd7337c8aaeba1",
+    "policySha256": "afde2b9de73d5fd2c03105bfd7731ba9cabd9dfb58e4fd20341f40172c1d90ee",
     "decisions": [
       {
         "source": "LICENSE-APACHE",

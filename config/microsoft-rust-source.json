@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "repository": "microsoft/rust-guidelines",
+  "repositoryId": 1020012680,
+  "branch": "main",
+  "revision": "9585e288d21d2da994a0550c926a09b62d79f8bd",
+  "files": [
+    {
+      "source": "LICENSE.md",
+      "target": "config/upstream/microsoft-rust-guidelines/LICENSE.md.txt",
+      "bytes": 1141,
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+      "blob": "9e841e7a26e4eb057b24511e7b92d42b257a80e5"
+    },
+    {
+      "source": "src/guidelines/correctness/M-UNSAFE.md",
+      "target": "config/upstream/microsoft-rust-guidelines/src-guidelines-correctness-M-UNSAFE.md.txt",
+      "bytes": 3050,
+      "sha256": "a468a08f2dfe4428ac789c5674be1b1797210a2846f1fdb82f3c4234a1758e08",
+      "blob": "4c3b6dd247bf9b3faaaabebba51e11533b151ed7"
+    },
+    {
+      "source": "src/guidelines/correctness/M-UNSOUND.md",
+      "target": "config/upstream/microsoft-rust-guidelines/src-guidelines-correctness-M-UNSOUND.md.txt",
+      "bytes": 2394,
+      "sha256": "5b50a3b0d004c58434fef93ba98a47ba50e7088a0ae834b81a9be00d3314de69",
+      "blob": "1adb469767e50c03bdbf9f6690447338a62dcdab"
+    },
+    {
+      "source": "src/guidelines/ffi/M-FFI-TRANSLATES.md",
+      "target": "config/upstream/microsoft-rust-guidelines/src-guidelines-ffi-M-FFI-TRANSLATES.md.txt",
+      "bytes": 1964,
+      "sha256": "0ce63fc687739527220bef6e114319fca1d9cbc0db1806c5148313dc244dbf50",
+      "blob": "1020aeacc7cca34008b17fe638c54c0f25461fa3"
+    },
+    {
+      "source": "src/guidelines/libs/building/M-FEATURES-ADDITIVE.md",
+      "target": "config/upstream/microsoft-rust-guidelines/src-guidelines-libs-building-M-FEATURES-ADDITIVE.md.txt",
+      "bytes": 991,
+      "sha256": "e09fba5def8df3a96fb999ad27ca96746a34dd5ef65cf0632b54fbfbba98119c",
+      "blob": "7d8a3bb229b0591df7763429f4017a7bbbc1bcce"
+    },
+    {
+      "source": "src/guidelines/performance/M-HOTPATH.md",
+      "target": "config/upstream/microsoft-rust-guidelines/src-guidelines-performance-M-HOTPATH.md.txt",
+      "bytes": 2101,
+      "sha256": "b5b10b25693c65245a03c82c15c984dd4ef482d9b7ecc93a8036ff94854ab7be",
+      "blob": "0d27ba669e12c906bd3a2cba236c2bda4218fcc8"
+    },
+    {
+      "source": "src/guidelines/performance/M-YIELD-POINTS.md",
+      "target": "config/upstream/microsoft-rust-guidelines/src-guidelines-performance-M-YIELD-POINTS.md.txt",
+      "bytes": 1805,
+      "sha256": "dd3bf7613e38c4566eb29634e48af1899dad0ebef2bda096906a98e1c7112b3b",
+      "blob": "87911da77a9f49b119da51a35c119ee37d1e4a32"
+    }
+  ],
+  "assessment": {
+    "revision": "9585e288d21d2da994a0550c926a09b62d79f8bd",
+    "policySha256": "afde2b9de73d5fd2c03105bfd7731ba9cabd9dfb58e4fd20341f40172c1d90ee",
+    "decisions": [
+      {
+        "source": "LICENSE.md",
+        "decision": "retained",
+        "reason": "Preserve the complete MIT license and copyright with maintenance originals; no upstream agent entrypoint or wholesale policy text is installed."
+      },
+      {
+        "source": "src/guidelines/correctness/M-UNSAFE.md",
+        "decision": "adopted",
+        "reason": "Require a justified small unsafe boundary, operation-specific safety arguments and adversarial validation. Use Miri where supported without claiming that it proves soundness or silently waiving missing coverage."
+      },
+      {
+        "source": "src/guidelines/correctness/M-UNSOUND.md",
+        "decision": "adopted",
+        "reason": "Safe APIs must uphold memory safety for all permitted safe calls, including panic and reentrancy. Preserve private invariant boundaries; an unenforceable caller safety precondition requires an unsafe API."
+      },
+      {
+        "source": "src/guidelines/ffi/M-FFI-TRANSLATES.md",
+        "decision": "adopted",
+        "reason": "Separate FFI representation and ownership translation from business logic, with explicit errors and unwind contracts. Do not require a new crate for every adapter; project delivery ownership remains authoritative."
+      },
+      {
+        "source": "src/guidelines/libs/building/M-FEATURES-ADDITIVE.md",
+        "decision": "adopted",
+        "reason": "Public library features should compose additively with declared feature dependencies. Retain project-owned toolchains, platform/backend restrictions and supported-combination checks instead of a universal all-features command."
+      },
+      {
+        "source": "src/guidelines/performance/M-HOTPATH.md",
+        "decision": "adopted",
+        "reason": "Require representative optimized-build baselines and equivalent measurements for performance changes. Do not import specific benchmark packages, allocator choices, anecdotal speedups or mandatory profiling for unrelated tasks."
+      },
+      {
+        "source": "src/guidelines/performance/M-YIELD-POINTS.md",
+        "decision": "adopted",
+        "reason": "Prevent executor starvation through supported compute/blocking facilities or bounded cooperative work. Do not assume every await yields or import a universal microsecond interval; ready futures can continue without yielding."
+      }
+    ]
+  }
+}
