@@ -11,6 +11,8 @@ Shared macOS skill for native `.sketch` work through Sketch 2026.3+ MCP and the 
 
 Follow the host's adopted model and collaboration policy. In Codex, the installed `policy/models.md` owns design and screenshot-review routing; this skill does not redefine that route or extend it to other products.
 
+Before saving or reopening, closing conflicting copies, importing Library assets, changing shared styles, auditing overrides, or cleaning native resources, read [identity and mutation handling](references/identity-and-mutations.md). This also applies to diagnosis and read-only review of those operations; reading a repair procedure does not authorize executing it.
+
 ## 0. Scope and Required Reusable Library
 
 ### Bind the Project Contract and Operation
@@ -41,7 +43,8 @@ The native MCP tools are `get_guide`, `get_document_info`, `get_layer_tree_summa
 
 ### Resolve the Document and Inspect Before Editing
 
-- Inspection, asset, override, and screenshot tools take an open document's `targetDocumentID`. Resolve it through `sketch.Document.getDocuments()` or open the exact file with `sketch.Document.open('/absolute/path/to/design.sketch', (err, doc) => { ... })` in `run_code`. Never substitute offline archive parsing when no document is open.
+- Bind the full source path and document ID using `sketch.Document.getDocuments()`, or open the exact file with `sketch.Document.open('/absolute/path/to/design.sketch', (err, doc) => { ... })` in `run_code`. Inspection, asset, override, and screenshot tools take `targetDocumentID`, but two open copies can share that ID. Resolve the path ambiguity before using those tools; a missing layer may mean the tool selected the other copy. Never substitute offline archive parsing when no document is open.
+- Before closing a conflicting copy, establish ownership, authorization, and preservation of unsaved work. Missing dirty state does not prove a clean document; follow the [copy and closure procedure](references/identity-and-mutations.md#document-identity-and-safe-closure).
 - Use `get_document_info({ targetDocumentID })` for Pages, counts, and frame bounds, then `get_layer_tree_summary({ targetDocumentID, layerID, depth })` for the relevant subtree (`depth`: `1..10`).
 - Reserve `sketch.find(predicate, root)` for targeted type, UUID, or property queries. For multi-frame scans, recurse cached `node.layers` in JavaScript rather than repeatedly invoking `sketch.find('*', frame)` over large trees.
 - Check `layer.isGraphicFrame` before `layer.isFrame`: Frames, Graphics, and plain Groups all report `type === 'Group'`, and Graphics report both flags as true.
@@ -49,7 +52,7 @@ The native MCP tools are `get_guide`, `get_document_info`, `get_layer_tree_summa
 ### Discover Assets and Overrides
 
 - Use `get_libraries({ targetDocumentID })` and `get_design_assets({ targetDocumentID, kind, nameContains, sourceLibraryID })`. Supported asset kinds include `symbol`, `swatch`, `textStyle`, `layerStyle`, `frameTemplate`, and `graphicTemplate`. Bind filters to discovered Library and asset identities.
-- Import and assign native references, for example `const inst = ref.import().createNewInstance()` or `override.swatchValue = swatchRef.import()`. Confirm that the consumer retains the reference.
+- Import from the verified Library, cache the returned object, and use its actual identity and consumer assignment. Source IDs can change during import; follow [Library import identity](references/identity-and-mutations.md#library-import-identity).
 - Before overriding an instance, call `get_symbol_overrides({ targetDocumentID, symbolInstanceID, kind })` and obtain `commonOverrideIDPrefix`. Here `kind` is `'text' | 'color' | 'image' | 'all'`; do not pass `layerID` in place of `symbolInstanceID`.
 
 ### `run_code` Safety and Performance
@@ -86,23 +89,17 @@ Use native imported symbols, swatches, and shared text/layer styles. Saving a Li
 
 For an authorized shared change, identify affected consumers and validate a representative consumer before wider propagation. Update the registered resource only where the actual setup requires it and authorization covers it. In affected consumers, call `syncWithLibrary()` on the changed imported `SymbolMaster`, `Swatch`, or `SharedStyle`, and `resizeWithSmartLayout()` on affected instances as appropriate. Verify references, layout, screenshots, and saved results. Do not blanket-sync unrelated consumers. Batch order, parallelism, and Human acceptance follow the existing project delivery policy and effective authorization; this skill adds no file-count trigger or approval gate.
 
+Before authorized resource removal, migrate real consumers and follow [native collection cleanup](references/identity-and-mutations.md#native-collection-cleanup). Preserve retained identities; never replace whole collections to remove a few items.
+
 ### Native Overrides and Reference Integrity
 
 Drive supported variations with `commonOverrideIDPrefix + '_' + property`, without arbitrary `detach()`. Relevant properties include `stringValue`, `symbolID`, `isVisible`, `preservesSpaceWhenHidden`, `swatchValue`, `color:fill-N`, `color:border-N`, `textColor`, `fillColor`, `textStyle`, `layerStyle`, `horizontalSizing`, `verticalSizing`, `image`, `imageResizeBehavior`, and `flowDestination`. Preserve API semantics, such as image resize values `2` for Fit and `3` for Fill, as defined by the installed guide; these are not visual tokens.
 
-After swapping a nested `<prefix>_symbolID`, clear stale overrides under that prefix that refer to the former master's child IDs, or duplicate a clean compatible template instance and reapply intended values. For example, `Control/Rest` to `Control/Focused` is an illustrative swap, not a required naming scheme. Preserve unrelated overrides and verify zero dangling `unresolvedOverrides` and no broken imported references.
+After a nested symbol swap or during override review, follow [public override verification](references/identity-and-mutations.md#public-override-verification). Preserve intended overrides and verify references and rendering. An undefined `unresolvedOverrides` is not a zero count or proof of exhaustive cleanup.
 
 ### Editable Containers, Styles, and Reflow
 
-- Build UI containers with `sketch.Group.Frame` and proportional icons or illustrations with `sketch.Group.Graphic`. Do not create legacy plain Groups or convert Frames to them. During authorized edits, use `convertToFrame()` or `convertToGraphic()` according to the layer's role; preserve existing Graphics. Use `background: { enabled: false }` for transparent wrappers.
-- Apply container fills, borders, dividers, shadows, and corners through native styles, including `sharedStyle`, Swatch-linked `style.fills`, `style.borders`, and per-side `border.sides`. When a child shape merely duplicates container chrome, transfer its intended styling before removing that specific redundant layer by ID. Keep independent vector artwork, masks, and other shapes with a real design purpose. A name such as `background` or `divider` is a search clue, never sufficient evidence for deletion.
-- Prefer the selected Library's focus treatment or native borders/shadows over redundant external focus rectangles. Measure the actual ring and ancestor clipping. Adjust clipping or available inset as appropriate, while preserving intentional scroll clipping; verify the whole focus indicator remains visible. No universal ring offset, padding, or variant name applies.
-- Reuse Library icons where suitable. For missing icons within scope, use editable vector geometry such as `ShapePath.fromSVGPath` in a Graphic, with the Library's stroke, caps, joins, size, and alignment. Do not substitute an arbitrary single-character Text glyph for a UI icon. Intentional text or symbols remain text when that is their actual semantic role.
-- Default flow-based UI regions to `stackLayout` (`Direction.Row` / `Direction.Column`, `gap`, `padding`, `wraps`, `bordersAffectLayout`) so content changes reflow siblings. Use fixed positioning for genuinely fixed or overlapping compositions, verifying the required variants. Highest `parent.layers` index renders first in a Stack; reorder through `layer.index = n` and `stackLayout.apply()`, not `parent.layers = [...]`.
-- Use `FlexSizing.Fixed`, `Fit`, `Fill`, `Relative`, `minSize`, and `maxSize` according to the component's geometry. Lock genuinely fixed-size icons, avatars, and indicators on both axes; do not let `Fill` stretch them or force accidental wrapping. Fit single-line labels and allow multiline text to fill its intended available width without an arbitrary minimum-width rule. Run `resizeWithSmartLayout()` after relevant text overrides.
-- After changing text or child geometry, recompute legacy non-Stack ancestor bounds from the inner container outward. Verify subsequent controls and the outer frame still fit. Text must show all intended lines; siblings must have no unintended overlap, and child overflow must match an explicit design purpose such as focus, overlays, or scrolling. Bounding-box collisions are diagnostic candidates, not proof that intentional overlap is wrong.
-- For trees and other connectors, verify the intended parent/child relationship, endpoint alignment, spacing, continuity, and termination at the last visible descendant. Avoid crossings through controls or dividers. Derive geometry from actual rows and the component contract rather than prescribing a gap or an L-shaped ending.
-- Resolve theme surfaces by semantic role, contrast, and design intent, including nested containers. A dark theme may intentionally use a light emphasis surface. Use `CornerStyle.Smooth`, `corners.concentric = true`, or `style.tint = { swatch }` only when the chosen design calls for them. Process pending changes with `doc.processPendingChanges()` after relevant Swatch, shared-style, or corner updates, then inspect the result.
+Before creating, editing, or reviewing containers, styling, icons, or reflow, read [native layout requirements](references/native-layout.md). Use editable Frame/Graphic containers, native styles, and flow-based Stack layouts where appropriate. Verify complete text, intended sizing, visible focus, connectors, theme roles, and absence of unintended overlaps. Shared-style corner failures require the [local or foreign style procedure](references/identity-and-mutations.md#shared-style-corners); inspect partial writes before retrying.
 
 ## 4. Pages, States, and Canvas Organization
 
@@ -142,11 +139,13 @@ Refresh, retry, recovery, back navigation, draft saving, cancel, and submit acti
 
 ## 6. Screenshot, Save, and Final Acceptance
 
-After each visual or layout change, use `get_screenshot({ targetDocumentID, layerID })` on the affected result. Check hierarchy, alignment, spacing, complete text, focus visibility, intended theme roles, connectors, and bounds. Inspect affected instances after Library changes as well as the Library source. Keep screenshots tied to the exact candidate and layer IDs; old screenshots do not validate subsequent edits.
+After each visual or layout change, use `get_screenshot({ targetDocumentID, layerID })` on the affected result after resolving any same-ID open-document ambiguity by full path. Check hierarchy, alignment, spacing, complete text, focus visibility, intended theme roles, connectors, and bounds. Inspect affected instances after Library changes as well as the Library source. Keep screenshots tied to the exact candidate path, document identity, and layer IDs; old screenshots do not validate subsequent edits.
 
 Export durable previews to the authorized location when required. For example, `sketch.export(layer, { output: '/absolute/output/directory', filename: 'preview.png', formats: ['png'], scales: ['2.0'], overwriting: true })` uses an absolute directory, not `output: false`. These path, filename, and scale values illustrate invocation, not delivery policy; permit overwrite only for the bound output.
 
-For edited candidates, save with `doc.save()`, verify the saved path and zero duplicate IDs using `sketchtool duplicates <file>` without repair options, then reopen the saved candidate through native tools. Verify Library references, overrides, layout, required interactions, and screenshots of affected content after reopening. Close only task-owned documents when safe, preserving unrelated unsaved work. For read-only review, report the observed candidate and any limits without save, repair, or host changes.
+For existing edited candidates, use the no-path `doc.save()` for an in-place save and follow [saving with identity preservation](references/identity-and-mutations.md#saving-with-identity-preservation). Path-taking saves and recovery copies can change identity. Verify the document ID, path, Library ID, and real source before and after saving and reopening.
+
+Verify zero duplicate IDs using `sketchtool duplicates <file>` without repair options, then reopen the exact saved candidate through native tools. Verify Library references, public overrides, layout, required interactions, and screenshots of affected content after reopening. Close only task-owned documents when safe, preserving unrelated unsaved work. For read-only review, report the observed candidate and any limits without save, repair, or host changes.
 
 Final review must cover:
 
