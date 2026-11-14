@@ -422,6 +422,7 @@ test("explicit Antigravity selection contains its platform-compatible skills and
       "antigravity:policy/writing.md",
       "antigravity:project-guide",
       "antigravity:property-based-testing",
+      "antigravity:rust-risk-review",
       ...(process.platform === "darwin" ? ["antigravity:sketch-native"] : []),
       "antigravity:tools/check-ids.mjs",
       "antigravity:tools/check-prose.mjs",

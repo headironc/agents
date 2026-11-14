@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "repository": "trailofbits/skills",
+  "repositoryId": 1134447175,
+  "branch": "main",
+  "revision": "149d7b21f4067765b82e67029730b42d228ef4b4",
+  "files": [
+    {
+      "source": "LICENSE",
+      "target": "config/upstream/rust-risk-review/LICENSE.txt",
+      "bytes": 20131,
+      "sha256": "7abe19ec9bb73b36141b999b861d24ad855e808bafe0f81e84cce28556f6c297",
+      "blob": "3b7b82d0da2db857eda1a798dbd908ea136f07b5"
+    },
+    {
+      "source": "plugins/rust-review/prompts/general/cancel-safety-finder.md",
+      "target": "config/upstream/rust-risk-review/cancel-safety-finder.md.txt",
+      "bytes": 1227,
+      "sha256": "75fea515a1e818c90ec1ff024b7e3d595e4247fb8a9f6c5b2004baa56bc3c51c",
+      "blob": "df5fa5977a24d96c56f64f4cd8683f6e66faeee6"
+    },
+    {
+      "source": "plugins/rust-review/prompts/general/send-sync-bounds-finder.md",
+      "target": "config/upstream/rust-risk-review/send-sync-bounds-finder.md.txt",
+      "bytes": 2639,
+      "sha256": "8f27a590734113e7094f45f2b71d115e807e9eb35d33fe8de2883c403e7957f4",
+      "blob": "45270bc74724bad52fd274be3839be85c9ad5cc7"
+    },
+    {
+      "source": "plugins/rust-review/prompts/general/unsafe-sync-impl-finder.md",
+      "target": "config/upstream/rust-risk-review/unsafe-sync-impl-finder.md.txt",
+      "bytes": 3803,
+      "sha256": "88f21b78fc146827e10ddfe823ed34057aaaedcd834141cb1ef10f1c3c4d3d65",
+      "blob": "652e76fe3f8586aa1dff058261e39e0683d20d66"
+    },
+    {
+      "source": "plugins/rust-review/prompts/general/panic-unwind-unsafe-finder.md",
+      "target": "config/upstream/rust-risk-review/panic-unwind-unsafe-finder.md.txt",
+      "bytes": 3031,
+      "sha256": "30a82a7d83ee1cbea971a2d87f6e996db077c48fc1e6b1afbed3c27dd3d26459",
+      "blob": "362f33af3a4d7247541c589b4525754cc6d728e2"
+    },
+    {
+      "source": "plugins/rust-review/prompts/general/closure-ffi-finder.md",
+      "target": "config/upstream/rust-risk-review/closure-ffi-finder.md.txt",
+      "bytes": 3991,
+      "sha256": "e02de116960cd52bc81074e11a522ace6ab70fa4773fe9235c86d85154f7f36a",
+      "blob": "142b3fa29aa392dc8910410a0753608ac0b984a0"
+    },
+    {
+      "source": "plugins/rust-review/prompts/general/resource-exhaustion-finder.md",
+      "target": "config/upstream/rust-risk-review/resource-exhaustion-finder.md.txt",
+      "bytes": 2506,
+      "sha256": "d8a169f355cfa18d30177bb19171190c290890d51af8ebde996767c1e07098f5",
+      "blob": "d9e15b92a00023a2e31bb6f52852bf09ef7b0fb1"
+    },
+    {
+      "source": "plugins/rust-review/prompts/general/toctou-finder.md",
+      "target": "config/upstream/rust-risk-review/toctou-finder.md.txt",
+      "bytes": 1316,
+      "sha256": "87917e3b47b0f2c6ee83af499144dabca50bd91e7a87f63963c301582457e09f",
+      "blob": "e1352297cf825246769927737b982794c2e21666"
+    }
+  ],
+  "adaptation": {
+    "revision": "149d7b21f4067765b82e67029730b42d228ef4b4",
+    "files": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "7abe19ec9bb73b36141b999b861d24ad855e808bafe0f81e84cce28556f6c297"
+      },
+      {
+        "path": "SKILL.md",
+        "sha256": "5a85a851deb104745fa9ac6a83999cdae7aa972d40c9b44eb725eb328a7a103b"
+      },
+      {
+        "path": "references/async-and-threads.md",
+        "sha256": "a615a65df00cf9f2948a697ea3e34bbeea18f704a595cc1a83c8ac0ee174b673"
+      },
+      {
+        "path": "references/unsafe-and-ffi.md",
+        "sha256": "b59093728a4136f0cd8fd55e1a421a50dcf210294003668ecccd5b21ea5bdbbd"
+      },
+      {
+        "path": "references/resources-and-files.md",
+        "sha256": "1c31732ce3ebea61e4968b0993b1e8efcefa050d4af28265c62c703ab5c22b34"
+      }
+    ],
+    "decisions": [
+      {
+        "source": "LICENSE",
+        "decision": "retained",
+        "reason": "Retain the complete CC-BY-SA-4.0 license and attribute Trail of Bits and contributors without implying endorsement."
+      },
+      {
+        "source": "plugins/rust-review/prompts/general/cancel-safety-finder.md",
+        "decision": "adapted",
+        "reason": "Retain cancellation ownership and partial-side-effect analysis; reject detached tasks as a universal repair and require actual cancellation and retry contracts."
+      },
+      {
+        "source": "plugins/rust-review/prompts/general/send-sync-bounds-finder.md",
+        "decision": "adapted",
+        "reason": "Distinguish compiler-enforced Send and lifetime errors from a demonstrated unsafe escape; preserve legitimate local tasks and actual runtime API constraints."
+      },
+      {
+        "source": "plugins/rust-review/prompts/general/unsafe-sync-impl-finder.md",
+        "decision": "adapted",
+        "reason": "Review each manual auto-trait invariant across safe constructors, generic bounds and foreign-resource destruction; synchronization must protect all actual access and respect thread affinity."
+      },
+      {
+        "source": "plugins/rust-review/prompts/general/panic-unwind-unsafe-finder.md",
+        "decision": "adapted",
+        "reason": "Retain initialized-range and destructor tracing with reachable panic evidence; separate abort availability impact from unwind memory corruption and require exception-safe guards."
+      },
+      {
+        "source": "plugins/rust-review/prompts/general/closure-ffi-finder.md",
+        "decision": "adapted",
+        "reason": "Retain callback lifetime, in-flight invocation and foreign ownership checks; remove unverified universal version claims and require proof before catch_unwind or AssertUnwindSafe remedies."
+      },
+      {
+        "source": "plugins/rust-review/prompts/general/resource-exhaustion-finder.md",
+        "decision": "adapted",
+        "reason": "Trace attacker-controlled total cost, buffering and concurrency; verify upstream caps and effective cancellation rather than treating every allocation as a vulnerability."
+      },
+      {
+        "source": "plugins/rust-review/prompts/general/toctou-finder.md",
+        "decision": "adapted",
+        "reason": "Require attacker control and a security-relevant check/use race; distinguish validated handles and exclusive creation from protection of mutable ancestors."
+      }
+    ]
+  }
+}

@@ -219,6 +219,7 @@ test("the scheduled workflow runs only on main with bounded publishing permissio
         "rust-api-guidelines",
         "property-based-testing",
         "microsoft-rust-guidelines",
+        "rust-risk-review",
       ],
     },
   });
