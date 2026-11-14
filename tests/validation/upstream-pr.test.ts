@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { load } from "js-yaml";
@@ -11,6 +18,7 @@ import {
   sha256,
 } from "../../scripts/modern-web-source.ts";
 import { repositoryRoot } from "./fixtures.ts";
+import { applyModernWebImport } from "../../scripts/update-modern-web-guidance.ts";
 
 const base = "a".repeat(40),
   head = "b".repeat(40);
@@ -27,16 +35,15 @@ const original: UpdatePlan = {
     ),
   })),
 };
-function next(): UpdatePlan {
-  const plan = structuredClone(original);
-  plan.source.version = "1.0.1";
-  plan.source.tarball =
-    "https://registry.npmjs.org/modern-web-guidance/-/modern-web-guidance-1.0.1.tgz";
-  const file = plan.source.files.find((f) =>
-    f.target.endsWith("/guides/ui-components/dialog.md"),
-  )!;
+function next(previous = original): UpdatePlan {
+  const plan = structuredClone(previous);
+  const parts = previous.source.version.split(".");
+  parts[2] = String(BigInt(parts[2]!) + 1n);
+  plan.source.version = parts.join(".");
+  plan.source.tarball = `https://registry.npmjs.org/modern-web-guidance/-/modern-web-guidance-${plan.source.version}.tgz`;
+  const file = plan.source.files[0]!;
   const bytes = Buffer.from(
-    "Synthetic changed guide for API simulation only.\n",
+    `Synthetic source ${plan.source.version} for API simulation only.\n`,
   );
   file.bytes = bytes.length;
   file.sha256 = sha256(bytes);
@@ -44,10 +51,11 @@ function next(): UpdatePlan {
     bytes.toString("base64");
   return plan;
 }
-function server(plan: UpdatePlan, fault = "") {
+function server(plan: UpdatePlan, fault = "", root = repositoryRoot) {
   const writes: string[] = [];
   const calls: string[] = [];
-  const expected = changes(repositoryRoot, plan);
+  const expected = changes(root, plan);
+  const branch = `codex/update-modern-web-guidance-${plan.source.version}`;
   let committed = false,
     opened = false;
   const api: Api = async (method, endpoint, body?: any) => {
@@ -56,10 +64,7 @@ function server(plan: UpdatePlan, fault = "") {
       writes.push(endpoint);
       if (endpoint === "/graphql") {
         assert.equal(body.variables.input.expectedHeadOid, base);
-        assert.equal(
-          body.variables.input.branch.branchName,
-          "codex/update-modern-web-guidance-1.0.1",
-        );
+        assert.equal(body.variables.input.branch.branchName, branch);
         assert.deepEqual(body.variables.input.fileChanges, {
           additions: expected.additions,
           deletions: expected.deletions,
@@ -105,7 +110,7 @@ function server(plan: UpdatePlan, fault = "") {
             state: "closed",
             head: {
               repo: { id: repositoryId },
-              ref: "codex/update-modern-web-guidance-1.0.1",
+              ref: branch,
             },
           },
         ];
@@ -114,27 +119,25 @@ function server(plan: UpdatePlan, fault = "") {
           {
             head: {
               repo: { id: repositoryId },
-              ref: "codex/update-modern-web-guidance-1.0.2",
+              ref: "codex/update-modern-web-guidance-0.0.0",
             },
           },
         ];
       return [];
     }
     if (endpoint.includes("matching-refs"))
-      return fault === "orphan"
-        ? [{ ref: "refs/heads/codex/update-modern-web-guidance-1.0.1" }]
-        : [];
+      return fault === "orphan" ? [{ ref: `refs/heads/${branch}` }] : [];
     if (endpoint.endsWith("/heads/main"))
       return { object: { sha: fault === "base-drift" ? head : base } };
     if (endpoint.includes("/git/ref/"))
       return {
-        ref: "refs/heads/codex/update-modern-web-guidance-1.0.1",
+        ref: `refs/heads/${branch}`,
         object: { sha: committed ? head : base },
       };
     if (endpoint.includes("/git/commits/"))
       return {
         parents: [{ sha: base }],
-        message: "chore(upstream): update modern-web-guidance to 1.0.1",
+        message: `chore(upstream): update modern-web-guidance to ${plan.source.version}`,
         verification: { verified: fault !== "unsigned" },
       };
     if (endpoint.includes("/git/trees/")) {
@@ -177,7 +180,7 @@ test("no update performs no API calls; drift and malformed plans fail before wri
     await publish(repositoryRoot, original, async () => {
       throw new Error("unexpected API");
     }),
-    { status: "unchanged", version: "1.0.0" },
+    { status: "unchanged", version: source.version },
   );
   const drift = structuredClone(original);
   drift.source.gitHead = base;
@@ -253,7 +256,7 @@ test("later pages remain authoritative and later write failures are read back on
             {
               head: {
                 repo: { id: repositoryId },
-                ref: "codex/update-modern-web-guidance-1.0.2",
+                ref: "codex/update-modern-web-guidance-0.0.0",
               },
             },
           ];
@@ -277,6 +280,40 @@ test("later pages remain authoritative and later write failures are read back on
       failed.calls.at(-1)!,
       fault === "lost-pr" ? /^GET .*pulls\?/ : /^GET .*git\/ref/,
     );
+  }
+});
+
+test("publisher coverage survives successive updates of the baseline source lock", async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "upstream-pr-baseline-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const file of original.files) {
+    const destination = path.join(root, file.path);
+    mkdirSync(path.dirname(destination), { recursive: true });
+    writeFileSync(destination, Buffer.from(file.content, "base64"));
+  }
+  mkdirSync(path.join(root, "config"));
+  writeFileSync(path.join(root, modernWebLock), JSON.stringify(source));
+  let current = original;
+  for (let generation = 0; generation < 2; generation++) {
+    const candidate = next(current);
+    const fake = server(candidate, "", root);
+    assert.equal((await publish(root, candidate, fake.api)).status, "created");
+    applyModernWebImport(root, {
+      source: candidate.source,
+      files: new Map(
+        candidate.files.map((f) => [f.path, Buffer.from(f.content, "base64")]),
+      ),
+    });
+    assert.deepEqual(
+      await publish(root, candidate, async () => {
+        throw new Error("unexpected API");
+      }),
+      {
+        status: "unchanged",
+        version: candidate.source.version,
+      },
+    );
+    current = candidate;
   }
 });
 
