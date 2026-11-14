@@ -123,7 +123,7 @@ export function expectedTargets(
     target,
     link,
   ];
-  const antigravity = `${home}/.gemini/antigravity-cli`;
+  const antigravity = `${home}/.gemini/config`;
   const all = [
     pair(`${codex}/README.md`, `${snapshot}/delivery/README.md`),
     ...policies.map((name) =>
@@ -486,12 +486,54 @@ export function treeState(root: string): unknown[] {
     });
 }
 
+function useLegacyAntigravityAssets(plan: InstallPlan): void {
+  const root = plan.roots.antigravity?.path;
+  if (!root) return;
+  const current = path.join(root, "config");
+  const previous = path.join(root, "antigravity-cli");
+  const remap = (file: string) =>
+    file === current || file.startsWith(`${current}/`)
+      ? path.join(previous, path.relative(current, file))
+      : file;
+  for (const target of plan.targets)
+    if (target.product === "antigravity") target.path = remap(target.path);
+  const missing = new Set<string>();
+  for (const target of plan.targets) {
+    let directory = path.dirname(target.path);
+    while (!exists(directory)) {
+      missing.add(directory);
+      directory = path.dirname(directory);
+    }
+  }
+  plan.newDirectories = [...missing].sort();
+}
+
+/** Freeze V8 paths independently of the current publication layout. */
+export function v8Plan(prepared: { plan: InstallPlan; review: string }): {
+  plan: InstallPlan;
+  review: string;
+} {
+  const plan = structuredClone(prepared.plan);
+  useLegacyAntigravityAssets(plan);
+  plan.version = 8;
+  const { sha256: _digest, ...body } = plan;
+  plan.sha256 = canonicalDigest(body);
+  InstallPlanSchema.parse(plan);
+  const bytes = JSON.stringify(plan);
+  chmodSync(plan.run.plan, 0o600);
+  writeFileSync(plan.run.plan, bytes);
+  chmodSync(plan.run.plan, 0o400);
+  writeFileSync(prepared.review, bytes);
+  return { plan, review: prepared.review };
+}
+
 /** Materialize a legacy fixture's recorded layout; never migrate a user's deployment records. */
 export function legacyPlan(
   prepared: { plan: InstallPlan; review: string },
   version: 5 | 6,
 ): { plan: InstallPlan; review: string } {
   const plan = structuredClone(prepared.plan);
+  useLegacyAntigravityAssets(plan);
   assert.ok(plan.roots.codex && plan.roots.dsh);
   assert.equal(plan.roots.antigravity !== undefined, version === 6);
   const codexRoot = plan.roots.codex;

@@ -61,7 +61,7 @@ Node 和 Bun 的版本由 [package.json](../package.json) 指定。[tool-version
 
 成员解析器计算当前清单的产品数量。`.cache/agents-build/` 只保留安装器产物。
 
-安装器的构建命令生成 `.cache/agents-build/install.mjs`。它还生成 Zod、js-yaml 许可证 `install-licenses.txt`。工具安装器从同一已核验归档提取 Node 的唯一顶层许可证。它写到 `.cache/agents-tools/licenses/node-LICENSE`。完整门禁绑定这些文件与固定 Node，作为安装运行副本的输入。V8 安装计划在状态根的 `agents/install/<run-id>/` 保存候选和恢复运行副本，仅绑定显式选择的产品。V5/V6 保留 Codex 私有目录的原路径；V7 沿用记录中的产品布局。门禁在临时目录重建并比对，也在脱离依赖的位置运行 bundle。缺失或过期失败。
+安装器的构建命令生成 `.cache/agents-build/install.mjs`。它还生成 Zod、js-yaml 许可证 `install-licenses.txt`。工具安装器从同一已核验归档提取 Node 的唯一顶层许可证。它写到 `.cache/agents-tools/licenses/node-LICENSE`。完整门禁绑定这些文件与固定 Node，作为安装运行副本的输入。V9 安装计划在状态根的 `agents/install/<run-id>/` 保存候选和恢复运行副本，仅绑定显式选择的产品。V5/V6 保留 Codex 私有目录的原路径；V7/V8 沿用记录中的产品布局。门禁在临时目录重建并比对，也在脱离依赖的位置运行 bundle。缺失或过期失败。
 
 安装器只把已验证的候选原子替换到 `.cache/agents-tools/bin/`。归档缓存每次重新校验摘要。随后它流式读取唯一的目标成员并检查版本。已有可执行文件不能仅凭版本输出绕过归档验证。损坏缓存、目录或链接目标、未知格式及版本不匹配都会失败。失败工具的旧目标保持原样。先前已成功准备的工具和有效下载缓存保留。
 
@@ -81,7 +81,7 @@ Node 和 Bun 的版本由 [package.json](../package.json) 指定。[tool-version
 
 Antigravity CLI 的官方校验入口是 `agy plugin validate --strict --json`，见[插件文档](https://antigravity.google/docs/plugins)。固定版本为 1.4.12，由工具准备入口下载到仓库私有缓存。三个支持平台的归档先对照官方安装脚本所指 release manifest 的 SHA-512 核对，再把 SHA-256 固定在工具清单；保留原有全清单核验日期。准备过程只提取二进制并查询版本，不运行官方安装脚本，不修改个人 CLI。校验时把所选技能复制到临时插件目录，以最小 `plugin.json` 调用真实加载器校验。解析 JSON 后核对实际技能数量，并拒绝 error、warning 或不完整覆盖。此临时包装仅用于校验，交付仍是普通 Skills 目录。
 
-三个产品的格式校验均进入统一门禁。Antigravity 回归使用官方二进制验证有效技能、缺失 frontmatter、名称不匹配与空选择。固定工具版本和实际二进制进入源码身份报告。官方插件校验不证明普通全局目录已被发现、模型会按需使用技能或外部服务操作可用；`/skills` 的真实全局发现仍需在获准安装后核对。
+三个产品的格式校验均进入统一门禁。Antigravity 回归使用官方二进制验证有效技能、缺失 frontmatter、名称不匹配与空选择。固定工具版本和实际二进制进入源码身份报告。官方插件校验不证明普通全局目录已被发现、模型会按需使用技能或外部服务操作可用；CLI 的 `/skills` 与 App 新会话的真实全局发现仍须在获准安装后分别核对。
 
 各产品还分别检查完整发布引用。上游工具只校验其固定版本支持的技能格式，不证明完整客户端兼容性、加载或模型行为。新增产品字段时先核对上游支持范围。
 

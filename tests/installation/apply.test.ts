@@ -35,6 +35,7 @@ import {
   installFixture,
   legacyPlan,
   link,
+  v8Plan,
 } from "./fixtures.ts";
 
 function outcome(result: {
@@ -73,7 +74,7 @@ for (const product of ["codex", "dsh", "antigravity"] as const) {
     const roots = {
       codex: path.join(f.home, ".codex"),
       dsh: path.join(f.home, ".dsh"),
-      antigravity: path.join(f.home, ".gemini/antigravity-cli"),
+      antigravity: path.join(f.home, ".gemini/config"),
     };
     const selected = roots[product];
     const unselected = (["codex", "dsh", "antigravity"] as const).filter(
@@ -174,7 +175,7 @@ for (const product of ["codex", "dsh", "antigravity"] as const) {
     const f = installFixture(t, { products: [product] });
     const root = path.join(
       f.home,
-      product === "antigravity" ? ".gemini/antigravity-cli" : `.${product}`,
+      product === "antigravity" ? ".gemini/config" : `.${product}`,
     );
     const skills = path.join(root, "skills");
     mkdirSync(skills, { recursive: true });
@@ -255,10 +256,9 @@ for (const version of [5, 6] as const)
 
 test("V7 status reads the original Antigravity root and detects its drift", (t) => {
   const f = installFixture(t, { products: ["antigravity"] });
-  const { plan, review } = f.planned([
-    "--target",
-    "antigravity:policy/writing.md",
-  ]);
+  const { plan, review } = v8Plan(
+    f.planned(["--target", "antigravity:policy/writing.md"]),
+  );
   plan.version = 7;
   plan.roots.antigravity!.path = path.join(f.home, ".gemini/antigravity-cli");
   const { sha256: _digest, ...body } = plan;
@@ -278,12 +278,27 @@ test("V7 status reads the original Antigravity root and detects its drift", (t) 
   );
   f.put("delivery/policy/writing.md", "V8 replacement rules\n", 0o600);
   f.writeReport();
-  const upgraded = f.planned([
-    "--target",
-    "antigravity:policy/writing.md",
-    "--adopt",
-    "antigravity:policy/writing.md",
-  ]);
+  const upgraded = v8Plan(
+    f.planned(["--target", "antigravity:policy/writing.md"]),
+  );
+  // V8 replaced the same CLI path. Bind the drifted original as its adopted before-state.
+  upgraded.plan.targets[0]!.before = readTargetState(plan.targets[0]!.path);
+  upgraded.plan.targets[0]!.action = "replace";
+  upgraded.plan.targets[0]!.adopted = true;
+  upgraded.plan.targets[0]!.backup = path.join(
+    upgraded.plan.roots.backup.path,
+    upgraded.plan.run.id,
+    "0",
+  );
+  upgraded.plan.adopt = ["antigravity:policy/writing.md"];
+  upgraded.plan.newDirectories = [];
+  const { sha256: _upgradedDigest, ...upgradedBody } = upgraded.plan;
+  upgraded.plan.sha256 = canonicalDigest(upgradedBody);
+  const upgradedBytes = JSON.stringify(upgraded.plan);
+  chmodSync(upgraded.plan.run.plan, 0o600);
+  writeFileSync(upgraded.plan.run.plan, upgradedBytes);
+  chmodSync(upgraded.plan.run.plan, 0o400);
+  writeFileSync(upgraded.review, upgradedBytes);
   assert.equal(upgraded.plan.targets[0]!.path, plan.targets[0]!.path);
   assert.equal(
     outcome(f.cli(["apply", "--plan", upgraded.review])).status,
@@ -295,6 +310,134 @@ test("V7 status reads the original Antigravity root and detects its drift", (t) 
     readFileSync(plan.targets[0]!.path, "utf8"),
     "V8 replacement rules\n",
   );
+});
+
+test("V8 remains verifiable and recoverable across a V9 shared-asset installation", (t) => {
+  const f = installFixture(t);
+  const instructionSource = "delivery/products/antigravity/AGENTS.md";
+  const sourceFile = path.join(f.checkout, instructionSource);
+  const sourceMode = lstatSync(sourceFile).mode & 0o7777;
+  const currentInstructions = readFileSync(sourceFile, "utf8");
+  const legacyInstructions = currentInstructions.replaceAll(
+    "config/",
+    "antigravity-cli/",
+  );
+  assert.notEqual(legacyInstructions, currentInstructions);
+  f.put(instructionSource, legacyInstructions, sourceMode);
+  f.writeReport();
+  const globalInstructions = path.join(f.home, ".gemini/AGENTS.md");
+  mkdirSync(path.dirname(globalInstructions), { recursive: true });
+  writeFileSync(globalInstructions, "original global instructions\n");
+  const { plan, review } = v8Plan(
+    f.planned([
+      "--product",
+      "codex",
+      "--product",
+      "dsh",
+      "--product",
+      "antigravity",
+      "--adopt",
+      "antigravity:AGENTS.md",
+    ]),
+  );
+  const frozen = readFileSync(plan.run.plan);
+  assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
+  assert.equal(readReceipt(plan.run.receipt).version, 8);
+  assert.equal(outcome(f.cli(["status"])).status, "installed");
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+  assert.equal(readFileSync(globalInstructions, "utf8"), legacyInstructions);
+  const legacyAssets = plan.targets.filter(
+    (target) =>
+      target.product === "antigravity" && target.category !== "instructions",
+  );
+  const legacyStates = legacyAssets.map((target) =>
+    readTargetState(target.path),
+  );
+  assert.ok(
+    legacyAssets.every((target) =>
+      target.path.startsWith(path.join(f.home, ".gemini/antigravity-cli/")),
+    ),
+  );
+  assert.equal(existsSync(path.join(f.home, ".gemini/config")), false);
+
+  f.put(instructionSource, currentInstructions, sourceMode);
+  f.writeReport();
+  assert.ok(
+    f
+      .gaps(f.plan(["--product", "antigravity"]))
+      .some(
+        (gap) =>
+          gap.code === "adopt-required" && gap.key === "antigravity:AGENTS.md",
+      ),
+  );
+  const current = f.planned([
+    "--product",
+    "antigravity",
+    "--adopt",
+    "antigravity:AGENTS.md",
+  ]);
+  assert.equal(current.plan.version, 9);
+  const changedEntry = current.plan.targets.find(
+    (target) => target.key === "antigravity:AGENTS.md",
+  )!;
+  assert.equal(changedEntry.action, "replace");
+  assert.equal(changedEntry.adopted, true);
+  for (const target of legacyAssets)
+    assert.ok(
+      current.plan.reported.some(
+        (entry) =>
+          (typeof entry === "string" ? entry : entry.path) === target.path,
+      ),
+    );
+  assert.equal(
+    outcome(f.cli(["apply", "--plan", current.review])).status,
+    "installed",
+  );
+  assert.equal(outcome(f.cli(["status"])).status, "installed");
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", current.plan.run.receipt])).verified,
+    true,
+  );
+  assert.equal(readFileSync(globalInstructions, "utf8"), currentInstructions);
+  const oldVerification = verifyInstallation(plan.run.receipt, {
+    HOME: f.home,
+  });
+  assert.equal(oldVerification.verified, false);
+  assert.deepEqual(oldVerification.problems, [
+    { code: "target-not-installed", path: globalInstructions },
+  ]);
+  assert.deepEqual(
+    legacyAssets.map((target) => readTargetState(target.path)),
+    legacyStates,
+  );
+  assert.equal(
+    outcome(f.cli(["rollback", "--receipt", current.plan.run.receipt])).status,
+    "rolled-back",
+  );
+  assert.equal(outcome(f.cli(["status"])).status, "installed");
+  assert.equal(readFileSync(globalInstructions, "utf8"), legacyInstructions);
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+  assert.equal(
+    outcome(f.cli(["rollback", "--receipt", plan.run.receipt])).status,
+    "rolled-back",
+  );
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
+    true,
+  );
+  assert.equal(outcome(f.cli(["status"])).status, "none");
+  assert.equal(
+    readFileSync(globalInstructions, "utf8"),
+    "original global instructions\n",
+  );
+  assert.deepEqual(readFileSync(plan.run.plan), frozen);
+  assert.ok(legacyAssets.every((target) => !existsSync(target.path)));
 });
 
 test("retired Codex targets remain recoverable from a V7 record", (t) => {
@@ -314,7 +457,7 @@ test("retired Codex targets remain recoverable from a V7 record", (t) => {
     "--target",
     "codex:capability/codex.toml",
   ]);
-  assert.equal(plan.version, 8);
+  assert.equal(plan.version, 9);
   plan.version = 7;
   plan.targets = members.map(([category, relative], order) => {
     const source = path.join(plan.run.source, "delivery", relative);
@@ -533,7 +676,7 @@ test("selected review files and complete skills preserve other targets through r
 
 test("explicit products apply, read back and restore Antigravity without touching App settings or unlisted skills", (t) => {
   const f = installFixture(t);
-  const root = path.join(f.home, ".gemini/antigravity-cli");
+  const root = path.join(f.home, ".gemini/config");
   const existing = path.join(root, "skills/gh");
   mkdirSync(existing, { recursive: true });
   writeFileSync(path.join(existing, "SKILL.md"), "original\n");
@@ -565,7 +708,7 @@ test("explicit products apply, read back and restore Antigravity without touchin
     "antigravity:AGENTS.md",
   ]);
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
-  assert.equal(readReceipt(plan.run.receipt).version, 8);
+  assert.equal(readReceipt(plan.run.receipt).version, 9);
   for (const target of plan.targets)
     assert.deepEqual(
       readTargetState(target.path),
@@ -607,9 +750,63 @@ test("explicit products apply, read back and restore Antigravity without touchin
   );
 });
 
+test("V9 reports former CLI assets without changing them or user configuration", (t) => {
+  const f = installFixture(t, { products: ["antigravity"] });
+  const legacy = path.join(f.home, ".gemini/antigravity-cli");
+  const retained = [
+    "skills/gh/SKILL.md",
+    "skills/personal/SKILL.md",
+    "policy/review.md",
+    "tools/check-prose.mjs",
+    "capability/rust-lints.toml",
+    "settings.json",
+  ];
+  for (const file of retained) {
+    mkdirSync(path.dirname(path.join(legacy, file)), { recursive: true });
+    writeFileSync(path.join(legacy, file), `original ${file}\n`);
+  }
+  const shared = path.join(f.home, ".gemini/config");
+  mkdirSync(path.join(shared, "skills/personal"), { recursive: true });
+  writeFileSync(path.join(shared, "settings.json"), "personal settings\n");
+  writeFileSync(
+    path.join(shared, "skills/personal/SKILL.md"),
+    "personal skill\n",
+  );
+  const before = readTargetState(legacy);
+  const sharedBefore = readTargetState(shared);
+  const { plan, review } = f.planned();
+  const reported = plan.reported.map((entry) =>
+    typeof entry === "string" ? entry : entry.path,
+  );
+  for (const file of [
+    "skills/gh",
+    "skills/personal",
+    "policy/review.md",
+    "tools/check-prose.mjs",
+    "capability/rust-lints.toml",
+  ])
+    assert.ok(reported.includes(path.join(legacy, file)), file);
+  assert.ok(reported.includes(path.join(shared, "skills/personal")));
+  assert.ok(
+    plan.targets.every((target) => !target.path.startsWith(`${legacy}/`)),
+  );
+  assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
+  assert.deepEqual(readTargetState(legacy), before);
+  assert.equal(
+    readFileSync(path.join(shared, "settings.json"), "utf8"),
+    "personal settings\n",
+  );
+  assert.equal(
+    outcome(f.cli(["rollback", "--receipt", plan.run.receipt])).status,
+    "rolled-back",
+  );
+  assert.deepEqual(readTargetState(legacy), before);
+  assert.deepEqual(readTargetState(shared), sharedBefore);
+});
+
 test("a late Antigravity failure restores all three products", (t) => {
   const f = installFixture(t);
-  const directory = path.join(f.home, ".gemini/antigravity-cli/skills");
+  const directory = path.join(f.home, ".gemini/config/skills");
   mkdirSync(directory, { recursive: true });
   writeFileSync(path.join(directory, "unmanaged"), "keep\n");
   const { plan, review } = f.planned([
@@ -651,10 +848,7 @@ test("rollback retains third-party Antigravity changes and restores other select
     "antigravity",
   ]);
   outcome(f.cli(["apply", "--plan", review]));
-  const target = path.join(
-    f.home,
-    ".gemini/antigravity-cli/skills/gh/SKILL.md",
-  );
+  const target = path.join(f.home, ".gemini/config/skills/gh/SKILL.md");
   writeFileSync(target, "third-party change\n");
   const result = rollbackInstallation(plan.run.receipt, { HOME: f.home });
   assert.equal(result.status, "rollback-incomplete");

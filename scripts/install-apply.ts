@@ -103,7 +103,8 @@ function readRecord(
     value.version !== 5 &&
     value.version !== 6 &&
     value.version !== 7 &&
-    value.version !== 8
+    value.version !== 8 &&
+    value.version !== 9
   ) {
     throw new RecordVersionError(`Unsupported ${code} version: ${physical}`);
   }

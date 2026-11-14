@@ -7,7 +7,7 @@ metadata:
 
 # Sketch Native Workflow
 
-Use Sketch 2026.3+ MCP and the bundled `sketchtool` for native `.sketch` work on macOS. This skill is delivered to Codex, DeepSeek Harness, and Antigravity CLI, and skipped off macOS.
+Use Sketch 2026.3+ MCP and the bundled `sketchtool` for native `.sketch` work on macOS. This skill is delivered to Codex, DeepSeek Harness, and Antigravity App and CLI, and skipped off macOS.
 
 ## Bind the Task
 

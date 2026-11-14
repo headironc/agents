@@ -39,7 +39,7 @@ test("all native entries include the complete shared body once and only their ow
   const products = ["codex", "dsh", "antigravity"];
   for (const [index, file] of generatedInstructionPaths.entries()) {
     const output = readFileSync(path.join(root, file), "utf8");
-    const prefix = products[index] === "antigravity" ? "antigravity-cli/" : "";
+    const prefix = products[index] === "antigravity" ? "config/" : "";
     const sharedBody = `## Collaboration\n\nPreserve authorized work.\n\n[Checks](${prefix}policy/review.md#checks)`;
     assert.equal(output.split(sharedBody).length, 2);
     for (const product of products)
@@ -110,7 +110,7 @@ test("declared source links resolve from each native entry and retain fragments"
     "# Shared instructions\n[Policy](execution.md#workspaces) [Tool](../tools/check-prose.mjs) [Skill](../skills/gh/SKILL.md) [Here](#local) [Web](https://example.com/)\n";
   const adapter = "[Route](../policy/models.md#goals)\n";
   for (const product of ["codex", "dsh", "antigravity"] as const) {
-    const prefix = product === "antigravity" ? "antigravity-cli/" : "";
+    const prefix = product === "antigravity" ? "config/" : "";
     const output = renderInstructions(source, adapter, product);
     for (const target of [
       "policy/execution.md#workspaces",
