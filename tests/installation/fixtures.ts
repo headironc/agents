@@ -101,6 +101,7 @@ export const antigravityPolicies = [
   "execution",
   "rust",
   "sql",
+  "antigravity",
 ];
 export const tools = ["check-ids.mjs", "check-prose.mjs", "task-temp.mjs"];
 // The capability category, written out here the way the installation target table names it.
@@ -527,6 +528,23 @@ export function v8Plan(prepared: { plan: InstallPlan; review: string }): {
 } {
   const plan = structuredClone(prepared.plan);
   useLegacyAntigravityAssets(plan);
+  plan.targets = plan.targets
+    .filter((target) => target.key !== "antigravity:policy/antigravity.md")
+    .map((target, order) => ({
+      ...target,
+      order,
+      backup:
+        target.backup === null
+          ? null
+          : path.join(plan.roots.backup.path, plan.run.id, String(order)),
+    }));
+  if (plan.selectedTargets)
+    plan.selectedTargets = plan.selectedTargets.filter(
+      (key) => key !== "antigravity:policy/antigravity.md",
+    );
+  plan.adopt = plan.adopt.filter(
+    (key) => key !== "antigravity:policy/antigravity.md",
+  );
   plan.version = 8;
   const { sha256: _digest, ...body } = plan;
   plan.sha256 = canonicalDigest(body);
@@ -578,7 +596,7 @@ export function legacyPlan(
         if (
           target.category === "capability" ||
           target.category === "instructions" ||
-          /:policy\/(?:rust|sql)\.md$/.test(target.key)
+          /:policy\/(?:rust|sql|antigravity)\.md$/.test(target.key)
         )
           return [];
       }

@@ -23,6 +23,18 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | AGYINSTALL-11 | 新目录安装后，旧 CLI 根仍有同名受管技能、用户技能、漂移文件和设置 | 计划报告旧资产但不修改；获准退役时按旧回执核对匹配目标并可恢复归档，再核对 CLI 实际来源；保留未知与漂移内容 | 只验证新文件便宣称 CLI 使用新版，自动删除旧目录，整体回滚跨产品计划，或把 V9 rollback 当作旧归档恢复 |
 | AGYINSTALL-12 | 获准安装后，在临时空项目启动 App 新会话并检查 CLI 技能发现 | 原生全局规则自动进入新会话；当前平台的适用个人技能可发现，macOS 为五项；gh 可实际加载及读取认证参考，旧 gh-identity 无独立入口；分别记录客户端与版本 | 手工读取规则冒充自动加载，只用官方格式校验或文件存在证明发现，调用技能产生无关外部写入，或将 App 结果泛化为所有客户端 |
 
+## Antigravity 运行时、会话空间与子代理回传
+
+依据：[Antigravity 适配](../../delivery/rules/antigravity.md)、[Antigravity 使用支持](../../delivery/policy/antigravity.md)、[操作边界](../../delivery/policy/common.md#operation-boundaries)与[执行规则](../../delivery/policy/execution.md)。以下为静态行为预期，不证明真实子代理演练已运行。
+
+| ID | 输入与事件 | 可观察的预期 | 失败判据 |
+| --- | --- | --- | --- |
+| AGYRUN-01 | Antigravity 会话识别出持续偏好或规则缺口；UI 提供 `/learn`，工作区可发现 `.agents/`，全局规则位于生成的 `~/.gemini/AGENTS.md`（单文件硬上限 `24,000` 字节，常驻规则共享 `20,000` tokens 预算）；对照项为候选改动使生成入口超过 `24,000` 字节 | 不在受控业务工作树写未获授权的 `.agents/` 规则或技能充当隐式 memory，也不手改 `~/.gemini/AGENTS.md` 安装副本；在获授权范围内回到 `agents` 权威源维护，保持常驻入口凝练并将细则下沉至 `config/policy/antigravity.md`；生成入口超 `24,000` 字节时构建门禁直接阻断 | 借 `/learn` 或手写 `.agents/` 充当自由文本 memory 污染受控仓库，手改生成的 `~/.gemini/AGENTS.md`，或将长篇参考堆入常驻入口导致超 `24,000` 字节截断及挤占 `20,000` tokens 预算 |
+| AGYRUN-02 | 用户请求检视、代码审查或架构推演并声明“只读 / 不修改任何文件”，未禁止写入当前会话 `brain/`；对照项为用户显式禁止写入会话 `brain/`，或演练结束收尾 | 保持目标仓库工作树、外部材料与受管配置零修改（不在受检仓库写 `progress.md`、`spec.md` 或临时稿）；默认允许当前执行会话自身的 `<appDataDir>/brain/<conversation-id>/scratch/`（及明确要求的会话 Artifact）承载会话内草稿，收尾按 `execution.md` 清理无用临时产物；对照项显式禁止时严格不写 `brain/` | 把目标仓库只读约束机械套用到自身会话 `scratch/` 拒绝落盘长文，反过来在受检工作树写入临时锚点或报告，忽略用户对 `brain/` 的显式禁令，或收尾遗漏临时产物清理 |
+| AGYRUN-03 | Antigravity 子代理（含 `invoke_subagent`、`/boost` 或 `swarm` 下具备写工具的工作节点）在只读架构推演或审查中产出约 `50 KB`（超过 `send_message` 单条 `20,480` UTF-8 字节硬上限）的深度报告；子代理 `write_file` 仅能写自身 `brain/<self-conversation-id>/` | 子代理一次性将完整未删减报告写入子代理自身的 `<appDataDir>/brain/<self-conversation-id>/scratch/` 文件，经 `send_message` 回传该文件绝对路径与精炼结论摘要；父会话或协调器收到路径后用 `read_file` 读取全文，目标仓库保持零修改 | 指令子代理写父会话 `brain/` 目录触发拒绝，直接将超长正文塞入 `send_message` 被截断，或在循环中反复调用 `python3` / `wc -c` 测字节数并多轮破坏性删减正文直至耗尽上下文 |
+| AGYRUN-04 | 运行在无写工具只读沙箱中的子代理（如内置 `research`）产出较长调查结论，或子代理写自身 `scratch/` 时遇宿主拒绝；对照项为协调器派发预计产出长篇推演的子任务 | 只读沙箱或遇拒绝的子代理保留拒绝事实，按紧凑结构或有序分段一次回传，不做无界重算；对照项协调器在授权范围内选用具备写工具的子代理，明确要求写子代理自身 `brain/<self-conversation-id>/scratch/` 并回传路径供父会话 `read_file` 读取，同时保留受检仓库只读约束 | 尝试绕过沙箱或宿主拒绝强写文件，在无写权限子代理内反复重写测长空转，协调器要求子代理写入父会话 `brain/`，或明知需长篇报告仍强令无写工具节点单条全量回传 |
+| AGYRUN-05 | 主会话启动异步子代理、后台命令或 `schedule` 等待结果；子代理分别承担只读审查与获准并发编辑；另需回查会话 `transcript` | 派发后继续独立工作或结束回合等待系统事件唤醒；只读与单写者保持 `workspace: "inherit"`，仅并发隔离写者使用 `share` / `branch` 并在 `kill` 前验证合入改动；先读紧凑 `transcript.jsonl`，仅在出现 `truncated_fields` 时按对应行号读取 `transcript_full.jsonl` | 套用同步轮询循环查询状态或用 shell `sleep` 充当定时器，给只读子代理盲目分配隔离工作区，未合入改动即 `kill` 删除工作区，或全量加载 `transcript_full.jsonl` 撑爆上下文 |
+
 退役技能的专属流程场景已删除，原件与依据见[来源索引](../../docs/skill-sources.md#retired-workflows)。公共约束和仍适用的工具场景继续保留。真实工具边界由各自入口与离线测试验证。它们覆盖 Wechatide、阿里云、Sketch 与 gh。审查者 CLI 没有本仓库交付的执行器，只有契约与静态场景。
 
 ## 入口与按需阅读
