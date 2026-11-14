@@ -1,6 +1,6 @@
 # Agents
 
-本仓库维护可复用的代理规则、技能和配套工具。安装时显式选择 Codex、DeepSeek Harness (`dsh`) 或 Antigravity。三端共享通用规则，各自由原生 `AGENTS.md` 入口加载产品适配。Antigravity 的全局规则同时作用于 CLI 和 App，技能与工具保留现有 CLI 安装位置。技能成员以[技能清单](config/personal-skills.txt)为准；源码交付不代表个人环境已经启用。
+本仓库维护可复用的代理规则、技能和配套工具。安装时显式选择 Codex、DeepSeek Harness (`dsh`) 或 Antigravity。三端共享通用规则，各自由原生 `AGENTS.md` 入口加载产品适配。Antigravity 的全局规则与 `config/` 下的技能资产供 CLI 和 App 共享。技能成员以[技能清单](config/personal-skills.txt)为准；源码交付不代表个人环境已经启用。
 
 ## 规则与交付架构
 
@@ -65,7 +65,7 @@
 | 检查执行与报告 | [check.ts](scripts/check.ts)、[check-report.ts](scripts/check-report.ts)、`check-*.ts` | 本地 `check.sh` 与安装计划 |
 | 安装命令与计划 | [install.ts](scripts/install.ts) | `install.sh` 与独立安装器产物 |
 | 安装执行与恢复 | [install-apply.ts](scripts/install-apply.ts)、[install-current.ts](scripts/install-current.ts) | 安装命令与状态查询 |
-| 安装记录与目标状态 | [install-records.ts](scripts/install-records.ts)、[install-legacy.ts](scripts/install-legacy.ts)、[install-state.ts](scripts/install-state.ts) | V8 安装与历史 V5/V6/V7 回执恢复 |
+| 安装记录与目标状态 | [install-records.ts](scripts/install-records.ts)、[install-legacy.ts](scripts/install-legacy.ts)、[install-state.ts](scripts/install-state.ts) | V9 安装与历史 V5/V6/V7/V8 回执恢复 |
 | 源码快照与身份 | [source.ts](scripts/source.ts) | 检查报告、成员校验与安装计划 |
 | 产物构建与工具准备 | [build-instructions.ts](scripts/build-instructions.ts)、[bundle-tools.ts](scripts/bundle-tools.ts)、[build-install.ts](scripts/build-install.ts)、[install-tools.sh](scripts/install-tools.sh) | 原生指令、交付检查器、独立安装器与本地门禁 |
 

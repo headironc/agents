@@ -33,7 +33,7 @@ export const retiredV7CodexMembers = [
   ["capability", "capability/codex-sessions.toml"],
 ] as const;
 
-export function legacyFileMembers(version: 5 | 6 | 7): {
+export function legacyFileMembers(version: 5 | 6 | 7 | 8): {
   product: RecordedProduct;
   category: (typeof memberCategories)[number];
   relative: string;
@@ -45,6 +45,66 @@ export function legacyFileMembers(version: 5 | 6 | 7): {
     relative: string;
     source: string;
   }[] = [];
+  if (version === 8) {
+    // V8 introduced native global entries but kept every Antigravity asset under the CLI root.
+    // Freeze that publication map independently of subsequent delivery changes.
+    for (const product of ["codex", "dsh", "antigravity"] as const) {
+      const prefix = product === "antigravity" ? "antigravity-cli/" : "";
+      for (const name of [
+        "writing",
+        "tool-contracts",
+        "review",
+        "common",
+        "execution",
+        "rust",
+        "sql",
+        ...(product !== "antigravity" ? ["deepseek-harness"] : []),
+        ...(product === "codex" ? ["models", "antigravity"] : []),
+      ])
+        members.push({
+          product,
+          category: "policy",
+          relative: `${prefix}policy/${name}.md`,
+          source: `delivery/policy/${name}.md`,
+        });
+      for (const name of ["check-ids", "check-prose", "task-temp"])
+        members.push({
+          product,
+          category: "tool",
+          relative: `${prefix}tools/${name}.mjs`,
+          source: `delivery/tools/${name}.mjs`,
+        });
+      for (const name of [
+        "rust-lints.toml",
+        ...(product !== "antigravity"
+          ? ["README.md", "dsh-headless.patch.yml"]
+          : []),
+        ...(product === "codex" ? ["codex.toml"] : []),
+      ])
+        members.push({
+          product,
+          category: "capability",
+          relative: `${prefix}capability/${name}`,
+          source: `delivery/capability/${name}`,
+        });
+      members.push({
+        product,
+        category: "instructions",
+        relative: "AGENTS.md",
+        source:
+          product === "codex"
+            ? "delivery/AGENTS.md"
+            : `delivery/products/${product}/AGENTS.md`,
+      });
+    }
+    members.push({
+      product: "codex",
+      category: "guide",
+      relative: "README.md",
+      source: "delivery/README.md",
+    });
+    return members;
+  }
   // Freeze the pre-V8 publication map: current entrypoints and policy additions must not
   // reinterpret a persistent plan or prevent its original runtime from restoring it.
   for (const product of ["codex", "dsh", "antigravity"] as const) {
@@ -142,7 +202,7 @@ export function validLegacyProductRoots(
 }
 
 export function privateRunDirectory(
-  version: 5 | 6 | 7 | 8,
+  version: 5 | 6 | 7 | 8 | 9,
   roots: { state: { path: string }; codex?: { path: string } | undefined },
   id: string,
 ): string {

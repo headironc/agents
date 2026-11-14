@@ -155,7 +155,7 @@ export function publicMembers(
         .filter((member) => member.product === product)
         .map((member) =>
           product === "antigravity" && member.category !== "instructions"
-            ? { ...member, relative: `antigravity-cli/${member.relative}` }
+            ? { ...member, relative: `config/${member.relative}` }
             : member,
         ),
     );

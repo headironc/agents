@@ -6,9 +6,9 @@
 
 Antigravity 保留为可选安装产品。仓库交付原生全局规则入口、通用 Skills、必要合同和工具，不安装 CLI、账号、密钥或个人设置。具体交付入口见[交付内容](../README.md)。安装目标、格式校验与个人环境中的实际发现分别验收。
 
-原生全局规则使用 `~/.gemini/AGENTS.md`，供 App 与 CLI 共享。[官方规则发现说明](https://antigravity.google/docs/customization-discovery/)也列出 `~/.gemini/GEMINI.md`；不要把两者作为互不相关的规则安装位置。仓库将入口引用的共享政策、技能和工具保留在 `~/.gemini/antigravity-cli/`，这只是交付资产根，不是独立的原生全局规则根。
+原生全局规则使用 `~/.gemini/AGENTS.md`，供 App 与 CLI 共享。[官方规则发现说明](https://antigravity.google/docs/customization-discovery/)也列出 `~/.gemini/GEMINI.md`；不要把两者作为互不相关的规则安装位置。共享技能使用 `~/.gemini/config/skills/<name>/SKILL.md`，配套政策和工具位于同一 `config/` 资产根，保留相对引用。标准目录自动发现，无须写入 `skills.json`。
 
-CLI 技能通过 `/skills` 核对实际来源；同名共享技能可能影响优先级。安装清单、目标根与恢复操作由仓库安装合同维护。静态交付闭包不证明 App 或 CLI 在个人环境中的实际发现。
+App 不读取 `~/.gemini/antigravity-cli/skills/` 和 `~/.gemini/skills/`，CLI 则优先读取这两处旧目录。升级后核对同名旧副本的实际来源，按安装合同处理受管旧资产。CLI 通过 `/skills` 核对来源，App 通过已安装技能列表及新会话调用核验。静态交付闭包不证明个人环境中的实际发现。
 
 ## 直接使用与账号
 

@@ -30,7 +30,7 @@ export function renderInstructions(
   adapter: string,
   product: Product,
 ): string {
-  const prefix = product === "antigravity" ? "antigravity-cli/" : "";
+  const prefix = product === "antigravity" ? "config/" : "";
   const rewrite = (source: string): string => {
     let result = source;
     function visit(node: Root | RootContent): void {

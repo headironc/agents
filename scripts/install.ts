@@ -317,7 +317,7 @@ function deriveTargets(
     const key =
       member.category === "skill"
         ? path.basename(member.relative)
-        : member.relative.replace(/^antigravity-cli\//, "");
+        : member.relative.replace(/^config\//, "");
     drafts.push({
       kind: member.category === "skill" ? "directory" : "file",
       category: member.category,
@@ -473,7 +473,7 @@ function inspectUnlisted(
         .filter((member) => member.category === "skill")
         .map((member) => path.basename(member.relative)),
     );
-    const prefix = product === "antigravity" ? "antigravity-cli/" : "";
+    const prefix = product === "antigravity" ? "config/" : "";
     const skillDirectory = path.join(root.path, prefix, "skills");
     for (const name of list(skillDirectory))
       if (!members.has(name)) report(path.join(skillDirectory, name));
@@ -505,6 +505,13 @@ function inspectUnlisted(
             member.relative.slice(prefix.length + directory.length + 1),
           ),
       );
+    if (product === "antigravity") {
+      // Former CLI assets remain discoverable there; report each without claiming ownership.
+      for (const directory of ["skills", "policy", "tools", "capability"]) {
+        const previous = path.join(root.path, "antigravity-cli", directory);
+        for (const name of list(previous)) report(path.join(previous, name));
+      }
+    }
   }
   return reported;
 }
@@ -866,7 +873,7 @@ export function planInstallation(
       report.report.platform,
     );
     const body = {
-      version: 8,
+      version: 9,
       createdAt,
       run,
       review: args.output,

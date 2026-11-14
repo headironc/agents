@@ -156,7 +156,13 @@ const runId = z.string().regex(runIdPattern);
 
 export const InstallPlanSchema = z
   .strictObject({
-    version: z.union([z.literal(5), z.literal(6), z.literal(7), z.literal(8)]),
+    version: z.union([
+      z.literal(5),
+      z.literal(6),
+      z.literal(7),
+      z.literal(8),
+      z.literal(9),
+    ]),
     createdAt: z.iso.datetime({ precision: 3 }),
     run: z.strictObject({
       id: runId,
@@ -266,7 +272,7 @@ export const InstallPlanSchema = z
       relative: string;
       source: string;
     }[] =
-      plan.version === 8 ? publicMembers([]) : legacyFileMembers(plan.version);
+      plan.version === 9 ? publicMembers([]) : legacyFileMembers(plan.version);
     plan.targets.forEach((target, index) => {
       const inside = (root: string, file: string) => {
         const relative = path.relative(root, file);
@@ -279,9 +285,11 @@ export const InstallPlanSchema = z
       };
       const name = target.key.slice(target.product.length + 1);
       const prefix =
-        plan.version === 8 && target.product === "antigravity"
-          ? "antigravity-cli/"
-          : "";
+        target.product !== "antigravity" || plan.version < 8
+          ? ""
+          : plan.version === 8
+            ? "antigravity-cli/"
+            : "config/";
       const relative =
         target.category === "skill" ? `${prefix}skills/${name}` : name;
       const member =
@@ -432,7 +440,13 @@ function sameTarget(left: TargetState, right: TargetState): boolean {
  */
 export const InstallReceiptSchema = z
   .strictObject({
-    version: z.union([z.literal(5), z.literal(6), z.literal(7), z.literal(8)]),
+    version: z.union([
+      z.literal(5),
+      z.literal(6),
+      z.literal(7),
+      z.literal(8),
+      z.literal(9),
+    ]),
     plan: z.strictObject({ path: absolutePath, sha256: digest }),
     run: z.strictObject({ id: runId, directory: absolutePath }),
     // The persistent recovery command is `<node> <installer> rollback --receipt <receipt>`.

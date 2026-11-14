@@ -1,6 +1,6 @@
 # 交付与使用指南
 
-本仓库按产品交付 Skills 及必要依赖。安装支持 Codex、DeepSeek Harness (`dsh`) 和 Antigravity CLI。安装计划没有默认产品，只向明确选中的产品交付内容。三端接收按产品生成的全局 `AGENTS.md` 和适用政策；产品差异、工具与配置的归属见[规则与交付架构](../README.md#规则与交付架构)。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
+本仓库按产品交付 Skills 及必要依赖。安装支持 Codex、DeepSeek Harness (`dsh`) 和 Antigravity App 和 CLI。安装计划没有默认产品，只向明确选中的产品交付内容。三端接收按产品生成的全局 `AGENTS.md` 和适用政策；产品差异、工具与配置的归属见[规则与交付架构](../README.md#规则与交付架构)。本地验证入口覆盖各产品的交付内容。维护入口见 [README 导航](../README.md#维护导航)。执行证据按 [README 执行记录](../README.md#执行记录)绑定实际实例、任务、分支与候选；不继承旧仓库的全局交接。历史设计审查不覆盖后来的实现。
 
 按任务查阅：[阅读与采用](#阅读与采用)列出文档入口，[交付目录](#交付目录)说明源码布局。[产品选择与安装](#产品选择与安装)给出计划、应用与恢复步骤，[验证能说明什么](#验证能说明什么)列出证据边界。各技能的使用说明见本页对应章节。
 
@@ -109,7 +109,7 @@
 
 ## 阿里云技能发现
 
-[alibabacloud-find-skills](../delivery/skills/alibabacloud-find-skills/SKILL.md) 已交付给 Codex、DeepSeek Harness 与 Antigravity CLI。它适用于明确的阿里云技能发现请求，或已确认的能力缺口。已有匹配能力时直接使用。不要从普通阿里云关键词启动发现。
+[alibabacloud-find-skills](../delivery/skills/alibabacloud-find-skills/SKILL.md) 已交付给 Codex、DeepSeek Harness 与 Antigravity App 和 CLI。它适用于明确的阿里云技能发现请求，或已确认的能力缺口。已有匹配能力时直接使用。不要从普通阿里云关键词启动发现。
 
 入口负责需求拆分、搜索选择、互补技能和结果交接。[HTTP 参考](../delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md)拥有请求形式。[验证参考](../delivery/skills/alibabacloud-find-skills/references/verification-method.md)拥有响应和分页判据。[安装参考](../delivery/skills/alibabacloud-find-skills/references/installation.md)区分下载、安装与后续使用。[示例](../delivery/skills/alibabacloud-find-skills/references/search-examples.md)仅说明选择方法。来源、原件摘要和退役依据见[来源记录](skill-sources.md#alibabacloud-find-skills)。
 
@@ -166,7 +166,7 @@
 
 ## 产品选择与安装
 
-安装器已交付 plan、apply、verify 和 rollback。plan 必须至少传入一个 `--product`，值为 `codex`、`dsh` 或 `antigravity`。重复该参数可明确选择多个产品；没有默认双端安装。缺少选择、无效值或重复产品均返回参数错误，不创建计划。旧 `--include-product` 参数及已退役的 `claude` 产品名不再接受。在候选源码上完成构建和完整门禁后生成 V8 计划。未提交改动由门禁报告的源码身份绑定：
+安装器已交付 plan、apply、verify 和 rollback。plan 必须至少传入一个 `--product`，值为 `codex`、`dsh` 或 `antigravity`。重复该参数可明确选择多个产品；没有默认双端安装。缺少选择、无效值或重复产品均返回参数错误，不创建计划。旧 `--include-product` 参数及已退役的 `claude` 产品名不再接受。在候选源码上完成构建和完整门禁后生成 V9 计划。未提交改动由门禁报告的源码身份绑定：
 
 ```bash
 umask 077
@@ -181,7 +181,7 @@ bash scripts/install.sh plan --product codex --source "$PWD" --report .cache/rep
 
 DeepSeek Harness（`0.2.2-rc.1` 实测）的 `desktop` 与 `headless` 两个 profile 共同继承 `@deepseek-ai/dsh-base`，默认启用 `@deepseek-ai/dsh-agent-instructions`、`@deepseek-ai/dsh-skill`、`@deepseek-ai/dsh-skill-filesystem` 和 `@deepseek-ai/dsh-tool-skill`，并共享用户主目录 `${DSH_HOME:-$HOME/.dsh}`。全局指令按固定顺序先读取 `${DSH_HOME:-$HOME/.dsh}/AGENTS.md`，再读取 `${DSH_AGENTS_HOME:-$HOME/.agents}/AGENTS.md`（正文去首尾空白相同则去重），随后按从 Git 根到当前工作目录（`cwd`）由浅入深读取项目级 `AGENTS.md`、`CLAUDE.md`、`AGENTS.local.md` 与 `CLAUDE.local.md`（总上限 64 KiB；全局级不读取 `CLAUDE.md`）。技能发现按单层 `<root>/<name>/SKILL.md` 或 `<root>/<name>.md` 扫描（跳过 `.` 开头隐藏目录，单文件上限 256 KiB），优先级由高到低为：项目 `<projectRoot>/.dsh/skills`（`100`）> `<projectRoot>/.agents/skills`（`200`）> 自定义 `customSkillDirs`（`300`）> 用户级 `${DSH_HOME:-$HOME/.dsh}/skills`（`400`）> `${DSH_AGENTS_HOME:-$HOME/.agents}/skills`（`500`）> 内置技能目录（`600`）。因此 `--product dsh` 直接将规则与技能安装到 `${DSH_HOME:-$HOME/.dsh}`，桌面端与 `headless` 共享同一安装位置且无须额外开关即可自动加载指令与技能；用户原有的 `.credentials.yaml`、`.anonymous-user-id`、`profiles/`、`sessions/`、`storages/` 和 `attachments/` 保持原样。
 
-V8 将 Antigravity 产品根设为 `$HOME/.gemini`，原生全局入口为 `AGENTS.md`，同时作用于 CLI 和 App。既有 `antigravity-cli/skills/`、`policy/` 和 `tools/` 的实际路径不变；CLI 专属技能目录不会因此被 App 自动发现。安装器只管理交付清单中的目标，不创建 Plugin，不写 `settings.json`、发现 manifest、hooks 或 MCP 配置。已有同名规则与技能仍须按[官方发现规则](https://antigravity.google/docs/customization-discovery/)核对；源码与隔离安装检查不证明当前会话已加载。
+V9 保留 `$HOME/.gemini` 产品根及 App、CLI 共用的 `AGENTS.md`，将技能、政策、工具和参考片段统一交付到 `config/`。两端从 `config/skills/<name>/SKILL.md` 自动发现技能，其余资产保持相对引用。安装器只管理交付清单中的目标，不创建 Plugin，不写 `settings.json`、发现 manifest、hooks 或 MCP 配置。已有同名规则与技能仍须按[官方发现规则](https://antigravity.google/docs/customization-discovery/)核对；源码与隔离安装检查不证明当前会话已加载。
 
 仅更新部分受管目标时，重复传入 `--target KEY` 指定完整目标集合。KEY 与下述接管名称相同，例如 `--target codex:policy/review.md --target codex:gh`。选择接受已选产品的受管文件和完整技能目录，拒绝重复、未知名称及技能内部文件路径。技能目录沿用完整备份、替换、回读和回滚，不拆分安装内部成员。未传时沿用整批计划。`--target` 不替代 `--adopt`；已有差异目标仍须明确接管。调用者按当前任务核对完整依赖，安装器不自动加入其他目标。未选目标不读取内容、不要求接管，也不修改权限。完整源码检查与冻结快照仍覆盖原候选。
 
@@ -189,11 +189,13 @@ V8 将 Antigravity 产品根设为 `$HOME/.gemini`，原生全局入口为 `AGEN
 
 报告必须来自同一平台和固定 Node 的完整通过的 `all`。检出 HEAD 必须等于报告基线，源码字节必须与报告一致。计划记录本机稳定标识：Linux 取 `/etc/machine-id`，macOS 取 `sysctl -n kern.uuid`。取不到即拒绝。apply、verify、rollback 均核对该标识。主机名变更只在 verify 中报告。报告绑定的被忽略文件同样阻止计划。
 
-运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，保存计划与回执。V7/V8 的候选和恢复运行副本位于同一状态根的 `agents/install/<run-id>/`，独立于产品目录。计划另在 `--output` 写出同字节审阅副本。计划不写公开目标内容。为核对文件系统的大小写别名和共享祖先，会建立选中产品缺失的根及祖先。计划成功后保留这些目录和私有安装器目录。规划阶段准备的根不列入 apply 创建的目录，rollback 保留这些根。计划失败时只清理本次建立的目录；祖先仍为空时才移除。既有目录及权限保持原状。
+运行目录位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`，保存计划与回执。V7/V8/V9 的候选和恢复运行副本位于同一状态根的 `agents/install/<run-id>/`，独立于产品目录。计划另在 `--output` 写出同字节审阅副本。计划不写公开目标内容。为核对文件系统的大小写别名和共享祖先，会建立选中产品缺失的根及祖先。计划成功后保留这些目录和私有安装器目录。规划阶段准备的根不列入 apply 创建的目录，rollback 保留这些根。计划失败时只清理本次建立的目录；祖先仍为空时才移除。既有目录及权限保持原状。
 
 已有链接，包括指向旧部署快照的链接，都必须用 `--adopt KEY` 显式接管。悬空链接、普通文件和已有目录同样如此。接管文件或目录时，目标及目录成员必须由安装用户拥有。复制备份无法恢复其他用户的所有权，计划会报告 `backup-owner-unrestorable`。已交付内容与新候选完全一致时列为不变。KEY 见[安装目标](#安装目标与接管)。未列入清单的名称只以路径列在 `reported` 中；安装器不读取其内容。
 
-新入口生成 V8 计划，并接受 V5 双端、V6 三端和 V7 显式选择记录。V6/V7 的 Antigravity 仍按旧 CLI 根解释；V8 增加共享全局入口，既有资产路径不变。V5/V6 保留原先的产品集合及 Codex 根下的 `.agents-install/<run-id>/` 恢复路径，不迁移或扩大旧记录。V5 不推导第三端目标；各版本回执与计划版本一致。公开目标为普通文件或完整技能目录。入口拒绝 V4 及更早版本的 apply、verify 和 rollback，不转换记录或清理旧材料。原 V4 运行副本和必要材料仍在时，可用原回执提供的恢复命令。`status` 不识别这些旧回执；部署目录中仍有旧回执时报告 `indeterminate`，并在 `unreadable` 中列出路径。这一限制在新目标验证通过后仍存在。
+新入口生成 V9 计划，并接受 V5 双端、V6 三端及 V7/V8 显式选择记录。V6/V7 的 Antigravity 仍按旧 CLI 根解释；V8 保持 `.gemini` 根入口与 `antigravity-cli/` 资产路径。V9 的 `config/` 布局不会重解释旧计划。V5/V6 保留原先的产品集合及 Codex 根下的 `.agents-install/<run-id>/` 恢复路径，不迁移或扩大旧记录。V5 不推导第三端目标；各版本回执与计划版本一致。公开目标为普通文件或完整技能目录。入口拒绝 V4 及更早版本的 apply、verify 和 rollback，不转换记录或清理旧材料。原 V4 运行副本和必要材料仍在时，可用原回执提供的恢复命令。`status` 不识别这些旧回执；部署目录中仍有旧回执时报告 `indeterminate`，并在 `unreadable` 中列出路径。这一限制在新目标验证通过后仍存在。
+
+V9 计划另在 `reported` 列出旧 `antigravity-cli/` 下的技能、政策、工具和参考片段。CLI 的旧技能目录优先级更高；新目录安装成功不能证明 CLI 已采用新版本。获准退役时，先验证新目标，再按旧回执逐项核对实际内容与记录的安装身份，将匹配的旧受管目标移至发现目录之外的可恢复归档。保留未知项、漂移内容、账号、设置及原始回执和快照。不要整体回滚跨产品旧计划来清理目录。V9 rollback 只恢复 V9 目标，旧资产归档的恢复顺序单独记录。
 
 参数错误返回 2。缺口以 JSON `gaps` 输出并返回 1，此时不建立运行目录。源、报告、根目录与目标的读取问题也列为缺口。候选目标超出记录大小限制时报告 `source-unreadable`。权限问题同样一次列出。计划写入中途失败只删除本次创建的运行目录、私有候选和审阅副本。新建上级目录仅在仍为空时删除。
 
@@ -232,14 +234,14 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | DeepSeek Harness 指令 | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` | `delivery/products/dsh/AGENTS.md` 生成物 |
 | DeepSeek Harness 技能 | `${DSH_HOME:-$HOME/.dsh}/skills/<name>` | 清单选择 `dsh` 的完整顶层目录 |
 | Antigravity 全局指令 | `$HOME/.gemini/AGENTS.md` | `delivery/products/antigravity/AGENTS.md` 生成物；CLI 与 App 共用 |
-| Antigravity 按需参考 | `$HOME/.gemini/antigravity-cli/policy/*.md` | 通用规则、执行、写作、工具、评审及采用后的 Rust/SQL 政策 |
-| Antigravity CLI 工具 | `$HOME/.gemini/antigravity-cli/tools/<name>.mjs` | 同一份打包工具 |
-| Antigravity Rust 参考配置 | `$HOME/.gemini/antigravity-cli/capability/rust-lints.toml` | 采用 Rust 偏好的项目可合并；不自动修改项目配置 |
-| Antigravity CLI 技能 | `$HOME/.gemini/antigravity-cli/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
+| Antigravity 按需参考 | `$HOME/.gemini/config/policy/*.md` | 通用规则、执行、写作、工具、评审及采用后的 Rust/SQL 政策 |
+| Antigravity 工具 | `$HOME/.gemini/config/tools/<name>.mjs` | 同一份打包工具 |
+| Antigravity Rust 参考配置 | `$HOME/.gemini/config/capability/rust-lints.toml` | 采用 Rust 偏好的项目可合并；不自动修改项目配置 |
+| Antigravity App 与 CLI 技能 | `$HOME/.gemini/config/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
-Codex 与 DeepSeek Harness（`dsh`）的技能清单均含六个完整顶层包、十五个内容入口。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
+Codex 与 DeepSeek Harness（`dsh`）的技能清单均含六个完整顶层包、十五个内容入口。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity App 和 CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
 
-Antigravity CLI 接收 `gh`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共五个顶层包及五个入口；其他平台保持四个包。配套交付本端全局规则、公共政策、三个工具和 Rust lint 参考片段，不接收 Codex 专属模型路线或产品配置。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
+Antigravity App 与 CLI 接收 `gh`、`project-guide`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共五个顶层包及五个入口；其他平台保持四个包。配套交付本端全局规则、公共政策、三个工具和 Rust lint 参考片段，不接收 Codex 专属模型路线或产品配置。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
 
 Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。Antigravity 新计划使用 `$HOME/.gemini`，V6/V7 旧记录沿用其记录的 CLI 根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
@@ -247,7 +249,7 @@ adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `dsh:gh`；其�
 
 ### 安装记录与恢复边界
 
-报告只证明已记录的检查，不授予安装权限。候选绑定源码字节、完整报告与固定运行副本。复制前后及计划冻结时均核对身份。候选冻结后不原地更新。私有运行副本包含固定 Node、安装 bundle 和许可证。V7/V8 由状态目录承载恢复，单产品安装也不依赖其他产品根。V5/V6 仍依赖记录中的 Codex 私有目录。公开内容不依赖恢复目录，恢复命令依赖该目录。缺失、损坏或平台不符时拒绝，不联网修复。
+报告只证明已记录的检查，不授予安装权限。候选绑定源码字节、完整报告与固定运行副本。复制前后及计划冻结时均核对身份。候选冻结后不原地更新。私有运行副本包含固定 Node、安装 bundle 和许可证。V7/V8/V9 由状态目录承载恢复，单产品安装也不依赖其他产品根。V5/V6 仍依赖记录中的 Codex 私有目录。公开内容不依赖恢复目录，恢复命令依赖该目录。缺失、损坏或平台不符时拒绝，不联网修复。
 
 持久计划是恢复依据，审阅副本只是同字节副本。应用前核对同次持久计划，再把其身份写入回执。审阅副本随后缺失不影响 verify 或 rollback。持久计划损坏、移动或被链接替换时拒绝。工具不扫描其他运行来猜测替代记录。计划与回执字段由 `scripts/install-records.ts` 唯一定义。结构验证不替代主机、路径与当前目标核对。
 
@@ -261,7 +263,7 @@ adopt KEY 必须包含产品前缀。技能使用 `codex:gh` 或 `dsh:gh`；其�
 
 自研会话客户端、合同和专属审批片段已退出新交付。新计划只报告现存的清单外文件，不接管或卸载。旧计划继续通过其绑定的安装器和原恢复材料读回与恢复。退役不改写旧计划、回执、恢复快照或会话记录。
 
-逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果。V5/V6/V7/V8 运行目录均位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的受支持计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。V7/V8 的 plan、apply、verify 和 rollback，以及新入口的 status，通过 JSON `products` 展示实际产品集合。计划的 `roots` 中仅记录选中产品的根，由这些根唯一拥有该选择。旧运行副本保持原有输出格式。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和该计划的每个目标，不读取候选源码。无法读取或不受支持的回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。新计划不卸载未选产品的既有安装；status 只证明当前计划的目标，未被该计划列出的旧成员保持原样。合并源码不会自动更新已安装目标。
+逐台安装状态由部署记录拥有。每次运行的 `deployment-plan.json` 记录主机标识与源基线，`deployment-receipt.json` 记录逐目标结果。V5/V6/V7/V8/V9 运行目录均位于 `${XDG_STATE_HOME:-$HOME/.local/state}/agents/deploy/<run-id>/`。`install.sh status` 从最新成功的受支持计划读取候选摘要与基线提交，并把基线提交与当前检出的 HEAD 比较。V7/V8/V9 的 plan、apply、verify 和 rollback，以及新入口的 status，通过 JSON `products` 展示实际产品集合。计划的 `roots` 中仅记录选中产品的根，由这些根唯一拥有该选择。旧运行副本保持原有输出格式。未提交改动的实际交付字节由 `candidate.sha256` 标识；`checkout.commit` 只表示基线。状态核验本机、恢复运行副本和该计划的每个目标，不读取候选源码。无法读取或不受支持的回执、较晚的未完成运行或核验缺口会使结果为 `indeterminate`。新计划不卸载未选产品的既有安装；status 只证明当前计划的目标，未被该计划列出的旧成员保持原样。合并源码不会自动更新已安装目标。
 
 个人安装形态只有一种，没有 managed 模式或 bot 入口目标。`~/.agents/github-app/` 不在安装范围内，本地 bot 凭据提供器已退役。个人安装不交付 App 私钥或本地令牌签发入口。旧项目审查关卡及其签发入口已移除，不属于当前源码或个人安装目标。
 
