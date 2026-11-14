@@ -14,3 +14,10 @@ useDefault = true
 # added beside it is still found.
 description = "One fixture string in the WechatIDE call test, allowed by its exact value."
 regexes = ['''mcp-fixture-secret-7f3a''']
+
+[[allowlists]]
+# This is a public WebCrypto algorithm identifier in the official guide, not a key.
+# Keep the exact secret match so credentials beside it remain subject to screening.
+description = "The MLKEM768-X25519 algorithm name in official WebCrypto guidance."
+regexTarget = "secret"
+regexes = ['''^MLKEM768-X25519$''']

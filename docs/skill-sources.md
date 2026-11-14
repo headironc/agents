@@ -4,6 +4,16 @@ This register covers the skills selected by [the product manifest](../config/per
 
 Historical links under `headironcc/agents` name the planned private archive destination. This content export does not establish completion of that migration, and access requires permission. These records preserve provenance; current capabilities, operation contracts and retained licenses are available in this content source without private-history access. Old runs and reviews do not establish the configuration or acceptance of a new repository instance.
 
+## modern-web-guidance
+
+The [delivered skill](../delivery/skills/modern-web-guidance/SKILL.md) uses the official Google Chrome [npm package](https://registry.npmjs.org/modern-web-guidance/1.0.0). Release `1.0.0` records source revision `544c250575f7811d87fef8b1c064bc9571cbfb80` in [modern-web-guidance-src](https://github.com/GoogleChrome/modern-web-guidance-src/tree/544c250575f7811d87fef8b1c064bc9571cbfb80). The machine-readable [source lock](../config/modern-web-guidance-source.json) owns package integrity and per-file digests.
+
+The complete npm skill directory is retained under `upstream/`, including its CLI, search index, guides, runtime metadata, and watchdog. Its original entry is named `SKILL.upstream.md` to keep one discoverable skill entry. The package-root LICENSE, THIRD_PARTY_NOTICES, and README are retained as well; the README is named `README.upstream.txt`. These filename changes do not alter file bytes. Unrelated npm plugin registrations and the separate Chrome Extensions skill are not adopted.
+
+Software is Apache-2.0; guides are CC-BY-4.0. The retained README and individual guides carry the upstream attribution, including MDN, W3C, WHATWG, and IETF sources. The local entry and CLI contract replace floating downloads, unconditional permission prompts, telemetry defaults, and mandatory response formatting with this repository's delivery and operation rules. They preserve targeted search, full retrieval, browser support conditions, and the distinct broad-modernization workflow.
+
+Update the official runtime and corpus together. A newer GitHub Markdown distribution is not a replacement for the npm package's matching index. Local adaptation files remain separately owned and require review when the upstream interface changes.
+
 ## project-guide
 
 This shared skill is maintained locally from authorized repository-orientation and validation work. Its four capabilities are project and version identification, authority discovery, check selection and execution, and evidence reporting. The [entrypoint](../delivery/skills/project-guide/SKILL.md) owns the reusable guidance; target projects retain their paths, business rules, commands, and acceptance criteria. No upstream skill or executable was copied.

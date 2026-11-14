@@ -6,6 +6,7 @@ contract	id-check	platform-interface	conditional	scripts/check-ids.mjs	comment-s
 contract	ref-check	platform-interface	conditional	scripts/check-refs.ts	comment-subject	ref-check
 contract	task-temp	platform-interface	conditional	delivery/policy/tool-contracts.md	contract-subject	task-temp
 contract	aliyun-sms	cli	conditional	delivery/skills/alibabacloud-sms-send-short-message/SKILL.md	contract-subject	aliyun-sms
+contract	modern-web-guidance	cli	conditional	delivery/skills/modern-web-guidance/references/cli.md	contract-subject	modern-web-guidance
 contract	wechatide	cli	conditional	delivery/skills/wechatide/references/cli.md	contract-subject	wechatide
 contract	wechatide-call	platform-interface	conditional	delivery/skills/wechatide/scripts/call.sh	comment-subject	wechatide-call
 contract	wechatide-install-check	platform-interface	conditional	delivery/skills/wechatide/skills/installer/scripts/check-install.mjs	comment-subject	wechatide-install-check
