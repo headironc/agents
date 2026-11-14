@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "repository": "rust-lang/api-guidelines",
+  "repositoryId": 81125442,
+  "branch": "master",
+  "revision": "f90deb77959af37e0bc72604fb8a5efe9b97dd20",
+  "files": [
+    {
+      "source": "LICENSE-APACHE",
+      "target": "config/upstream/rust-api-guidelines/LICENSE-APACHE.txt",
+      "bytes": 10847,
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "blob": "16fe87b06e802f094b3fbb0894b137bca2b16ef1"
+    },
+    {
+      "source": "LICENSE-MIT",
+      "target": "config/upstream/rust-api-guidelines/LICENSE-MIT.txt",
+      "bytes": 1071,
+      "sha256": "29662666b44dff84977b46e05642cdef910bc3a93a17b5fd86e632bafa59cf21",
+      "blob": "52d82415d8b60cd3c5858c8939fa0d8fae1aeca0"
+    },
+    {
+      "source": "src/flexibility.md",
+      "target": "config/upstream/rust-api-guidelines/src-flexibility.md.txt",
+      "bytes": 7623,
+      "sha256": "5565a393442c9dcaf73161584233060f4cb52f8de1b2c1abad5ccc95f61aed7d",
+      "blob": "e3c67920541fc245c2a4190fbee81df43d4c091f"
+    },
+    {
+      "source": "src/interoperability.md",
+      "target": "config/upstream/rust-api-guidelines/src-interoperability.md.txt",
+      "bytes": 13372,
+      "sha256": "e795059bf83624252ee979c1e9672eb42600e0b7ea40a80026a975a2c0fb5d0d",
+      "blob": "7a505f4b5860dfd2046005130e4d44a371c049e2"
+    },
+    {
+      "source": "src/naming.md",
+      "target": "config/upstream/rust-api-guidelines/src-naming.md.txt",
+      "bytes": 15267,
+      "sha256": "5fd09b2f17891828c3ffd615704c88b6de349953f77c6dc5aabdd67d3cc9aaf0",
+      "blob": "b1bb332fed2c8d7160218d20589a9a960c15022b"
+    },
+    {
+      "source": "src/type-safety.md",
+      "target": "config/upstream/rust-api-guidelines/src-type-safety.md.txt",
+      "bytes": 8841,
+      "sha256": "d2bfa67228eb1252e1f1e515e036766f3996c2e874dd7ba5ad1b4d8a566f51f5",
+      "blob": "5315ee4b4cbfd17e5fabc501720508505342bd06"
+    }
+  ],
+  "assessment": {
+    "revision": "f90deb77959af37e0bc72604fb8a5efe9b97dd20",
+    "policySha256": "bf569712f318c8d45783b4bb15829fa313fc4757a2778887a633aedfeda24902",
+    "decisions": [
+      {
+        "source": "LICENSE-APACHE",
+        "decision": "retained",
+        "reason": "Preserve the unmodified upstream Apache-2.0 license with the selected reference originals; no change to local policy ownership."
+      },
+      {
+        "source": "LICENSE-MIT",
+        "decision": "retained",
+        "reason": "Preserve the unmodified upstream MIT license and attribution alongside the alternative Apache-2.0 license."
+      },
+      {
+        "source": "src/flexibility.md",
+        "decision": "retained",
+        "reason": "C-CALLER-CONTROL matches the existing ownership boundary. Retain semantic value types and justify generic or trait-object interfaces by actual callers rather than importing all library design advice."
+      },
+      {
+        "source": "src/interoperability.md",
+        "decision": "retained",
+        "reason": "Existing rules cover applicable common traits, From/TryFrom, AsRef and validated Deserialize. Preserve required-only derives and domain validation; collection, formatting and reader/writer guidance remains conditional on concrete APIs."
+      },
+      {
+        "source": "src/naming.md",
+        "decision": "retained",
+        "reason": "C-CASE, C-CONV and C-GETTER agree with the adopted naming rules. Keep local query and Option naming choices. Iterator and feature naming guidance is reference material, not a new universal requirement."
+      },
+      {
+        "source": "src/type-safety.md",
+        "decision": "retained",
+        "reason": "C-NEWTYPE and C-CUSTOM-TYPE align with semantic value types and valid optionality. Retain reuse of SDK types and actual invariant boundaries; do not require bitflags dependencies or builders without a consumer."
+      }
+    ]
+  }
+}
