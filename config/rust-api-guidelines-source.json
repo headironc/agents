@@ -3,7 +3,7 @@
   "repository": "rust-lang/api-guidelines",
   "repositoryId": 81125442,
   "branch": "master",
-  "revision": "f90deb77959af37e0bc72604fb8a5efe9b97dd20",
+  "revision": "97a0969cb07fe4cabb0eed8a56234053f47d83dc",
   "files": [
     {
       "source": "LICENSE-APACHE",
@@ -36,9 +36,9 @@
     {
       "source": "src/naming.md",
       "target": "config/upstream/rust-api-guidelines/src-naming.md.txt",
-      "bytes": 15267,
-      "sha256": "5fd09b2f17891828c3ffd615704c88b6de349953f77c6dc5aabdd67d3cc9aaf0",
-      "blob": "b1bb332fed2c8d7160218d20589a9a960c15022b"
+      "bytes": 15261,
+      "sha256": "36b3fcb3705867fc96cb6346a86d0ad3ef9ad97fe5a2741d1afc68063001c63a",
+      "blob": "8bbeeb333685c1f4b15bec475958d5a077bd95d8"
     },
     {
       "source": "src/type-safety.md",
@@ -49,8 +49,8 @@
     }
   ],
   "assessment": {
-    "revision": "f90deb77959af37e0bc72604fb8a5efe9b97dd20",
-    "policySha256": "bf569712f318c8d45783b4bb15829fa313fc4757a2778887a633aedfeda24902",
+    "revision": "97a0969cb07fe4cabb0eed8a56234053f47d83dc",
+    "policySha256": "2d39908f085f599a7bc78af00746b4a26528a69b2999fb5f13bd7337c8aaeba1",
     "decisions": [
       {
         "source": "LICENSE-APACHE",
@@ -75,7 +75,7 @@
       {
         "source": "src/naming.md",
         "decision": "retained",
-        "reason": "C-CASE, C-CONV and C-GETTER agree with the adopted naming rules. Keep local query and Option naming choices. Iterator and feature naming guidance is reference material, not a new universal requirement."
+        "reason": "The only selected upstream change replaces the obsolete Unique::get_mut example with Pin::get_mut in C-GETTER. This repairs a reference link without changing the recommendation. Retain existing getter and mutable-getter rules, local query and Option naming choices, and the previous conditional scope for iterator and feature names."
       },
       {
         "source": "src/type-safety.md",
