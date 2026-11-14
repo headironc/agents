@@ -207,11 +207,11 @@ bash scripts/check.sh all --report .cache/reports/check.json
 
 ## 官方内容自动更新
 
-本节描述已实现的四个来源。职责划分见[上游内容维护架构](#上游内容维护架构)。
+本节描述已实现的五个来源。职责划分见[上游内容维护架构](#上游内容维护架构)。
 
-[upstream 工作流](../.github/workflows/upstream.yml)每周一 UTC 02:17（北京时间 10:17）检查已采用来源，也支持从 `main` 手动运行。矩阵独立处理四个来源，关闭 fail-fast。一个来源失败不取消其他来源，运行仍保留失败结果。[调度入口](../scripts/upstream-pr.ts)仅接受固定来源名；准备步骤不传入发布令牌。
+[upstream 工作流](../.github/workflows/upstream.yml)每周一 UTC 02:17（北京时间 10:17）检查已采用来源，也支持从 `main` 手动运行。矩阵独立处理五个来源，关闭 fail-fast。一个来源失败不取消其他来源，运行仍保留失败结果。[调度入口](../scripts/upstream-pr.ts)仅接受固定来源名；准备步骤不传入发布令牌。
 
-Modern Web 的 npm 准备器完整更新 CLI、索引、指南和许可证。两个 Rust 参考与属性测试复用 [Git 获取器](../scripts/upstream-git.ts)，固定仓库身份、前向提交和已选文件，核对 Git blob 与文件摘要。下载内容不执行。[Modern Web 适配器](../scripts/upstream-modern-web.ts)、[Rust 参考适配器](../scripts/upstream-reference.ts)与[属性测试适配器](../scripts/upstream-property-testing.ts)分别产生受限变更，再交给[公共发布器](../scripts/upstream-publish.ts)。Microsoft 的固定来源与章节由[来源模块](../scripts/microsoft-rust-source.ts)拥有。
+Modern Web 的 npm 准备器完整更新 CLI、索引、指南和许可证。两个 Rust 参考、属性测试与 Rust 专项审查复用 [Git 获取器](../scripts/upstream-git.ts)，固定仓库身份、前向提交和已选文件，核对 Git blob 与文件摘要。下载内容不执行。[Modern Web 适配器](../scripts/upstream-modern-web.ts)、[Rust 参考适配器](../scripts/upstream-reference.ts)与[技能适配器](../scripts/upstream-adapted.ts)分别产生受限变更，再交给[公共发布器](../scripts/upstream-publish.ts)。Microsoft 的固定来源与章节由[来源模块](../scripts/microsoft-rust-source.ts)拥有。
 
 无相关更新时不创建分支或空 PR。每个来源版本使用独立分支；同版本已有任何状态的 PR 时不再创建。同一来源已有其他版本待审时先等待。遗留分支、基线变化或写入结果未知均停止，由维护者核对原对象后恢复。自动化不覆盖人工提交、不重开已关闭 PR、不强推，也不自动合并或安装。
 
@@ -238,6 +238,12 @@ Modern Web 的 npm 准备器完整更新 CLI、索引、指南和许可证。两
 ```bash
 .cache/agents-tools/bin/node --input-type=module -e 'import {readFileSync} from "node:fs"; import {digest} from "./scripts/rust-api-source.ts"; console.log(digest(readFileSync("delivery/policy/rust.md")));'
 ```
+
+### 适配技能更新
+
+[共用来源校验器](../scripts/adapted-source.ts)与[更新适配器](../scripts/upstream-adapted.ts)服务属性测试和 Rust 专项审查两个实际消费者。各来源模块独立固定仓库、原件、许可、本地完整文件集和分支前缀；同一上游仓库的计划也不能互换。下述步骤同时适用两者，明确采用范围后才能扩大输入清单。
+
+[Rust 专项审查来源锁](../config/rust-risk-source.json)采用七份独立检测提示及许可，交付短入口、三份引用和完整许可。未采用上游入口、命名代理、脚本或其他检测器；这不是完整 rust-review 包。逐项核对取消语义、线程与 lifetime 约束、panic/ABI、外部资源上限及路径竞态的前提，保留反例与证据缺口。新提示不会因上游新增而自动加入技能。校验命令为 `.cache/agents-tools/bin/node scripts/rust-risk-source.ts --check`。
 
 ### 属性测试技能适配
 

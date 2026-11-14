@@ -26,6 +26,7 @@ jobs:
             rust-api-guidelines,
             property-based-testing,
             microsoft-rust-guidelines,
+            rust-risk-review,
           ]
     permissions:
       contents: write

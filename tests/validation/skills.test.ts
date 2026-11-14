@@ -21,7 +21,7 @@ const skill = (name: string) =>
 
 test("delivered skills scope dual-product shared entries and reach all products on macOS for Sketch", () => {
   const entries = readSkillEntries(repositoryRoot);
-  assert.equal(entries.length, 17);
+  assert.equal(entries.length, 18);
   assert.equal(
     entries.find((entry) => entry.path === "project-guide")?.target,
     "codex,dsh,antigravity",
@@ -41,6 +41,7 @@ test("delivered skills scope dual-product shared entries and reach all products 
       "modern-web-guidance",
       "project-guide",
       "property-based-testing",
+      "rust-risk-review",
       "sketch-native",
     ],
   );
@@ -64,10 +65,10 @@ test("delivered skills scope dual-product shared entries and reach all products 
     [],
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 17, DeepSeek Harness 17, Antigravity 7",
-    "Codex skill validation: 17 entries",
-    "DeepSeek Harness skill validation: 17 entries",
-    "Antigravity skill validation: 7 entries",
+    "Skill membership: DELIVERED; Codex 18, DeepSeek Harness 18, Antigravity 8",
+    "Codex skill validation: 18 entries",
+    "DeepSeek Harness skill validation: 18 entries",
+    "Antigravity skill validation: 8 entries",
   ]);
 });
 
@@ -121,18 +122,18 @@ test("nested members belong to their top-level skill and do not add install targ
     entries.find((entry) => entry.path === "suite/skills/child")?.topLevel,
     "suite",
   );
-  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 10);
-  assert.equal(selectSkillEntries(entries, "dsh").length, 19);
+  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 11);
+  assert.equal(selectSkillEntries(entries, "dsh").length, 20);
   assert.ok(
     !selectSkillEntries(entries, "dsh").some(
       (entry) => entry.path === "private",
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 20, DeepSeek Harness 19, Antigravity 7",
-    "Codex skill validation: 20 entries",
-    "DeepSeek Harness skill validation: 19 entries",
-    "Antigravity skill validation: 7 entries",
+    "Skill membership: DELIVERED; Codex 21, DeepSeek Harness 20, Antigravity 8",
+    "Codex skill validation: 21 entries",
+    "DeepSeek Harness skill validation: 20 entries",
+    "Antigravity skill validation: 8 entries",
   ]);
 });
 

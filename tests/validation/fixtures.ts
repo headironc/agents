@@ -175,6 +175,7 @@ export function fixtureRepository(t: TestContext) {
         "project-guide\tcodex,dsh,antigravity\n" +
         "modern-web-guidance\tcodex,dsh,antigravity\n" +
         "property-based-testing\tcodex,dsh,antigravity\n" +
+        "rust-risk-review\tcodex,dsh,antigravity\n" +
         additional,
     );
   function commitBaseline() {

@@ -8,6 +8,7 @@ import { modernWebUpdate, prepareModernWeb } from "./upstream-modern-web.ts";
 import { prepareRust, rustUpdate } from "./upstream-rust-api.ts";
 import { preparePbt, pbtUpdate } from "./upstream-property-testing.ts";
 import { microsoftRustUpdate } from "./microsoft-rust-source.ts";
+import { rustRiskUpdate } from "./rust-risk-source.ts";
 import {
   publishPrepared,
   repository,
@@ -28,6 +29,7 @@ export const sources = [
   "rust-api-guidelines",
   "property-based-testing",
   "microsoft-rust-guidelines",
+  "rust-risk-review",
 ] as const;
 export function preparedUpdate(root: string, source: string, input: unknown) {
   if (source === "modern-web-guidance") return modernWebUpdate(root, input);
@@ -35,6 +37,7 @@ export function preparedUpdate(root: string, source: string, input: unknown) {
   if (source === "property-based-testing") return pbtUpdate(root, input);
   if (source === "microsoft-rust-guidelines")
     return microsoftRustUpdate.update(root, input);
+  if (source === "rust-risk-review") return rustRiskUpdate.update(root, input);
   throw new Error("Unknown upstream source");
 }
 
@@ -71,7 +74,9 @@ async function main(): Promise<void> {
           ? await prepareRust(root, base)
           : source === "property-based-testing"
             ? await preparePbt(root, base)
-            : await microsoftRustUpdate.prepare(root, base);
+            : source === "microsoft-rust-guidelines"
+              ? await microsoftRustUpdate.prepare(root, base)
+              : await rustRiskUpdate.prepare(root, base);
     preparedUpdate(root, source!, plan);
     writeFileSync(file, JSON.stringify(plan), { mode: 0o600, flag: "wx" });
     console.log(`Prepared verified source: ${source}`);
