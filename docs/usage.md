@@ -140,7 +140,7 @@
 
 工具技能按完整单元交付。入口、引用、必要资产、执行器、测试与许可证共同验收。来源记录保留原件身份和采用范围。跨技能调用使用可用安装名。内部引用从物理安装目录解析，保持完整可达。清单决定成员与产品，不授予业务权限。新增入口同步登记、反例与完整门禁。不得删减清单来绕过缺失能力。
 
-Rust、专项审查与测试、Web 和小程序源码质量的候选取舍见[来源登记](skill-sources.md#code-quality-maintenance)。来源准备、本地适配、更新 PR 与安装的分工见[维护架构](tooling.md#上游内容维护架构)。每周任务覆盖 Modern Web Guidance 发布包、Rust API Guidelines 与 Microsoft Rust Guidelines 参考章节，以及属性测试与 Rust 专项审查技能原件。Rust 更新须[完成评估](tooling.md#rust-api-guidelines-评估)，技能更新须[完成适配](tooling.md#适配技能更新)，草稿候选才可交付。
+Rust、专项审查与测试、Web 和小程序源码质量的候选取舍见[来源登记](skill-sources.md#code-quality-maintenance)。来源准备、本地适配、更新 PR 与安装的分工见[维护架构](tooling.md#上游内容维护架构)。每周任务覆盖 Modern Web Guidance 发布包、Rust API Guidelines 与 Microsoft Rust Guidelines 参考章节，以及属性测试、Rust 专项审查与 Web 质量审查技能原件。Rust 更新须[完成评估](tooling.md#rust-api-guidelines-评估)，技能更新须[完成适配](tooling.md#适配技能更新)，草稿候选才可交付。
 
 合并遵循目标项目的有效合同（本仓库采用[重建期规则](review-gate.md#重建期交付规则)，其他目标按[通用合并准入规则](../delivery/policy/review.md#merge-admission)核对）。已采用的上游工具不为统一语言而改写；无实际调用方的历史脚本不自动恢复；实际服务、模型与个人安装分别取得授权并回读。
 
@@ -159,6 +159,12 @@ Rust、专项审查与测试、Web 和小程序源码质量的候选取舍见[�
 [modern-web-guidance](../delivery/skills/modern-web-guidance/SKILL.md) 随 Codex、DSH 和 Antigravity 安装。编写或审查浏览器端 HTML、CSS、JavaScript 前，按具体能力查询官方指南。纯后端、基础设施、非 Web 原生界面和技能自身维护不触发查询。
 
 CLI、搜索索引与指南来自同一固定 npm 发布包，运行时查询本地语料。它不依赖浮动版本下载，也不代表实时在线文档。项目的浏览器支持矩阵优先；技能不会自行改写 `.mwgrc`。本地入口与[调用合同](../delivery/skills/modern-web-guidance/references/cli.md)负责授权、遥测关闭和临时输出清理。原件、许可与精确来源见[来源登记](skill-sources.md#modern-web-guidance)。
+
+### Web 质量审查
+
+[web-quality-audit](../delivery/skills/web-quality-audit/SKILL.md) 随三端安装，采用 Addy Osmani 的社区审查与测量方法，不代表 Google 官方产品。它补充 Modern Web Guidance 的实际页面验收：按需检查键盘操作、渲染语义、性能及适用的 SEO，记录真实工具与测量条件。源码检查、单次浏览器观察、Lighthouse 和真实用户数据分别报告。没有浏览器时可以继续静态审查，但不能声称运行验收通过；只读审查不修改被审页面的源码或配置。
+
+上游入口、测量引用与完整 MIT 许可作为三个维护输入，技能本身交付短入口、两份引用及许可。未采用的类别包、静态分析脚本和固定部署检查不随安装混入；来源变化按[适配流程](tooling.md#适配技能更新)创建草稿，重新评估后交付。
 
 ## 任务临时目录与收尾
 
@@ -257,9 +263,9 @@ Codex 的 [Antigravity 使用支持](../delivery/policy/antigravity.md)保留安
 | Antigravity Rust 参考配置 | `$HOME/.gemini/config/capability/rust-lints.toml` | 采用 Rust 偏好的项目可合并；不自动修改项目配置 |
 | Antigravity App 与 CLI 技能 | `$HOME/.gemini/config/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
-Codex 与 DeepSeek Harness（`dsh`）在 macOS 上均交付九个完整顶层包、十八个内容入口。其他平台交付八个包、十七个入口。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity App 和 CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
+Codex 与 DeepSeek Harness（`dsh`）在 macOS 上均交付十个完整顶层包、十九个内容入口。其他平台交付九个包、十八个入口。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity App 和 CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
 
-Antigravity App 与 CLI 接收 `gh`、`project-guide`、`modern-web-guidance`、`property-based-testing`、`rust-risk-review`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共八个顶层包及八个入口；其他平台交付七个包。配套交付本端全局规则、公共政策、三个工具和 Rust lint 参考片段，不接收 Codex 专属模型路线或产品配置。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
+Antigravity App 与 CLI 接收 `gh`、`project-guide`、`modern-web-guidance`、`property-based-testing`、`rust-risk-review`、`web-quality-audit`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共九个顶层包及九个入口；其他平台交付八个包。配套交付本端全局规则、公共政策、三个工具和 Rust lint 参考片段，不接收 Codex 专属模型路线或产品配置。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
 
 Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。Antigravity 新计划使用 `$HOME/.gemini`，V6/V7 旧记录沿用其记录的 CLI 根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 

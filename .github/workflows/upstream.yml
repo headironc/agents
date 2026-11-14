@@ -27,6 +27,7 @@ jobs:
             property-based-testing,
             microsoft-rust-guidelines,
             rust-risk-review,
+            web-quality-audit,
           ]
     permissions:
       contents: write
