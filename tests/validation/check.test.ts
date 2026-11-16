@@ -144,6 +144,7 @@ const required = [
     "codex.toml",
     "dsh-headless.patch.yml",
     "rust-lints.toml",
+    "wx-docs.mcp.json",
   ].map((name) => `delivery/capability/${name}`),
   ...[
     "personal-skills",
@@ -217,6 +218,7 @@ const required = [
   "delivery/skills/wechatide/SKILL.md",
   "delivery/skills/wechatide/references/capabilities.md",
   "delivery/skills/wechatide/references/cli.md",
+  "delivery/skills/wechatide/references/docs.md",
   "delivery/skills/wechatide/references/tasks.md",
   "delivery/skills/wechatide/scripts/call.sh",
   "delivery/skills/wechatide/skills/automator/SKILL.md",
@@ -231,6 +233,7 @@ const required = [
   "delivery/skills/wechatide/skills/project-config/SKILL.md",
   "delivery/skills/wechatide/skills/project-config/references/fields.md",
   "delivery/skills/wechatide/skills/project-manager/SKILL.md",
+  "delivery/skills/wechatide/skills/simulator/SKILL.md",
   ".githooks/pre-commit",
   ...Object.values(expectedTestPaths).flat(),
   ".github/CODEOWNERS",
@@ -313,7 +316,7 @@ test("Codex loader accepts a temporary root reached through a symlink", (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(
     result.stdout,
-    /Codex loaded AGENTS\.md and 19 delivered skills; model policy is available on demand/,
+    /Codex loaded AGENTS\.md and 20 delivered skills; model policy is available on demand/,
   );
 });
 
@@ -658,9 +661,9 @@ test("repository and all gates register each official product validator", async 
   ] as const) {
     const specs = await checkSpecs([...groups], "all");
     for (const [product, name] of [
-      ["codex", "Codex skill validation: 19 entries"],
-      ["dsh", "DeepSeek Harness skill validation: 19 entries"],
-      ["antigravity", "Antigravity skill validation: 9 entries"],
+      ["codex", "Codex skill validation: 20 entries"],
+      ["dsh", "DeepSeek Harness skill validation: 20 entries"],
+      ["antigravity", "Antigravity skill validation: 20 entries"],
     ]) {
       const selected = specs.filter((spec) => spec.name === name);
       assert.equal(selected.length, 1);
@@ -791,6 +794,7 @@ test("the real checker refuses every missing R5 delivery member before execution
     "delivery/capability/README.md",
     "delivery/capability/codex.toml",
     "delivery/capability/rust-lints.toml",
+    "delivery/capability/wx-docs.mcp.json",
     "tests/validation/capability.test.ts",
     "delivery/skills/gh/SKILL.md",
     "delivery/skills/gh/references/extended-commands.md",
@@ -810,6 +814,7 @@ test("the real checker refuses every missing R5 delivery member before execution
     "delivery/skills/wechatide/SKILL.md",
     "delivery/skills/wechatide/references/capabilities.md",
     "delivery/skills/wechatide/references/cli.md",
+    "delivery/skills/wechatide/references/docs.md",
     "delivery/skills/wechatide/references/tasks.md",
     "delivery/skills/wechatide/scripts/call.sh",
     "delivery/skills/wechatide/tests/call.test.mjs",
@@ -826,6 +831,7 @@ test("the real checker refuses every missing R5 delivery member before execution
     "delivery/skills/wechatide/skills/project-config/SKILL.md",
     "delivery/skills/wechatide/skills/project-config/references/fields.md",
     "delivery/skills/wechatide/skills/project-manager/SKILL.md",
+    "delivery/skills/wechatide/skills/simulator/SKILL.md",
   ];
   let cursor = 0;
   const concurrency = Math.min(os.availableParallelism(), 6);

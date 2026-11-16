@@ -8,8 +8,8 @@
 # After the checks below, the CLI's stdout, stderr and exit status pass through unchanged.
 set -euo pipefail
 
-# Delivered operations across initializer, compiler, debugger, previewer, project-manager, automator, and cloudbase-operator.
-readonly operations=" check_wechatide_status login polling_task_result open_project_window close_project_window get_user_appids automation_runtime_info quit simulator_open_page simulator_refresh build_npm compile_wxml compile_wxss get_simulator_console get_simulator_network simulator_screenshot automation_wx_api debug_clear_cache auto_preview create_preview_qrcode upload project_list project_import share_minicode import_minicode project_remove automation_navigate automation_element_action automation_page_action automation_viewport_action automation_game_action automation_evaluate automation_testaccount automation_generate_script cloud_env_list cloud_fn_list cloud_fn_info cloud_fn_deploy cloud_fn_inc_deploy cloud_db_read_struct cloud_db_read_doc cloud_db_write_struct cloud_db_write_doc cloud_query_storage cloud_manage_storage cloud_query_msg_push cloud_manage_msg_push "
+# Delivered operations across initializer, compiler, simulator, debugger, previewer, project-manager, automator, and cloudbase-operator.
+readonly operations=" check_wechatide_status login polling_task_result open_project_window close_project_window get_user_appids automation_runtime_info quit simulator_open_page simulator_refresh build_npm compile_wxml compile_wxss simulator_get_device simulator_set_device simulator_set_darkmode simulator_popup get_simulator_console get_simulator_network simulator_screenshot automation_wx_api debug_clear_cache auto_preview create_preview_qrcode upload project_list project_import share_minicode import_minicode project_remove automation_navigate automation_element_action automation_page_action automation_viewport_action automation_game_action automation_evaluate automation_testaccount automation_generate_script cloud_env_list cloud_fn_list cloud_fn_info cloud_fn_deploy cloud_fn_inc_deploy cloud_db_read_struct cloud_db_read_doc cloud_db_write_struct cloud_db_write_doc cloud_query_storage cloud_manage_storage cloud_query_msg_push cloud_manage_msg_push "
 
 fail() {
   printf 'wechatide-call: %s\n' "$1" >&2
@@ -21,7 +21,7 @@ client=$1
 operation=$2
 shift 2
 case "$client" in
-  ClaudeCode|Codex) ;;
+  Antigravity|ClaudeCode|Codex) ;;
   *) fail unsupported-client 2 ;;
 esac
 if [ "$operation" != auth ]; then

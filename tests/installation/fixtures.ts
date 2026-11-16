@@ -45,7 +45,7 @@ export const skills = {
     "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "web-quality-audit",
-    "wechatide",
+    ...(process.platform === "darwin" ? ["wechatide"] : []),
   ],
   dsh: [
     "alibabacloud-find-skills",
@@ -57,7 +57,7 @@ export const skills = {
     "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "web-quality-audit",
-    "wechatide",
+    ...(process.platform === "darwin" ? ["wechatide"] : []),
   ],
   antigravity: [
     "alibabacloud-find-skills",
@@ -69,6 +69,7 @@ export const skills = {
     "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
     "web-quality-audit",
+    ...(process.platform === "darwin" ? ["wechatide"] : []),
   ],
 };
 export const policies = [
@@ -110,11 +111,13 @@ export const capability: [string, string][] = [
   ["codex.toml", "delivery/capability/codex.toml"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 export const dshCapability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 export const runtimeInputs = [
   ".cache/agents-tools/bin/node",
@@ -186,6 +189,10 @@ export function expectedTargets(
     pair(
       `${antigravity}/capability/rust-lints.toml`,
       `${snapshot}/delivery/capability/rust-lints.toml`,
+    ),
+    pair(
+      `${antigravity}/capability/wx-docs.mcp.json`,
+      `${snapshot}/delivery/capability/wx-docs.mcp.json`,
     ),
     pair(
       `${home}/.gemini/AGENTS.md`,
@@ -528,8 +535,11 @@ export function v8Plan(prepared: { plan: InstallPlan; review: string }): {
 } {
   const plan = structuredClone(prepared.plan);
   useLegacyAntigravityAssets(plan);
+  const isPostV8Key = (key: string) =>
+    key === "antigravity:policy/antigravity.md" ||
+    key.endsWith(":capability/wx-docs.mcp.json");
   plan.targets = plan.targets
-    .filter((target) => target.key !== "antigravity:policy/antigravity.md")
+    .filter((target) => !isPostV8Key(target.key))
     .map((target, order) => ({
       ...target,
       order,
@@ -540,10 +550,13 @@ export function v8Plan(prepared: { plan: InstallPlan; review: string }): {
     }));
   if (plan.selectedTargets)
     plan.selectedTargets = plan.selectedTargets.filter(
-      (key) => key !== "antigravity:policy/antigravity.md",
+      (key) => !isPostV8Key(key),
     );
-  plan.adopt = plan.adopt.filter(
-    (key) => key !== "antigravity:policy/antigravity.md",
+  plan.adopt = plan.adopt.filter((key) => !isPostV8Key(key));
+  plan.newDirectories = plan.newDirectories.filter(
+    (file) =>
+      !exists(file) &&
+      plan.targets.some((target) => target.path.startsWith(`${file}/`)),
   );
   plan.version = 8;
   const { sha256: _digest, ...body } = plan;
@@ -601,7 +614,11 @@ export function legacyPlan(
           return [];
       }
       if (target.product === "codex") {
-        if (target.key === "codex:capability/dsh-headless.patch.yml") return [];
+        if (
+          target.key === "codex:capability/dsh-headless.patch.yml" ||
+          target.key === "codex:capability/wx-docs.mcp.json"
+        )
+          return [];
         if (target.key === "codex:policy/deepseek-harness.md") {
           return [
             {
@@ -642,6 +659,13 @@ export function legacyPlan(
           ? null
           : path.join(plan.roots.backup.path, plan.run.id, String(order)),
     }));
+  plan.adopt = plan.adopt.filter(
+    (key) => !key.endsWith(":capability/wx-docs.mcp.json"),
+  );
+  if (plan.selectedTargets)
+    plan.selectedTargets = plan.selectedTargets.filter(
+      (key) => !key.endsWith(":capability/wx-docs.mcp.json"),
+    );
   if (plan.roots.antigravity)
     plan.roots.antigravity.path = path.join(
       plan.roots.antigravity.path,
@@ -662,6 +686,9 @@ export function legacyPlan(
     path.join(plan.run.source, "delivery/capability/dsh-headless.patch.yml"),
     { force: true },
   );
+  rmSync(path.join(plan.run.source, "delivery/capability/wx-docs.mcp.json"), {
+    force: true,
+  });
   for (const file of plan.runtime.files)
     file.path = path.join(plan.run.runtime, path.basename(file.path));
   for (const target of plan.targets)
@@ -679,7 +706,8 @@ export function legacyPlan(
       )
       .filter(
         (entryPath) =>
-          entryPath !== "delivery/capability/dsh-headless.patch.yml",
+          entryPath !== "delivery/capability/dsh-headless.patch.yml" &&
+          entryPath !== "delivery/capability/wx-docs.mcp.json",
       ),
   );
   plan.candidate.sha256 = canonicalDigest(plan.candidate.entries);

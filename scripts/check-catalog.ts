@@ -114,6 +114,7 @@ export const requiredRepositoryPaths = [
     "codex.toml",
     "dsh-headless.patch.yml",
     "rust-lints.toml",
+    "wx-docs.mcp.json",
   ].map((name) => `delivery/capability/${name}`),
   ...[
     "personal-skills",
@@ -189,6 +190,7 @@ export const requiredRepositoryPaths = [
   "delivery/skills/wechatide/SKILL.md",
   "delivery/skills/wechatide/references/capabilities.md",
   "delivery/skills/wechatide/references/cli.md",
+  "delivery/skills/wechatide/references/docs.md",
   "delivery/skills/wechatide/references/tasks.md",
   "delivery/skills/wechatide/scripts/call.sh",
   "delivery/skills/wechatide/skills/automator/SKILL.md",
@@ -203,6 +205,7 @@ export const requiredRepositoryPaths = [
   "delivery/skills/wechatide/skills/project-config/SKILL.md",
   "delivery/skills/wechatide/skills/project-config/references/fields.md",
   "delivery/skills/wechatide/skills/project-manager/SKILL.md",
+  "delivery/skills/wechatide/skills/simulator/SKILL.md",
   ".githooks/pre-commit",
   ...Object.values(testPaths).flat(),
   ".github/CODEOWNERS",

@@ -9,12 +9,15 @@
 | `codex.toml` | `${CODEX_HOME:-$HOME/.codex}/config.toml` |
 | `dsh-headless.patch.yml` | `${DSH_HOME:-$HOME/.dsh}/profiles/headless/cordis.patch.yml`，或调用时通过 `--patch` 传入 |
 | `rust-lints.toml` | 明确采用 `policy/rust.md` 的项目的 `Cargo.toml` |
+| `wx-docs.mcp.json` | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置；Codex 也可合并 `codex.toml` 中的 `mcp_servers.wx-docs` 段落 |
 
 ## 推荐值
 
-`codex.toml` 以注释展示与[操作边界](../policy/common.md#operation-boundaries)相配的可选设置；安装片段不启用这些设置。
+`codex.toml` 以注释展示与[操作边界](../policy/common.md#operation-boundaries)相配的可选设置与 `wx-docs` 文档服务示例；安装片段不启用这些设置。
 
 `dsh-headless.patch.yml` 让官方 `headless` profile 复用桌面端托管凭据，并选择 `opencode-go` 路由。片段只含插件开关和凭据引用名，不含密钥。默认 profile、凭据优先级、模型与参数由 [DeepSeek Harness 调用合同](../policy/deepseek-harness.md)维护。
+
+`wx-docs.mcp.json` 登记微信开放文档官方只读 Streamable HTTP MCP 服务（`https://developers.weixin.qq.com/doc/mcp`），无鉴权。客户端未挂载该服务时，由使用者自行将片段合并到对应 MCP 配置。
 
 ## 规则与执行配置
 

@@ -12,7 +12,7 @@ export const memberCategories = [
 
 export const products = ["codex", "dsh", "antigravity"] as const;
 export type Product = (typeof products)[number];
-export const darwinOnlySkills = new Set(["sketch-native"]);
+export const darwinOnlySkills = new Set(["sketch-native", "wechatide"]);
 const sharedPolicies = [
   "writing",
   "tool-contracts",
@@ -37,11 +37,13 @@ const capability: [string, string][] = [
   ["codex.toml", "delivery/capability/codex.toml"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 const dshCapability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 
 export type PublicMember = {
@@ -125,12 +127,16 @@ export function publicMembers(
       relative: `capability/${name}`,
       source,
     });
-  members.push({
-    category: "capability",
-    product: "antigravity",
-    relative: "capability/rust-lints.toml",
-    source: "delivery/capability/rust-lints.toml",
-  });
+  for (const [name, source] of [
+    ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+    ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
+  ] as const)
+    members.push({
+      category: "capability",
+      product: "antigravity",
+      relative: `capability/${name}`,
+      source,
+    });
   for (const product of products)
     members.push({
       category: "instructions",

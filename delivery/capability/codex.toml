@@ -7,3 +7,7 @@
 # reading). `on-request` prompts before outward or out-of-workspace actions.
 # sandbox_mode = "workspace-write"
 # approval_policy = "on-request"
+
+# Optional read-only WeChat official documentation MCP server (Streamable HTTP, no authentication).
+# [mcp_servers.wx-docs]
+# url = "https://developers.weixin.qq.com/doc/mcp"

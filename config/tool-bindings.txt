@@ -51,6 +51,7 @@ binding	delivery/skills/wechatide/skills/installer/SKILL.md	skill	wechatide-inst
 binding	delivery/skills/wechatide/skills/installer/scripts/check-install.mjs	script	wechatide-install-check	delivery/skills/wechatide/skills/installer/scripts/check-install.mjs	direct-execution	defined
 binding	delivery/skills/wechatide/skills/previewer/SKILL.md	skill	wechatide-call	delivery/skills/wechatide/scripts/call.sh	read-before-use	defined
 binding	delivery/skills/wechatide/skills/project-manager/SKILL.md	skill	wechatide-call	delivery/skills/wechatide/scripts/call.sh	read-before-use	defined
+binding	delivery/skills/wechatide/skills/simulator/SKILL.md	skill	wechatide-call	delivery/skills/wechatide/scripts/call.sh	read-before-use	defined
 binding	delivery/policy/tool-contracts.md	instructions	rg	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	delivery/policy/tool-contracts.md	instructions	jq	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	delivery/policy/tool-contracts.md	instructions	curl	delivery/policy/tool-contracts.md	read-before-use	defined

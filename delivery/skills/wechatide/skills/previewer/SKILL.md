@@ -1,7 +1,7 @@
 ---
 name: previewer
 description: >-
-  Preview and publish a WeChat Mini Program or Mini Game on macOS: push a preview to the developer's WeChat, create a preview QR code, or upload the code package as a trial version when the user explicitly asks for it. Not compilation, diagnostics, page automation or cloud operations.
+  Preview and publish a WeChat Mini Program or Mini Game on macOS: push a preview to mobile or PC WeChat, create a preview QR code, or upload the code package as a trial version (with optional file-size breakdown) when the user explicitly asks for it. Not compilation, diagnostics, page automation or cloud operations.
 ---
 
 # Preview and upload
@@ -14,11 +14,11 @@ These operations act on the project's current code and need a logged-in develope
 
 | Goal | Operation | Effect |
 | --- | --- | --- |
-| Preview on the developer's phone | `auto_preview --project PATH` | Pushes the preview into the developer's WeChat; writes no QR code file |
+| Preview on mobile or PC WeChat | `auto_preview --project PATH` | Pushes the preview into the developer's mobile or PC WeChat; writes no QR code file |
 | Preview QR code | `create_preview_qrcode --project PATH --qr-format window` | Returns a scannable preview QR code, shown in a new window |
 | Publish a trial version | `upload --project PATH --upload-version VERSION` | Uploads the code package as that version's trial build |
 
-`--page-path`, `--query` and `--scene` select the previewed page, its parameters and its scene value for both preview operations. The page path is a route inside the project, such as `pages/index/index`, not the absolute `--project` path. `--desc` records the uploaded version's note. Pass no local output path to `auto_preview`. When the user asked for a QR code file, use `create_preview_qrcode --qr-output` instead and check that writing there is authorized. Check flags with `OPERATION -h` before first use.
+`--page-path`, `--query` and `--scene` select the previewed page, its parameters and its scene value for both preview operations. The page path is a route inside the project, such as `pages/index/index`, not the absolute `--project` path. Pass `--auto-preview-type mobile` or `--auto-preview-type pc` to `auto_preview` to select the target WeChat client; omitting it keeps DevTools' current setting (default `mobile`). Pass no local output path to `auto_preview`. When the user asked for a QR code file, use `create_preview_qrcode --qr-output` instead and check that writing there is authorized. `--desc` records the uploaded version's note, and `--file-size` (`--file-size` or `--file-size true`, default `false`) adds `info.package_file_size` with per-subpackage file names and byte sizes to a successful upload result. Check flags with `OPERATION -h` before first use.
 
 ## Upload
 

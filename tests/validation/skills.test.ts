@@ -19,39 +19,30 @@ import { fixtureRepository, repositoryRoot } from "./fixtures.ts";
 const skill = (name: string) =>
   `---\nname: ${name}\ndescription: Read a synthetic fixture.\n---\n\n# Fixture\n\nRead the supplied value.\n`;
 
-test("delivered skills scope dual-product shared entries and reach all products on macOS for Sketch", () => {
+test("delivered skills scope macOS-only entries and reach all three products", () => {
   const entries = readSkillEntries(repositoryRoot);
-  assert.equal(entries.length, 19);
+  assert.equal(entries.length, 20);
   assert.equal(
     entries.find((entry) => entry.path === "project-guide")?.target,
     "codex,dsh,antigravity",
   );
   assert.ok(
-    entries.every((entry) =>
-      ["shared", "codex,dsh,antigravity"].includes(entry.target),
-    ),
+    entries.every((entry) => entry.target === "codex,dsh,antigravity"),
   );
   assert.deepEqual(selectSkillEntries(entries, "codex"), entries);
-  assert.deepEqual(
-    selectSkillEntries(entries, "antigravity").map((entry) => entry.path),
-    [
-      "alibabacloud-find-skills",
-      "alibabacloud-sms-send-short-message",
-      "gh",
-      "modern-web-guidance",
-      "project-guide",
-      "property-based-testing",
-      "rust-risk-review",
-      "sketch-native",
-      "web-quality-audit",
-    ],
-  );
+  assert.deepEqual(selectSkillEntries(entries, "antigravity"), entries);
   assert.deepEqual(selectSkillEntries(entries, "dsh"), entries);
   assert.deepEqual(
-    publicMembers(entries)
+    publicMembers(entries, undefined, "darwin")
       .filter((member) => member.source === "delivery/skills/wechatide")
       .map((member) => member.product),
-    ["codex", "dsh"],
+    ["codex", "dsh", "antigravity"],
+  );
+  assert.deepEqual(
+    publicMembers(entries, undefined, "linux").filter(
+      (member) => member.source === "delivery/skills/wechatide",
+    ),
+    [],
   );
   assert.deepEqual(
     publicMembers(entries, undefined, "darwin")
@@ -66,10 +57,10 @@ test("delivered skills scope dual-product shared entries and reach all products 
     [],
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 19, DeepSeek Harness 19, Antigravity 9",
-    "Codex skill validation: 19 entries",
-    "DeepSeek Harness skill validation: 19 entries",
-    "Antigravity skill validation: 9 entries",
+    "Skill membership: DELIVERED; Codex 20, DeepSeek Harness 20, Antigravity 20",
+    "Codex skill validation: 20 entries",
+    "DeepSeek Harness skill validation: 20 entries",
+    "Antigravity skill validation: 20 entries",
   ]);
 });
 
@@ -124,17 +115,17 @@ test("nested members belong to their top-level skill and do not add install targ
     "suite",
   );
   assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 12);
-  assert.equal(selectSkillEntries(entries, "dsh").length, 21);
+  assert.equal(selectSkillEntries(entries, "dsh").length, 22);
   assert.ok(
     !selectSkillEntries(entries, "dsh").some(
       (entry) => entry.path === "private",
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 22, DeepSeek Harness 21, Antigravity 9",
-    "Codex skill validation: 22 entries",
-    "DeepSeek Harness skill validation: 21 entries",
-    "Antigravity skill validation: 9 entries",
+    "Skill membership: DELIVERED; Codex 23, DeepSeek Harness 22, Antigravity 20",
+    "Codex skill validation: 23 entries",
+    "DeepSeek Harness skill validation: 22 entries",
+    "Antigravity skill validation: 20 entries",
   ]);
 });
 
