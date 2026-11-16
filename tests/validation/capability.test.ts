@@ -77,7 +77,7 @@ test("delivery/capability/codex.toml's commented recommendations parse once unco
   );
   const recommended = body
     .split("\n")
-    .filter((line) => /^#\s*[a-z_]+\s*=/.test(line))
+    .filter((line) => /^#\s*(?:\[[a-z0-9_.-]+\]|[a-z_]+\s*=)/i.test(line))
     .map((line) => line.replace(/^#\s*/, ""));
   const result = parseToml(`${recommended.join("\n")}\n`);
   assert.equal(
@@ -89,8 +89,39 @@ test("delivery/capability/codex.toml's commented recommendations parse once unco
   // future edit that silently drops a recommended key.
   assert.deepEqual([...result.keys].sort(), [
     "approval_policy",
+    "mcp_servers",
     "sandbox_mode",
   ]);
+  const fullParsed = spawnSync(
+    bun,
+    [
+      "-e",
+      "const parsed = Bun.TOML.parse(await Bun.stdin.text()); console.log(JSON.stringify(parsed.mcp_servers));",
+    ],
+    {
+      cwd: root,
+      input: `${recommended.join("\n")}\n`,
+      encoding: "utf8",
+      timeout: 30_000,
+    },
+  );
+  assert.equal(fullParsed.status, 0, fullParsed.stderr.trim());
+  assert.deepEqual(JSON.parse(fullParsed.stdout.trim()), {
+    "wx-docs": { url: "https://developers.weixin.qq.com/doc/mcp" },
+  });
+});
+
+test("delivery/capability/wx-docs.mcp.json parses as a valid MCP server fragment", () => {
+  const body = readFileSync(
+    path.join(root, "delivery/capability/wx-docs.mcp.json"),
+    "utf8",
+  );
+  assert.deepEqual(JSON.parse(body), {
+    mcpServers: {
+      "wx-docs": { url: "https://developers.weixin.qq.com/doc/mcp" },
+    },
+  });
+  assert.throws(() => JSON.parse("{invalid"), SyntaxError);
 });
 
 test("the readers used here reject a malformed file", () => {

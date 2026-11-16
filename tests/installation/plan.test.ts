@@ -350,6 +350,7 @@ function installDistinctProducts(
     "README.md",
     "dsh-headless.patch.yml",
     "rust-lints.toml",
+    "wx-docs.mcp.json",
   ]);
   assert.deepEqual(readdirSync(path.join(dsh, "skills")).sort(), skills.dsh);
   const verified = f.cli(
@@ -409,6 +410,7 @@ test("explicit Antigravity selection contains its platform-compatible skills and
     [
       "antigravity:AGENTS.md",
       "antigravity:capability/rust-lints.toml",
+      "antigravity:capability/wx-docs.mcp.json",
       "antigravity:alibabacloud-find-skills",
       "antigravity:alibabacloud-sms-send-short-message",
       "antigravity:gh",
@@ -425,7 +427,9 @@ test("explicit Antigravity selection contains its platform-compatible skills and
       "antigravity:property-based-testing",
       "antigravity:rust-risk-review",
       "antigravity:web-quality-audit",
-      ...(process.platform === "darwin" ? ["antigravity:sketch-native"] : []),
+      ...(process.platform === "darwin"
+        ? ["antigravity:sketch-native", "antigravity:wechatide"]
+        : []),
       "antigravity:tools/check-ids.mjs",
       "antigravity:tools/check-prose.mjs",
       "antigravity:tools/task-temp.mjs",

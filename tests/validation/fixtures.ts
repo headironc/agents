@@ -171,7 +171,7 @@ export function fixtureRepository(t: TestContext) {
     put(
       "config/personal-skills.txt",
       "sketch-native\tcodex,dsh,antigravity\n" +
-        "gh\tcodex,dsh,antigravity\nalibabacloud-find-skills\tcodex,dsh,antigravity\nalibabacloud-sms-send-short-message\tcodex,dsh,antigravity\nwechatide\tshared\nwechatide/skills/automator\tshared\nwechatide/skills/cloudbase-operator\tshared\nwechatide/skills/compiler\tshared\nwechatide/skills/debugger\tshared\nwechatide/skills/initializer\tshared\nwechatide/skills/installer\tshared\nwechatide/skills/previewer\tshared\nwechatide/skills/project-config\tshared\nwechatide/skills/project-manager\tshared\n" +
+        "gh\tcodex,dsh,antigravity\nalibabacloud-find-skills\tcodex,dsh,antigravity\nalibabacloud-sms-send-short-message\tcodex,dsh,antigravity\nwechatide\tcodex,dsh,antigravity\nwechatide/skills/automator\tcodex,dsh,antigravity\nwechatide/skills/cloudbase-operator\tcodex,dsh,antigravity\nwechatide/skills/compiler\tcodex,dsh,antigravity\nwechatide/skills/debugger\tcodex,dsh,antigravity\nwechatide/skills/initializer\tcodex,dsh,antigravity\nwechatide/skills/installer\tcodex,dsh,antigravity\nwechatide/skills/previewer\tcodex,dsh,antigravity\nwechatide/skills/project-config\tcodex,dsh,antigravity\nwechatide/skills/project-manager\tcodex,dsh,antigravity\nwechatide/skills/simulator\tcodex,dsh,antigravity\n" +
         "project-guide\tcodex,dsh,antigravity\n" +
         "modern-web-guidance\tcodex,dsh,antigravity\n" +
         "property-based-testing\tcodex,dsh,antigravity\n" +

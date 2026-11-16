@@ -91,16 +91,17 @@
 
 ## 微信项目配置、DevTools 初始化、编译、诊断、预览、项目列表、自动化、云开发与安装诊断
 
-[wechatide](../delivery/skills/wechatide/SKILL.md) 从[实际交付索引](../delivery/skills/wechatide/references/capabilities.md)路由九个子入口并核验返回：
+[wechatide](../delivery/skills/wechatide/SKILL.md) 从[实际交付索引](../delivery/skills/wechatide/references/capabilities.md)路由十个子入口与[官方文档检索](../delivery/skills/wechatide/references/docs.md)并核验返回：
 
-- **本地配置与安装诊断（无需启动 DevTools）**：[project-config](../delivery/skills/wechatide/skills/project-config/SKILL.md) 按[字段规则](../delivery/skills/wechatide/skills/project-config/references/fields.md)读取与合并本地 JSON 配置，不触发项目 hooks；[installer](../delivery/skills/wechatide/skills/installer/SKILL.md) 仅在执行器报 `cli-unavailable` / `cli-unbound` 或用户明确询问安装状态时调用只读 `check-install.mjs`，诊断十二类安装与 `PATH` 状态，不自动下载、安装或修改 `PATH`。
-- **DevTools CLI 执行与业务子入口（仅限 macOS）**：[initializer](../delivery/skills/wechatide/skills/initializer/SKILL.md)、[compiler](../delivery/skills/wechatide/skills/compiler/SKILL.md)、[debugger](../delivery/skills/wechatide/skills/debugger/SKILL.md)、[previewer](../delivery/skills/wechatide/skills/previewer/SKILL.md)、[project-manager](../delivery/skills/wechatide/skills/project-manager/SKILL.md)、[automator](../delivery/skills/wechatide/skills/automator/SKILL.md) 与 [cloudbase-operator](../delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md) 统一经[调用执行器](../delivery/skills/wechatide/scripts/call.sh)与 [CLI 合同](../delivery/skills/wechatide/references/cli.md)（适配 DevTools `2.02.2610302` / 技能 `0.3.15` skill-call 路线，固定客户端名 `ClaudeCode`、`Codex`，不读取钥匙串或注入 Token；登录与客户端授权按[异步任务](../delivery/skills/wechatide/references/tasks.md)有界轮询）。发布、运行态改动和云写操作按各子技能绑定具体目标与有效授权，复用已覆盖的任务或批次授权。未知写结果先回读，不盲目重发。
+- **本地配置、官方文档与安装诊断（无需启动 DevTools）**：[project-config](../delivery/skills/wechatide/skills/project-config/SKILL.md) 按[字段规则](../delivery/skills/wechatide/skills/project-config/references/fields.md)读取与合并本地 JSON 配置，不触发项目 hooks；[官方文档检索](../delivery/skills/wechatide/references/docs.md)通过无鉴权 `wx-docs` Streamable HTTP MCP 查询 DevTools 与微信全站官方板块（未配置时提示合并 `wx-docs.mcp.json` 或 `codex.toml` 片段，不代写配置也不误调 `wechatide`）；[installer](../delivery/skills/wechatide/skills/installer/SKILL.md) 仅在执行器报 `cli-unavailable` / `cli-unbound` 或用户明确询问安装状态时调用只读 `check-install.mjs`，诊断十二类安装与 `PATH` 状态，不自动下载、安装或修改 `PATH`。
+- **DevTools CLI 执行与业务子入口（仅限 macOS）**：[initializer](../delivery/skills/wechatide/skills/initializer/SKILL.md)、[compiler](../delivery/skills/wechatide/skills/compiler/SKILL.md)、[simulator](../delivery/skills/wechatide/skills/simulator/SKILL.md)、[debugger](../delivery/skills/wechatide/skills/debugger/SKILL.md)、[previewer](../delivery/skills/wechatide/skills/previewer/SKILL.md)、[project-manager](../delivery/skills/wechatide/skills/project-manager/SKILL.md)、[automator](../delivery/skills/wechatide/skills/automator/SKILL.md) 与 [cloudbase-operator](../delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md) 统一经[调用执行器](../delivery/skills/wechatide/scripts/call.sh)与 [CLI 合同](../delivery/skills/wechatide/references/cli.md)（适配 DevTools `2.02.2611162` / 技能 `0.3.17` skill-call 路线，固定客户端名 `Antigravity`、`ClaudeCode`、`Codex`，不读取钥匙串或注入 Token；登录与客户端授权按[异步任务](../delivery/skills/wechatide/references/tasks.md)有界轮询）。支持 `open_project_window --always-on-top`、`auto_preview --auto-preview-type mobile|pc`、`upload --file-size`、模拟器工具栏操作及按明确授权协调从零建项。发布、运行态改动和云写操作按各子技能绑定具体目标与有效授权，复用已覆盖的任务或批次授权。未知写结果先回读，不盲目重发。
 
-十个入口均为验证成员，安装成员只有顶层 `wechatide`（上游 `0.3.15` 新增的 `simulator` 入口及未登记别名仍拒绝）。来源与实测边界见[来源记录](skill-sources.md#wechatide)（本机已实测客户端授权、只读状态、云开发 `-h` 与 `check-install.mjs`，其余开窗、编译、自动化、预览上传与云端读写由离线假 CLI 回归与下列静态场景覆盖）：
+十一个入口均为三端共享验证成员，顶层安装成员只有 `wechatide`（限 macOS 安装，非 macOS 平台自动跳过）。全部 51 个非废弃 `skill_call` 操作均可调用，未登记别名及废弃的 `project_setting_*` 仍拒绝。来源与实测边界见[来源记录](skill-sources.md#wechatide)（本机已实测 `2.02.2610302` 客户端授权与只读状态、`2.02.2611162` 下的 `check-install.mjs` 与 `simulator_get_device` / `auto_preview -h` 路由，以及 `wx-docs` MCP 只读握手与板块查询，其余开窗、编译、模拟器、自动化、预览上传与云端读写由离线假 CLI 回归与下列静态场景覆盖）：
 
 - [本地配置](../tests/scenarios/rules.md#wechatide-顶层与本地配置)
 - [初始化](../tests/scenarios/rules.md#wechatide-devtools-初始化)
 - [编译](../tests/scenarios/rules.md#wechatide-编译与刷新)
+- [模拟器工具栏](../tests/scenarios/rules.md#wechatide-模拟器工具栏)
 - [诊断](../tests/scenarios/rules.md#wechatide-诊断)
 - [预览](../tests/scenarios/rules.md#wechatide-预览与上传)
 - [项目列表](../tests/scenarios/rules.md#wechatide-项目列表与代码片段)
@@ -250,23 +251,23 @@ bash scripts/install.sh status
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
 | Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/*.md` | `delivery/policy/` 中适用于 Codex 的政策 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
-| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应四个文件 |
+| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应五个文件 |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
 | Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
 | DeepSeek Harness 按需参考 | `${DSH_HOME:-$HOME/.dsh}/policy/*.md` | `delivery/policy/` 中适用于 dsh 的政策 |
 | DeepSeek Harness 工具 | `${DSH_HOME:-$HOME/.dsh}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
-| DeepSeek Harness 推荐配置 | `${DSH_HOME:-$HOME/.dsh}/capability/{README.md,dsh-headless.patch.yml,rust-lints.toml}` | 同一份 `delivery/capability/` 适用配置片段 |
+| DeepSeek Harness 推荐配置 | `${DSH_HOME:-$HOME/.dsh}/capability/{README.md,dsh-headless.patch.yml,rust-lints.toml,wx-docs.mcp.json}` | 同一份 `delivery/capability/` 适用配置片段 |
 | DeepSeek Harness 指令 | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` | `delivery/products/dsh/AGENTS.md` 生成物 |
 | DeepSeek Harness 技能 | `${DSH_HOME:-$HOME/.dsh}/skills/<name>` | 清单选择 `dsh` 的完整顶层目录 |
 | Antigravity 全局指令 | `$HOME/.gemini/AGENTS.md` | `delivery/products/antigravity/AGENTS.md` 生成物；CLI 与 App 共用 |
 | Antigravity 按需参考 | `$HOME/.gemini/config/policy/*.md` | 通用规则、执行、写作、工具、评审、Antigravity 运行与使用政策及采用后的 Rust/SQL 政策 |
 | Antigravity 工具 | `$HOME/.gemini/config/tools/<name>.mjs` | 同一份打包工具 |
-| Antigravity Rust 参考配置 | `$HOME/.gemini/config/capability/rust-lints.toml` | 采用 Rust 偏好的项目可合并；不自动修改项目配置 |
+| Antigravity 参考配置 | `$HOME/.gemini/config/capability/{rust-lints.toml,wx-docs.mcp.json}` | 采用 Rust 偏好的项目或启用微信文档 MCP 时可合并；不自动修改项目或客户端配置 |
 | Antigravity App 与 CLI 技能 | `$HOME/.gemini/config/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
-Codex 与 DeepSeek Harness（`dsh`）在 macOS 上均交付十个完整顶层包、十九个内容入口。其他平台交付九个包、十八个入口。`sketch-native` 依赖 macOS 原生 Sketch 与内置 MCP 服务，仅在 macOS 上向 Codex、DeepSeek Harness 和 Antigravity App 和 CLI 安装，非 macOS 平台自动跳过。wechatide 的九个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及三份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
+Codex、DeepSeek Harness（`dsh`）与 Antigravity App 和 CLI 在 macOS 上均交付十个完整顶层包、二十个内容入口。非 macOS 平台自动跳过依赖 macOS 原生环境的 `sketch-native` 与 `wechatide`，三端均交付八个顶层包、八个内容入口。wechatide 的十个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及四份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
 
-Antigravity App 与 CLI 接收 `gh`、`project-guide`、`modern-web-guidance`、`property-based-testing`、`rust-risk-review`、`web-quality-audit`、`alibabacloud-find-skills` 和 `alibabacloud-sms-send-short-message`。macOS 另交付 `sketch-native`，共九个顶层包及九个入口；其他平台交付八个包。配套交付本端全局规则、公共政策与本端运行政策（`policy/antigravity.md`）、三个工具和 Rust lint 参考片段，不接收 Codex 专属模型路线或产品配置。wechatide 的执行器只接受上游固定的 `Codex` 与 `ClaudeCode` 客户端枚举，不向 Antigravity 发布。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 表示 Codex 与 DeepSeek Harness，不自动扩张。
+Antigravity App 与 CLI 接收与另外两端一致的通用与平台技能集合（macOS 十个顶层包，其他平台八个顶层包），配套交付本端全局规则、公共政策与本端运行政策（`policy/antigravity.md`）、三个工具和 `rust-lints.toml`、`wx-docs.mcp.json` 两份参考片段，不接收 Codex 专属模型路线或产品配置。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 保留作为 Codex 与 DeepSeek Harness 双端兼容目标，不自动扩张。
 
 Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。Antigravity 新计划使用 `$HOME/.gemini`，V6/V7 旧记录沿用其记录的 CLI 根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 

@@ -1352,7 +1352,9 @@ test("the frozen runtime applies and recovers after its source checkout is remov
   for (const product of ["codex", "dsh"]) {
     for (const relative of [
       "skills/gh/SKILL.md",
-      "skills/wechatide/skills/project-config/SKILL.md",
+      ...(process.platform === "darwin"
+        ? ["skills/wechatide/skills/project-config/SKILL.md"]
+        : []),
       "policy/review.md",
     ])
       assert.ok(

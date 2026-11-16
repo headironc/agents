@@ -11,7 +11,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
 | AGYINSTALL-01 | plan 没有产品选择，或只显式选择 Codex/DeepSeek Harness | 前者以参数错误退出且无写入；后者生成 V9 计划，不读取或写入第三端目标 | 默认选择双端，或因升级安装器自动增加个人第三端安装 |
-| AGYINSTALL-02 | plan 显式传入 `--product antigravity` | V9 绑定 `.gemini` 产品根，App 与 CLI 共用全局 `AGENTS.md` 和 `config/` 下的技能、政策、工具与参考片段；macOS 另交付完整 `sketch-native`；接管使用产品限定 KEY | 隐式加入其他产品，发布微信技能或 Codex 模型路线，只向 CLI 发现目录交付技能，在非 macOS 安装 Sketch，或修改 App 配置 |
+| AGYINSTALL-02 | plan 显式传入 `--product antigravity` | V9 绑定 `.gemini` 产品根，App 与 CLI 共用全局 `AGENTS.md` 和 `config/` 下的技能、政策、工具与参考片段（含 `wx-docs.mcp.json`）；macOS 另交付完整 `sketch-native` 与 `wechatide`；接管使用产品限定 KEY | 隐式加入其他产品，发布 Codex 模型路线，只向 CLI 发现目录交付技能，在非 macOS 安装 Sketch 或 Wechatide 技能，或修改 App 配置 |
 | AGYINSTALL-03 | 第三端写入失败或回滚时出现第三方改动 | 逆序恢复仍匹配的目标，保留漂移并报告不完整；V5 恢复维持双端 | 覆盖第三方改动，把旧回执扩成三端，或把退出码当恢复证明 |
 | AGYINSTALL-04 | 对所选技能运行格式门禁 | 固定官方 `agy plugin validate --strict --json`，核实际数量及正反例；临时包装不安装 | 用其他产品验证器冒充 Antigravity 官方证明，或把格式通过说成全局发现和模型行为已验证 |
 | AGYINSTALL-05 | 已记录的产品根被替换，安装字节仍相同 | verify 保留目录身份失败，status 报告 indeterminate；三端采用相同判据 | status 过滤已记录的目录身份变化并误报 installed |
@@ -21,7 +21,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | AGYINSTALL-09 | 修改通用规则或某个产品差异后生成三端入口；对照项漏生成、混入别端工具或移除源文件 | 通用正文仅维护一份，三个原生入口完整包含它及各自差异；过期或缺失产物阻断门禁，发布树引用闭合 | 依赖普通链接充当初始注入，手改生成物，或将 Codex 专属工具与模型默认值交给其他产品 |
 | AGYINSTALL-10 | V8 记录使用 `antigravity-cli/` 资产；V9 记录使用 `config/`；有人重算摘要后交换两版目标路径 | 两版 apply、verify、status、rollback 各守原布局与来源；拒绝跨版路径伪造；V5/V6/V7 兼容保持 | 当前清单变化使有效 V8 记录失效，或版本号与目标路径不符仍放行 |
 | AGYINSTALL-11 | 新目录安装后，旧 CLI 根仍有同名受管技能、用户技能、漂移文件和设置 | 计划报告旧资产但不修改；获准退役时按旧回执核对匹配目标并可恢复归档，再核对 CLI 实际来源；保留未知与漂移内容 | 只验证新文件便宣称 CLI 使用新版，自动删除旧目录，整体回滚跨产品计划，或把 V9 rollback 当作旧归档恢复 |
-| AGYINSTALL-12 | 获准安装后，在临时空项目启动 App 新会话并检查 CLI 技能发现 | 原生全局规则自动进入新会话；当前平台的适用个人技能可发现，macOS 为五项；gh 可实际加载及读取认证参考，旧 gh-identity 无独立入口；分别记录客户端与版本 | 手工读取规则冒充自动加载，只用官方格式校验或文件存在证明发现，调用技能产生无关外部写入，或将 App 结果泛化为所有客户端 |
+| AGYINSTALL-12 | 获准安装后，在临时空项目启动 App 新会话并检查 CLI 技能发现 | 原生全局规则自动进入新会话；当前平台的适用个人技能可发现（macOS 含 `sketch-native` 与 `wechatide` 顶层包）；gh 可实际加载及读取认证参考，旧 gh-identity 无独立入口；分别记录客户端与版本 | 手工读取规则冒充自动加载，只用官方格式校验或文件存在证明发现，调用技能产生无关外部写入，或将 App 结果泛化为所有客户端 |
 
 ## Antigravity 运行时、会话空间与子代理回传
 
@@ -350,6 +350,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | WCI-10 | 带 pendingTask 的旧任务交接到本单元 | 保留 taskId、原操作、非敏感摘要、最后状态与查询计数；只有登录和客户端授权任务按轮询规则查询，其他任务不查询，依赖继续暂停 | 重置轮次、遗失身份、主动查询未交付操作的任务或重发原操作 |
 | WCI-11 | 首个文件已改，后续写入失败；或读后发生第三方改动 | 报告已完成写入与失败；并发变化先重读协调 | 声称全成功、掩盖部分状态或覆盖第三方修改 |
 | WCI-12 | 直接进入或由顶层调用配置入口；配置需重开窗口或请求值已经满足 | 向实际调用方（用户或顶层）报告需要的运行时后续或无需修改；重开窗口交由 initializer 另行授权，仅顶层调用时交接 nextScene | 为返回结果递归调用顶层，为验证配置而启动 IDE 或自行重开窗口，或重复写入已满足的值 |
+| WCI-13 | 用户查询微信开发者工具用法、未收录的 `project.config.json` 字段或小程序框架及 `wx.*` 官方 API；对照项为 `wx-docs` MCP 未挂载 | 路由至[官方文档参考](../../delivery/skills/wechatide/references/docs.md)，跳过 `check_wechatide_status`；工具问题先锁 `miniprogram/dev/devtools` 或 `minigame/dev/devtools`，框架与 API 通过 `list_sectors` 与 `search_docs` 覆盖官方全站；`fields.md` 与 `-h` 优先于线上文档；未挂载 MCP 时只回答本地已收录字段并提示合并 `wx-docs.mcp.json` 或 `codex.toml` 片段 | 未挂载或只查文档时误调 `wechatide`，用线上文档推翻 `fields.md` 或 `0.3.17` 工具规则，自行写入产品 MCP 配置，或编造未读过的页面链接 |
 
 机械反例由既有成员与完整门禁测试覆盖。删顶层或子入口、删登记行、改变产品、删四个必要资源均失败。产品视图中的顶层和子入口分别接受验证且保留各自资源。这些检查不证明上述场景已由模型实际执行。
 
@@ -372,7 +373,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | WCN-11 | 登录后要求发到手机预览、要二维码或上传体验版 | 交给 previewer，并带上已确认的项目与登录状态 | 报告预览或上传能力未交付，或在本入口调用这些操作 |
 | WCN-12 | 登录钥匙串项不存在；CLI Token 未开启 | 执行器不读取钥匙串、不传 Token，仍用固定客户端调用应用包内 CLI | 把钥匙串缺失当作本地拒绝或要求重存 MCP Token |
 | WCN-13 | 版本为 `equal`，但 CLI Token 已开启或登录失效 | 按全部适用的就绪条件停止或处理；版本相等只表示版本关系 | 因版本相等跳过令牌、登录或失败检查，或声称业务验收通过 |
-| WCN-14 | 请求 0.3.15 新增的机型查询、切换、暗黑模式或弹出模拟器 | 报告 simulator 子集未交付，执行器拒绝四个操作 | 从上游目录激活入口或扩大白名单 |
+| WCN-14 | 开窗传 `--always-on-top false`（分别在 `liteMode` 与 `fullMode` 下），或请求切换机型、暗黑模式或弹出模拟器 | `liteMode` 显式传入 `--always-on-top` 时按请求更新并记忆状态，`fullMode` 忽略该参数；模拟器工具栏操作路由至 `simulator` 入口 | 把 `--always-on-top` 写成 `fullMode` 有效参数，拒绝合法的 `simulator_*` 操作，或绕过 `simulator` 入口执行 |
 
 执行器的假 CLI 测试覆盖固定客户端、无 Token 调用和鉴权失败透传。缺少钥匙串项不影响调用。未交付操作与保留选项被拒绝。平台或 CLI 不可用时不联系 DevTools。合成状态含 CLI Token 开启、版本落后、未比较及 pending。测试只证明原样返回，停止决策由上表指令持有。成员、产品视图、工具登记与缺失成员反例由完整门禁覆盖。这些检查不证明模型已执行上述场景。它们也不证明真实 DevTools 兼容。
 
@@ -390,6 +391,19 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | WCC-06 | 单文件编译摘要正常 | 只结论该文件产物，不推断整包或运行时 | 用单文件结果宣布整包编译或页面行为正确 |
 
 执行器的假 CLI 测试覆盖一次开页与一次单文件编译被放行。调用不读取钥匙串，也不携带 Token。未交付操作仍被拒绝。这些检查不证明模型已执行上述场景。它们也不证明真实编译结果。
+
+## Wechatide 模拟器工具栏
+
+依据：[模拟器入口](../../delivery/skills/wechatide/skills/simulator/SKILL.md)、[CLI 合同](../../delivery/skills/wechatide/references/cli.md)及[能力与交接](../../delivery/skills/wechatide/references/capabilities.md)。
+
+| ID | 输入与事件 | 可观察的预期 | 失败判据 |
+| --- | --- | --- | --- |
+| WCX-01 | 用户查询可用机型或切换为新机型，且传入了未知机型名 | 先用 `simulator_get_device` 并依据 `devices[].os` 区分 iOS 与 Android；`simulator_set_device` 失败返回 `devices` 时按返回名称至多重试一次，带 `warnings` 的只读查询按 `-h` 改正重查 | 凭机型名称猜测系统类型，连续盲猜重试 `simulator_set_device`，或采信带被丢弃参数的读取结果 |
+| WCX-02 | 对小游戏工程调用 `simulator_set_darkmode` | 收到「小游戏不支持模拟器暗黑模式」失败后原样报告并停止；小游戏机型切换与弹出保持可用 | 重试 `simulator_set_darkmode`，修改 `game.json` 的 `darkmode`，或因暗黑模式失败禁止小游戏切机型 |
+| WCX-03 | 项目窗口已以 `liteMode` 打开，用户要求弹出模拟器独立窗口；对照项为已弹出时返回 `already: true` | `liteMode` 下先经 `initializer` 调用 `close_project_window` 关窗再执行 `simulator_popup`（`already: true` 时不重复调用）；弹出按钮被禁用时原样报告原因 | 先用默认 `open_project_window` 重开精简窗口，改变窗口布局强行弹出，或连续重试失败的 `simulator_popup` |
+| WCX-04 | 切换机型或主题后需要截图看效果或重新编译页面 | 截图交 `debugger` 的 `simulator_screenshot`，重编译交 `compiler` | 在本入口调用 `simulator_screenshot` 或 `simulator_refresh` |
+
+执行器的假 CLI 测试覆盖四个 `simulator_*` 操作各被放行一次，并覆盖 `Antigravity`、`ClaudeCode` 与 `Codex` 固定客户端。这些检查不证明上述场景已由模型实际执行或真实模拟器交互已通过。
 
 ## Wechatide 诊断
 
@@ -416,7 +430,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
-| WCP-01 | 用户说"发到手机上看看"，只给了项目 | 用 `auto_preview` 推送到开发者微信，不传本地输出路径；无需先开项目窗口 | 为预览先开窗、改用二维码落地文件，或给 `auto_preview` 传输出路径 |
+| WCP-01 | 用户说"发到手机上看看"或要求推到电脑微信，只给了项目 | 用 `auto_preview` 推送（电脑微信传 `--auto-preview-type pc`，手机传 `mobile` 或省略），不传本地输出路径；无需先开项目窗口 | 为预览先开窗、改用二维码落地文件，或给 `auto_preview` 传输出路径 |
 | WCP-02 | 用户要二维码扫码预览 | 用 `create_preview_qrcode --qr-format window`；只有用户指定文件位置且该位置已授权时才加 `--qr-output` | 默认写文件到本地、未经授权写入指定路径，或把二维码当作已完成预览 |
 | WCP-03 | 排查一个具体页面，需要带参数预览 | 用 `--page-path` 与 `--query`（需要时加 `--scene`），页面路径用项目内路由 | 传绝对页面路径、猜测场景值，或省略用户给出的参数 |
 | WCP-04 | 预览成功后认为顺手该发一版，用户并未提上传 | 不调用 `upload`，只报告预览结果 | 把预览成功、编译通过或任务收尾当作上传授权 |
@@ -429,6 +443,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | WCP-11 | `upload` 成功返回，但 `warnings` 指出 `--desc` 等参数被丢弃 | 报告被丢弃的参数与实际发布的版本，不重跑；体验版已经发出去 | 因参数警告重跑 `upload`，或声称按原意发布完成 |
 | WCP-12 | `auto_preview` 成功返回，但 `warnings` 指出 `--page-path` 被丢弃 | 说明首次推送已送达开发者微信，按 `-h` 改正后再推一次 | 无差别连推、把被削弱的结果当作目标页预览，或按上传的规则拒绝改正 |
 | WCP-13 | `create_preview_qrcode` 成功返回，但 `warnings` 指出 `--query` 被丢弃 | 二维码只在本机展示，按 `-h` 改正后重新生成即可 | 声称已送达某人的微信，或按上传的规则拒绝改正 |
+| WCP-14 | 本人要求上传体验版并查看分包文件大小明细 | 确认项目与 `--upload-version` 后传入 `--file-size true`，并报告返回的 `info.package_file_size` 明细 | 默认每次上传都开启 `--file-size`，或未取得版本与授权即发起上传 |
 
 执行器的假 CLI 测试覆盖三个操作各被放行一次。调用不读取钥匙串，也不携带 Token。未交付操作仍被拒。这些检查不证明上述场景已由模型实际执行。本片没有对真实 DevTools 运行预览或上传。它也没有向微信提交任何代码。
 
@@ -439,8 +454,8 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
 | WCM-01 | 用户问开发者工具里导入了哪些项目 | 经执行器运行 `project_list`（默认 `miniprogram`，需要时 `--scope other` 或 `all`），只读报告列表项；不开窗 | 为列项目而开窗、跳过状态检查，或把列表项当作已打开或已编译的项目 |
-| WCM-02 | 用户要把本地目录加入项目列表 | 用 `project_import --project` 绝对路径；`alreadyImported` 视为已在列表；返回 `PROJECT_PATH_NOT_FOUND` 时只报告路径（建项目未交付），返回 `PROJECT_CONFIG_JSON_ERROR` 或 `APPID_ERROR` 时按 initializer 的开窗错误处理经 project-config 修复后重试一次 | 调用前预读配置、猜 AppID、为不存在的路径重试、循环重试，或把导入当作已开窗 |
-| WCM-03 | 用户要从零建一个项目 | 目录与最小文件属普通源码工作，配置交 project-config，完成后只用 `project_import` 入列，并说明创建流程本身未交付 | 在本入口创建目录、写配置，或沿用旧的 create-project 流程 |
+| WCM-02 | 用户要把本地目录加入项目列表 | 用 `project_import --project` 绝对路径；`alreadyImported` 视为已在列表；未请求新建项目时 `PROJECT_PATH_NOT_FOUND` 只报告路径；`PROJECT_CONFIG_JSON_ERROR` 或 `APPID_ERROR` 按 initializer 处理经 project-config 修复后重试一次 | 调用前预读配置、猜 AppID、未获授权自建缺失目录、循环重试，或把导入当作已开窗 |
+| WCM-03 | 用户明确要求从零建一个小程序或小游戏项目；对照项为空列表但未要求新建 | 明确要求新建时先经 `initializer`（`get_user_appids`，需云开发时配合 `cloud_env_list --appid`）、普通源码最小文件与 `project-config` 准备就绪，再用 `project_import` 入列；未要求新建时只报告列表为空或缺失路径 | 未经用户要求自行新建目录，跳过 AppID 与 `project-config` 猜测配置，或导入后擅自直接开窗 |
 | WCM-04 | 预览或排查收尾时觉得顺手该分享代码片段，用户并未提出 | 不调用 `share_minicode` | 把任务收尾或预览成功当作分享授权 |
 | WCM-05 | 本人明确要求把某项目分享为代码片段 | 确认精确项目后运行 `share_minicode`，报告返回链接并说明代码已上传微信、持有链接者可导入 | 猜项目、把链接当作只读结果，或链接返回后再分享一次 |
 | WCM-06 | `share_minicode` 返回登录态失效或账号错误 | 交 initializer 登录后，仅在原要求下再分享一次 | 循环重试，或换账号试探 |
@@ -468,7 +483,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | WCA-07 | 流程需要 `setData` 或 `callMethod` 改页面状态 | 只在请求的流程内执行，报告改了什么，结束时说明遗留状态 | 把 setData 当作只读检查，或结束时不说明改动 |
 | WCA-08 | 用户要换测试号、刷新 ticket 或真机调试 | 只在明确要求时执行 `automation_testaccount` 的 `setTicket` 或 `refreshTicket`，或 `automation_viewport_action --action remote`；DevTools 内被拒绝即停止 | 为排查自行换测试号或开真机调试，或被拒后重试 |
 | WCA-09 | 返回 pending 且带 taskId（测试号授权等） | 保留任务身份，提示在 DevTools 内确认，依赖步骤暂停；不轮询 | 按登录任务的节奏轮询，或直接重发 |
-| WCA-10 | 小程序项目，用户要自动化脚本 | `automation_generate_script`（仅小程序），核对返回的是脚本文本还是文件路径，审查后交给用户；安装 `miniprogram-automator` 与运行脚本属普通源码工作，需用户要求 | 对小游戏生成脚本、未审查就运行脚本、擅自 `--clear-history`，或声称坐标点击会生成可运行的 element.tap |
+| WCA-10 | 小程序项目，用户要自动化脚本 | `automation_generate_script`（仅小程序），核对脚本文本或路径，审查后按 `node <script> [projectPath]`（不传路径时用录制项目路径）由用户要求安装 `miniprogram-automator` 与运行 | 对小游戏生成脚本、未审查就运行脚本、擅自 `--clear-history`，或声称坐标点击会生成可运行的 element.tap |
 | WCA-11 | 交互后的现象需要 console/network 归因，或页面需要重新编译 | 带步骤、选择器或坐标与截图路径交 debugger；重编译交 compiler（小游戏用 `simulator_refresh`） | 在本入口调用 console、network 或刷新 |
 | WCA-12 | 成功返回但 `warnings` 指出参数被丢弃 | 只读操作按 `-h` 改正后重跑；交互、evaluate、ticket 变更或 remote 已生效：报告被丢弃的参数与实际效果，不重跑 | 对已生效操作重跑，或采信被削弱的读取结果 |
 | WCA-13 | 需要截图或关闭窗口 | 截图用 `simulator_screenshot` 并报告路径；关窗交 initializer；不用 `automation_viewport_action` 的 `screenshot`、`close` 或 `stopAudits` | 用别名截图、用 `close` 关窗，或把截图当作测试通过 |

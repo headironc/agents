@@ -28,11 +28,11 @@ A login result means the QR code is ready, not that the user has logged in. Tell
 
 ## Project windows
 
-Use liteMode by default; request `--window-mode fullMode` only when the task needs the editor or debugger. Opening an already open project returns its window, so do not reopen it to refresh state. Call the operation first instead of pre-reading project configuration, then handle a returned reason or code:
+Use `liteMode` by default; request `--window-mode fullMode` only when the task enters editing or debugging. Pass `--always-on-top true` or `--always-on-top false` (or `--always-on-top=false`) only for `liteMode` windows (`fullMode` ignores `--always-on-top`). When `--always-on-top` is omitted on a new `liteMode` window, DevTools reuses its last recorded pin preference and defaults to `true` if unrecorded; passing `false` disables top-pinning and saves that preference. Opening an already-open project returns its window without changing `windowMode`, and omitting `--always-on-top` preserves the open `liteMode` window's pin state while passing it updates that state. Call the operation first instead of pre-reading project configuration, then handle a returned reason or code:
 
 | Error | Handling |
 | --- | --- |
-| `PROJECT_PATH_NOT_FOUND` | Report the path; creating a project is not delivered |
+| `PROJECT_PATH_NOT_FOUND` | When project creation was not requested, report the missing path and stop. When the user explicitly asks to create a project from scratch, resolve an AppID with `get_user_appids` (and cloud environments via `cloudbase-operator` `cloud_env_list --appid` when CloudBase applies), create minimal starter files as ordinary source work (`app.json` and starter page for `miniprogram`, or `game.json` and `game.js` for `game`), configure `project.config.json` via `project-config`, and register the directory with `project-manager` (`project_import`) before opening a window |
 | `PROJECT_CONFIG_JSON_ERROR` | Hand the path and error to project-config; retry once after its verified repair |
 | `APPID_ERROR` | Use a supplied AppID or list AppIDs for the user to choose; hand the change to project-config and retry once |
 

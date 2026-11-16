@@ -23,7 +23,7 @@ const status = [
   "ClaudeCode",
   "check_wechatide_status",
   "--skill-version",
-  "0.3.15",
+  "0.3.17",
 ];
 
 function fixture(t, options = {}) {
@@ -97,7 +97,20 @@ test("calls the bundled CLI without a token even when keychain access is unavail
     '{"ok":true,"tool":"check_wechatide_status","result":{"loginExpired":false}}\n',
   );
   assert.deepEqual(result.calls, [
-    `cli [-c] [ClaudeCode] [check_wechatide_status] [--skill-version] [0.3.15]`,
+    `cli [-c] [ClaudeCode] [check_wechatide_status] [--skill-version] [0.3.17]`,
+  ]);
+});
+
+test("calls the bundled CLI for Antigravity without a token", (t) => {
+  const result = fixture(t)([
+    "Antigravity",
+    "check_wechatide_status",
+    "--skill-version",
+    "0.3.17",
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.calls, [
+    `cli [-c] [Antigravity] [check_wechatide_status] [--skill-version] [0.3.17]`,
   ]);
 });
 
@@ -213,6 +226,17 @@ for (const [name, args] of [
     ],
   ],
   [
+    "a pushed PC preview",
+    [
+      "Antigravity",
+      "auto_preview",
+      "--project",
+      "/work/app",
+      "--auto-preview-type",
+      "pc",
+    ],
+  ],
+  [
     "a preview QR code",
     [
       "Codex",
@@ -224,7 +248,7 @@ for (const [name, args] of [
     ],
   ],
   [
-    "a trial upload",
+    "a trial upload with file sizes",
     [
       "ClaudeCode",
       "upload",
@@ -234,7 +258,52 @@ for (const [name, args] of [
       "1.0.0",
       "--desc",
       "first trial",
+      "--file-size",
+      "true",
     ],
+  ],
+  [
+    "a lite window without top-pinning",
+    [
+      "Antigravity",
+      "open_project_window",
+      "--project",
+      "/work/app",
+      "--window-mode",
+      "liteMode",
+      "--always-on-top",
+      "false",
+    ],
+  ],
+  [
+    "a simulator device list query",
+    ["Antigravity", "simulator_get_device", "--project", "/work/app"],
+  ],
+  [
+    "a simulator device switch",
+    [
+      "Codex",
+      "simulator_set_device",
+      "--project",
+      "/work/app",
+      "--device",
+      "iPhone 15",
+    ],
+  ],
+  [
+    "a simulator dark mode update",
+    [
+      "ClaudeCode",
+      "simulator_set_darkmode",
+      "--project",
+      "/work/app",
+      "--mode",
+      "dark",
+    ],
+  ],
+  [
+    "a simulator popup request",
+    ["Antigravity", "simulator_popup", "--project", "/work/app"],
   ],
 ])
   test(`runs ${name} without a token`, (t) => {
@@ -729,7 +798,7 @@ for (const result of [
     assert.equal(output.status, 0);
     assert.equal(output.stdout, `${stdout}\n`);
     assert.deepEqual(output.calls, [
-      "cli [-c] [ClaudeCode] [check_wechatide_status] [--skill-version] [0.3.15]",
+      "cli [-c] [ClaudeCode] [check_wechatide_status] [--skill-version] [0.3.17]",
     ]);
   });
 
@@ -762,16 +831,6 @@ for (const [name, args, code] of [
     ["Codex", "project_setting_update"],
     "undelivered-operation",
   ],
-  ...[
-    "simulator_get_device",
-    "simulator_set_device",
-    "simulator_set_darkmode",
-    "simulator_popup",
-  ].map((operation) => [
-    operation,
-    ["Codex", operation, "--project", "/work/app"],
-    "undelivered-operation",
-  ]),
   ["MCP bridge mode", ["ClaudeCode", "mcp"], "undelivered-operation"],
   [
     "caller token",
@@ -852,10 +911,12 @@ for (const [name, options, code] of [
 test("client authorization and local help preserve their fixed client and arguments", (t) => {
   const run = fixture(t);
   assert.equal(run(["Codex", "auth"]).status, 0);
+  assert.equal(run(["Antigravity", "auth"]).status, 0);
   const help = run(["ClaudeCode", "open_project_window", "-h"]);
   assert.equal(help.status, 0);
   assert.deepEqual(help.calls, [
     "cli [auth] [-c] [Codex]",
+    "cli [auth] [-c] [Antigravity]",
     "cli [-c] [ClaudeCode] [open_project_window] [-h]",
   ]);
 });

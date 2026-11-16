@@ -42,7 +42,7 @@
 | 上游内容更新 | [每周更新流程](docs/tooling.md#官方内容自动更新) | Modern Web 发布包、两组 Rust 参考章节、属性测试、Rust 专项审查与 Web 质量审查分别创建更新 PR；参考评估和技能适配完成后才能交付 |
 | 原生 CI 与交付 | [运行合同](docs/tooling.md#ci-与审查边界)、[实例与证据边界](docs/review-gate.md#实例与证据边界) | 两平台复用完整检查；实际配置、运行与独立审查分别绑定实例验证 |
 | 阿里云技能发现与短信 | [技能发现](delivery/skills/alibabacloud-find-skills/SKILL.md)、[短信](delivery/skills/alibabacloud-sms-send-short-message/SKILL.md) | 发现、安装及发送遵循各自授权 |
-| 微信开发者工具 | [wechatide](delivery/skills/wechatide/SKILL.md) | 九个子入口已交付；实际 DevTools 操作限 macOS |
+| 微信开发者工具 | [wechatide](delivery/skills/wechatide/SKILL.md) | 十个子入口及官方文档检索参考已交付；限 macOS 安装与运行，三端共享 |
 | 安装与恢复 | [安装合同](docs/usage.md#产品选择与安装) | 显式选择一个或多个产品；支持受管文件和完整技能选择、Codex 工作树来源、回读与恢复 |
 
 规则拥有行为要求，技能拥有完整能力单元。项目决定采用范围及检查参数。工具打包器负责生成可执行产物，安装器负责目标绑定及恢复。安装后的使用入口见随交付发布的 [README.md](delivery/README.md)。

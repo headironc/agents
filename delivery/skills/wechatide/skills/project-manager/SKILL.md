@@ -8,7 +8,7 @@ description: >-
 
 Read the [handoff contract](../../references/capabilities.md), the [CLI contract](../../references/cli.md) and [pending tasks](../../references/tasks.md) before the first operation. Use this entry directly or receive it from the router. Read the [call executor](../../scripts/call.sh). Use tool `wechatide-call` for the operations below and complete the CLI contract's readiness check first.
 
-These operations act on the project list inside DevTools, not on a project window: none of them opens a window, compiles or runs a project. Windows belong to initializer. Creating a project from scratch is not a delivered workflow: the directory and its minimal files are ordinary source work, project-config owns the configuration, and this entry only adds the finished directory to the list.
+These operations act on the project list inside DevTools, not on a project window: none of them opens a window, compiles or runs a project. Windows belong to initializer. When the user explicitly asks to create a project from scratch, resolve an AppID through `initializer` (`get_user_appids`, plus `cloudbase-operator` `cloud_env_list --appid` when CloudBase applies), create the minimal directory and starter files as ordinary source work (`app.json` and starter page for `miniprogram`, or `game.json` and `game.js` for `game`), configure `project.config.json` through `project-config`, and register the finished directory with `project_import` here.
 
 ## Operations
 
@@ -42,9 +42,9 @@ When an operation returns `pending` with a `taskId`, retain the task without pol
 
 | Error | Handling |
 | --- | --- |
-| `PROJECT_PATH_NOT_FOUND`, `PROJECT_CONFIG_JSON_ERROR`, `APPID_ERROR` from `project_import` | Follow initializer's project-window handling: a missing path is only reported, because creating a project is not delivered, while a configuration or AppID error goes through its project-config handoff and its single retry |
+| `PROJECT_PATH_NOT_FOUND`, `PROJECT_CONFIG_JSON_ERROR`, `APPID_ERROR` from `project_import` | When project creation was not requested, report `PROJECT_PATH_NOT_FOUND`; when creating a project from scratch on explicit request, prepare the starter directory and configuration via `project-config` and retry `project_import`. Configuration or AppID errors go through `initializer`'s project-config handoff and its single retry |
 | Login expired or an account failure on `share_minicode` | Log in through initializer, then share again only under the original request |
-| An empty `project_list` | Report that nothing is imported; creating a project is not delivered |
+| An empty `project_list` | Report that nothing is imported; create and register a project only when the user explicitly requests creating one |
 | Timeout or unknown outcome of a share, import or removal | Report it as unknown; before considering a repeat, check the list for an import or removal, and only the retained task for a share, which the list cannot show |
 | A successful result naming a dropped flag in `warnings` | `project_list` is read-only, so correct the flag from `-h` and list again. A share, import or removal already took effect, so report the dropped flag and what actually happened rather than running it again |
 

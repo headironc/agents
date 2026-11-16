@@ -113,6 +113,7 @@ test("every delivered consumer has its independently expected binding and declar
     "delivery/skills/wechatide/skills/project-manager/SKILL.md": [
       "wechatide-call",
     ],
+    "delivery/skills/wechatide/skills/simulator/SKILL.md": ["wechatide-call"],
     "delivery/policy/tool-contracts.md": ["rg", "jq", "curl", "git", "openssh"],
     "delivery/policy/deepseek-harness.md": ["dsh"],
     "delivery/policy/models.md": ["dsh"],
@@ -231,6 +232,11 @@ test("every delivered consumer has its independently expected binding and declar
     ],
     [
       "delivery/skills/wechatide/skills/project-manager/SKILL.md",
+      "skill",
+      "wechatide-call",
+    ],
+    [
+      "delivery/skills/wechatide/skills/simulator/SKILL.md",
       "skill",
       "wechatide-call",
     ],
