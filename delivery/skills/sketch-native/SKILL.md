@@ -1,13 +1,13 @@
 ---
 name: sketch-native
-description: MUST load before any .sketch inspection, diagnosis, creation, editing, or review on macOS. Use Sketch 2026.3+ MCP and sketchtool, require reusable Library consumption for UI designs, and forbid offline .sketch archive access.
+description: MUST load before any .sketch inspection, diagnosis, creation, editing, or review on macOS. Use Sketch 2026.4+ MCP and sketchtool, require reusable Library consumption for UI designs, and forbid offline .sketch archive access.
 metadata:
   short-description: Native Sketch workflow with required Library reuse and visual verification
 ---
 
 # Sketch Native Workflow
 
-Use Sketch 2026.3+ MCP and the bundled `sketchtool` for native `.sketch` work on macOS. This skill is delivered to Codex, DeepSeek Harness, and Antigravity App and CLI, and skipped off macOS.
+Use Sketch 2026.4+ MCP and the bundled `sketchtool` for native `.sketch` work on macOS. This skill is delivered to Codex, DeepSeek Harness, and Antigravity App and CLI, and skipped off macOS.
 
 ## Bind the Task
 
@@ -19,10 +19,10 @@ Follow the host's adopted model and collaboration policy. In Codex, the installe
 
 - Use native tools and public APIs only. Never read, synthesize, or modify `.sketch` ZIP/JSON archives with offline scripts, and never use private native APIs as a fallback.
 - Creating or modifying a deliverable Sketch UI design **must use an applicable reusable foundation Library**. Its components, variables, and styles must serve real consumers through native references. Listing or installing a Library, importing unrelated assets, or copying detached local layers does not satisfy this requirement. No universal Library name or second physical Library is required.
-- Read-only review checks the same requirements without modifying documents or host state. Do not install, register, enable, import, synchronize, repair, migrate, clean up, save, or close windows during that review. Read repair guidance to assess a gap, not as permission to repair it.
+- Read-only review checks the same requirements without modifying documents, Workspace threads, or host state. Do not install, register, enable, import, synchronize, repair, migrate, detach, patch, clean up, save, close windows, or post, edit, resolve, reopen, or delete Workspace comments (`save_comment`, `delete_comment`) during that review. Read repair guidance to assess a gap, not as permission to repair it.
 - Bind documents by full path and identity. Same-ID open copies can make ID-only tools ambiguous; missing dirty state does not establish safe closure. Preserve unrelated unsaved work.
 - Failed calls can leave partial writes. Read back the same target before retrying; a successful save return or an in-memory value does not prove persistence.
-- Host configuration and external writes retain existing authorization boundaries. This skill never writes MCP registration or Sketch preferences. Missing authority or native capability stops dependent operations; continue unaffected preparation and report incomplete acceptance.
+- Host configuration and external writes retain existing authorization boundaries. This skill never writes MCP registration or Sketch preferences. Workspace collaboration writes (`save_comment` and `delete_comment`, where deleting comments is irreversible) require explicit authorization for that external effect. Saving or migrating a document in Sketch 2026.4 upgrades its file format and makes it incompatible with pre-2026.4 Sketch versions; confirm version compatibility before saving shared older documents or Libraries. Missing authority or native capability stops dependent operations; continue unaffected preparation and report incomplete acceptance.
 
 ## Load Guidance Before the Related Operation
 
@@ -30,9 +30,9 @@ Read the applicable references below before acting, including during diagnosis a
 
 | Task or condition | Required guidance |
 | --- | --- |
-| Any native inspection or tool call; document selection; bounded scans; `sketchtool` inventory, duplicate checks, or exports | [Native tools](references/native-tools.md). Load the installed MCP and use guides in the specified order. |
-| Creating, modifying, or reviewing a UI design; selecting a foundation; importing components; changing shared assets or consumer synchronization | [Library selection and actual consumption](references/libraries.md). |
-| Creating, changing, or reviewing containers, icons, styles, reflow, themes, Pages, states, or canvas organization | [Native layout and canvas requirements](references/native-layout.md). |
+| Any native inspection or tool call; document selection; prompt `layer:<ID>` or share links; Workspace comments or notifications; bounded scans; `sketchtool` metadata, duplicate checks, or exports | [Native tools](references/native-tools.md). Load the installed MCP and use guides in the specified order. |
+| Creating, modifying, or reviewing a UI design; selecting a foundation; importing components or Component Variants (`VariantSet`); changing shared assets or consumer synchronization | [Library selection and actual consumption](references/libraries.md). |
+| Creating, changing, or reviewing containers, `Section`s, icons, proportional scaling (`layer.scale`), styles, reflow, themes, Pages, states, or canvas organization | [Native layout and canvas requirements](references/native-layout.md). |
 | Creating, changing, or reviewing prototype routes, interactions, state coverage, or visible content | [Prototype behavior and content](references/prototypes.md). |
 | Saving, copying, reopening, or closing conflicting documents; same-ID or missing-layer diagnosis; import identity; shared-style failures; override integrity; resource cleanup | [Identity and mutation handling](references/identity-and-mutations.md). |
 | Checking a visual change, exporting delivery previews, or completing review or delivery | [Screenshots and final acceptance](references/acceptance.md). |
