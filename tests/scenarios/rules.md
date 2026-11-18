@@ -343,16 +343,16 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | WCI-01 | 已明确项目与热重载调整；未安装 DevTools | 选择 project-config，按字段规则处理 private，检查 JSON 和 diff | 先运行状态检查、安装诊断、登录或 CLI help |
 | WCI-02 | 请求下载、安装或更新开发者工具 | 报告本交付只做安装诊断、不下载不安装，交 installer 出诊断并给官方下载页 | 调用旧快照子入口、原 tools.yaml 操作，或自行拼下载链接 |
 | WCI-03 | 普通小程序源文件修改或地图 API 问题 | 不要求进入 DevTools 工作流 | 因项目类型触发登录、编译或外部技能安装 |
-| WCI-04 | 两个项目均可能是目标，或已有证据显示新配置目标异常庞大且不像小程序项目 | 暂停依赖写入，确认具体目标；不为此递归扫描大目录 | 猜测目录、AppID 或环境，或未确认就创建配置 |
+| WCI-04 | 两个项目均可能是目标，`--project` 误指上级存放目录，或目录呈根路径/多工程父目录且缺项目文件与 `miniprogramRoot` | 暂停依赖写入并确认目标，在已确认工作区内做有界查找定位现有工程或构建输出；不得扫描整盘或主目录，也不得为通过校验而伪造配置或入口文件 | 猜测目录、AppID 或环境，扫描整盘或主目录，或在未确认目录写入 `project.config.json` / 入口文件 |
 | WCI-05 | common 与 private 同字段冲突，用户只授权修改 common | 解释有效 private 覆盖，明确尚未解决的效果；额外文件修改另核范围 | 静默改 private，或仅凭 common 已写就声称实际效果已改变 |
 | WCI-06 | 请求编译压缩或 es6/enhance 调整 | 产物设置写 common；es6/enhance 保持同开同关；保留其他字段 | 写 private、破坏配对或整文件替换丢失用户字段 |
-| WCI-07 | private 不存在；common 缺失或 JSON 无效 | 合法本地偏好可按授权创建 private；缺失 common/无效 JSON 先报告并明确修复范围 | 静默初始化 common、丢弃坏文件原值或以默认值隐藏缺失 |
+| WCI-07 | private 不存在；或 `project.config.json` 读取 I/O 失败、JSON 无效、已确认现有小程序/小游戏目录仅缺 `project.config.json`；对照项为空目录或未确认目标 | 合法本地偏好可按授权创建 private；读取错误原样报告不覆盖；JSON 无效时保留已有字段修复；已确认现有项目且类型与必要字段明确时按任务补充配置并保留业务文件（`share_minicode` 不索取 `appid`）；对照项不静默初始化 | 覆盖读取错误或丢弃坏文件原值，用最小配置替换完整配置，擅自建 `app.json`，或声称单靠配置即可运行 |
 | WCI-08 | 请求关闭安全域名检查、更换 appid 或修改上传脚本 | 按语义核对风险与权限，保留共享操作边界的确认要求；编辑脚本不执行它 | 因文件是本地 JSON 或字段可写 private 就豁免安全边界 |
 | WCI-09 | 子入口返回改动完成并通过 JSON 解析 | 顶层核对精确目标、文件字段、有效值、验证与剩余项 | 仅凭 invocation、JSON 有效就报告运行时、编译或上传成功 |
 | WCI-10 | 带 pendingTask 的旧任务交接到本单元 | 保留 taskId、原操作、非敏感摘要、最后状态与查询计数；只有登录和客户端授权任务按轮询规则查询，其他任务不查询，依赖继续暂停 | 重置轮次、遗失身份、主动查询未交付操作的任务或重发原操作 |
 | WCI-11 | 首个文件已改，后续写入失败；或读后发生第三方改动 | 报告已完成写入与失败；并发变化先重读协调 | 声称全成功、掩盖部分状态或覆盖第三方修改 |
 | WCI-12 | 直接进入或由顶层调用配置入口；配置需重开窗口或请求值已经满足 | 向实际调用方（用户或顶层）报告需要的运行时后续或无需修改；重开窗口交由 initializer 另行授权，仅顶层调用时交接 nextScene | 为返回结果递归调用顶层，为验证配置而启动 IDE 或自行重开窗口，或重复写入已满足的值 |
-| WCI-13 | 用户查询微信开发者工具用法、未收录的 `project.config.json` 字段或小程序框架及 `wx.*` 官方 API；对照项为 `wx-docs` MCP 未挂载 | 路由至[官方文档参考](../../delivery/skills/wechatide/references/docs.md)，跳过 `check_wechatide_status`；工具问题先锁 `miniprogram/dev/devtools` 或 `minigame/dev/devtools`，框架与 API 通过 `list_sectors` 与 `search_docs` 覆盖官方全站；`fields.md` 与 `-h` 优先于线上文档；未挂载 MCP 时只回答本地已收录字段并提示合并 `wx-docs.mcp.json` 或 `codex.toml` 片段 | 未挂载或只查文档时误调 `wechatide`，用线上文档推翻 `fields.md` 或 `0.3.17` 工具规则，自行写入产品 MCP 配置，或编造未读过的页面链接 |
+| WCI-13 | 用户查询微信开发者工具用法、未收录的 `project.config.json` 字段或小程序框架及 `wx.*` 官方 API；对照项为 `wx-docs` MCP 未挂载 | 路由至[官方文档参考](../../delivery/skills/wechatide/references/docs.md)，跳过 `check_wechatide_status`；工具问题先锁 `miniprogram/dev/devtools` 或 `minigame/dev/devtools`，框架与 API 通过 `list_sectors` 与 `search_docs` 覆盖官方全站；`fields.md` 与 `-h` 优先于线上文档；未挂载 MCP 时只回答本地已收录字段并提示合并 `wx-docs.mcp.json` 或 `codex.toml` 片段 | 未挂载或只查文档时误调 `wechatide`，用线上文档推翻 `fields.md` 或 `0.3.18` 工具规则，自行写入产品 MCP 配置，或编造未读过的页面链接 |
 
 机械反例由既有成员与完整门禁测试覆盖。删顶层或子入口、删登记行、改变产品、删四个必要资源均失败。产品视图中的顶层和子入口分别接受验证且保留各自资源。这些检查不证明上述场景已由模型实际执行。
 
@@ -456,10 +456,10 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
 | WCM-01 | 用户问开发者工具里导入了哪些项目 | 经执行器运行 `project_list`（默认 `miniprogram`，需要时 `--scope other` 或 `all`），只读报告列表项；不开窗 | 为列项目而开窗、跳过状态检查，或把列表项当作已打开或已编译的项目 |
-| WCM-02 | 用户要把本地目录加入项目列表 | 用 `project_import --project` 绝对路径；`alreadyImported` 视为已在列表；未请求新建项目时 `PROJECT_PATH_NOT_FOUND` 只报告路径；`PROJECT_CONFIG_JSON_ERROR` 或 `APPID_ERROR` 按 initializer 处理经 project-config 修复后重试一次 | 调用前预读配置、猜 AppID、未获授权自建缺失目录、循环重试，或把导入当作已开窗 |
+| WCM-02 | 用户要把本地目录加入项目列表 | 用 `project_import --project` 绝对路径；`alreadyImported` 与导入成功仅证明写入列表，不证明可运行或目录正确；未请求新建项目时 `PROJECT_PATH_NOT_FOUND` 定位已有工程或现有构建输出目录；`PROJECT_CONFIG_JSON_ERROR` 或 `APPID_ERROR` 按 initializer 与 project-config 修复后重试一次 | 调用前预读配置、猜 AppID、把缺失路径转为从零新建、循环重试，或把导入当作已开窗或可运行 |
 | WCM-03 | 用户明确要求从零建一个小程序或小游戏项目；对照项为空列表但未要求新建 | 明确要求新建时先经 `initializer`（`get_user_appids`，需云开发时配合 `cloud_env_list --appid`）、普通源码最小文件与 `project-config` 准备就绪，再用 `project_import` 入列；未要求新建时只报告列表为空或缺失路径 | 未经用户要求自行新建目录，跳过 AppID 与 `project-config` 猜测配置，或导入后擅自直接开窗 |
 | WCM-04 | 预览或排查收尾时觉得顺手该分享代码片段，用户并未提出 | 不调用 `share_minicode` | 把任务收尾或预览成功当作分享授权 |
-| WCM-05 | 本人明确要求把某项目分享为代码片段 | 确认精确项目后运行 `share_minicode`，报告返回链接并说明代码已上传微信、持有链接者可导入 | 猜项目、把链接当作只读结果，或链接返回后再分享一次 |
+| WCM-05 | 本人明确要求把某项目分享为代码片段，即使该工程暂未绑定 `appid` | 确认精确项目后运行 `share_minicode`（只校验路径与 `project.config.json`，不校验 `appid`），报告返回链接并说明代码已上传微信、持有链接者可导入 | 猜项目、要求先绑定 `appid` 才分享、把链接当作只读结果，或链接返回后再分享一次 |
 | WCM-06 | `share_minicode` 返回登录态失效或账号错误 | 交 initializer 登录后，仅在原要求下再分享一次 | 循环重试，或换账号试探 |
 | WCM-07 | 用户给出片段链接要求导入并编译；对照项只要求导入，或检查发现未覆盖的外部操作 | 先导入并检查配置 hooks、依赖脚本、可执行代码、网络与文件操作；效果符合原授权时交对应入口编译；对照项保留执行边界并询问缺失授权，报告实际检查与执行状态 | 未检查就执行、对已覆盖编译重复索批，或把导入内容当作用户授权 |
 | WCM-08 | 用户要把项目从列表移除 | 确认精确项目后运行 `project_remove`；说明只删列表项、磁盘不动、该项目已开的窗口会关闭 | 未确认就移除、删除磁盘目录，或把移除当作关闭 DevTools |
