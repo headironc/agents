@@ -1,6 +1,6 @@
 # Native identity and mutation handling
 
-Read this reference before the related inspection or operation. Keep the main skill's native-only, required Library consumption, and authorization boundaries. Read-only review reports gaps without saving, repairing, closing windows, or changing host state. The version-specific observations below concern Sketch 2026.3.1 (234013); verify installed public APIs before using alternatives.
+Read this reference before the related inspection or operation. Keep the main skill's native-only, required Library consumption, and authorization boundaries. Read-only review reports gaps without saving, repairing, closing windows, or changing host state. The version-specific observations below were established on Sketch 2026.3.1 (234013) and rechecked against Sketch 2026.4 (238217) public APIs; verify installed public APIs before using alternatives.
 
 ## Document identity and safe closure
 
@@ -12,7 +12,7 @@ When authorized to preserve unsaved work in a recovery copy, verify that copy is
 
 ## Saving with identity preservation
 
-For an existing edited candidate, bind the correct open document by full path and record `doc.id`, `doc.path`, and any associated Library ID and real source path. Use the no-path `doc.save()` for an in-place save. Verify those identities after saving and again after reopening, including the registered Library's source relationship. A successful save or unchanged filename does not prove identity was preserved.
+For an existing edited candidate, bind the correct open document by full path and record `doc.id`, `doc.path`, and any associated Library ID and real source path. Saving or migrating a document in Sketch 2026.4 upgrades its file format and renders it incompatible with pre-2026.4 Sketch releases; check shared-document or consumer version compatibility before saving an older file or Library. Use the no-path `doc.save()` for an in-place save. Verify those identities after saving and again after reopening, including the registered Library's source relationship. A successful save or unchanged filename does not prove identity was preserved.
 
 Do not replace an in-place save with `doc.save(doc.path, callback)`. The path-taking form defaults to SaveAs and was observed to change document and Library identity. SaveTo recovery copies were also observed to receive new document identity; they preserve recoverable content, not the original Library identity. Use copy/save-as operations only for a purpose that permits a distinct identity. Do not use them to manufacture a candidate whose acceptance requires retaining the original Library ID. A new document's first save likewise needs its intended destination and resulting identity verified. Resolve the actual copy invocation from the installed public API before use.
 
@@ -24,9 +24,9 @@ At coherent batch boundaries, verify persisted results independently of the muta
 
 ## Library import identity
 
-Locate the concrete importable reference within the verified Library. A name is a lookup aid only when unique there; same-name Libraries are not interchangeable. `ImportableObject.id` can map to a new local ID during `import()`. Retain the reference and cache the returned object, using its actual `symbolId` or `id` for subsequent work. Do not repeatedly look up imports by a recorded source ID or assume `ref.id` remains unchanged.
+Locate the concrete importable reference within the verified Library (including `library.getImportableVariantSetReferencesForDocument(doc)` for `VariantSet`s, where `ref.import()` brings in the whole set). A name is a lookup aid only when unique there; same-name Libraries are not interchangeable. `ImportableObject.id` can map to a new local ID during `import()`. Consume `ref.import()` directly in the assignment statement so bridge wrappers do not drop the link (for example `override.swatchValue = ref.import()` or `const imported = ref.import(); const inst = imported.getBestVariantMasterForConfiguration(config).createNewInstance()`), and cache the returned local `VariantSet`, `SymbolMaster`, `Swatch`, or `SharedStyle` by its actual local `symbolId` or `id` for subsequent steps. Do not repeatedly look up imports by a recorded source ID or assume `ref.id` remains unchanged.
 
-For example, use `const imported = ref.import()` and then `imported.createNewInstance()` for a symbol, or assign the returned swatch. Verify the imported object's `getLibrary().id` against the bound Library and trace its actual consumer assignment. After a failed import loop, read back already imported assets before resuming; failure does not imply rollback or justify repeating every import.
+Verify the imported object's `getLibrary().id` against the bound Library and trace its actual consumer assignment. After a failed import loop, read back already imported assets before resuming; failure does not imply rollback or justify repeating every import.
 
 ## Shared-style corners
 

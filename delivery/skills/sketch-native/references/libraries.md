@@ -16,7 +16,15 @@ When Library registration or enabling is authorized, use the supported native AP
 
 ## Master ownership and consumer updates
 
-Keep shared master components in their owning Library. Within a document that owns masters, use the top level of its Symbols page (`sketch.Page.getSymbolsPage(doc)`), with instances on showcase or business pages. Avoid duplicate masters and repeated clones; discover actual component and variant organization from the selected Library.
+Keep shared master components in their owning Library. Within a document that owns masters, place standalone `SymbolMaster`s and `sketch.Group.VariantSet`s at the top level of its Symbols page (`sketch.Page.getSymbolsPage(doc)`), keep Variant `SymbolMaster`s inside their owning `VariantSet`, and place instances on showcase or business pages. Avoid duplicate masters and repeated clones; discover actual component and variant organization from the selected Library.
+
+Never insert a plain `Frame` or nested `Section` into a `VariantSet`: the JavaScript API does not block insertion, and doing so leaves the component invalid. Never call `set.ungroup()` (which dissolves the set, clears `variantConfiguration`, and renames masters) or `master.ungroup()` (which detaches all instances) unless explicitly authorized.
+
+For Components with Variants (`sketch.Group.VariantSet`):
+
+1. Resolve local variant sets with `doc.getVariantSets()` or `doc.getVariantSetWithID(id)`, and Library variant sets with `library.getImportableVariantSetReferencesForDocument(doc)`.
+2. Read `set.variantProperties` before calling `set.getBestVariantMasterForConfiguration(config)`. Partial configurations return the nearest matching Variant, whereas unknown property names or values throw.
+3. Importing a `VariantSet` reference (`ref.import()`) imports the whole set rather than one Variant. Keep `ref.import()` on the same statement as its consumer use (for example `ref.import().getBestVariantMasterForConfiguration(config).createNewInstance()` or `override.swatchValue = ref.import()`), and cache the resulting local object or ID for follow-up lookups per [Library import identity](identity-and-mutations.md#library-import-identity).
 
 Use native imported symbols, swatches, and shared text/layer styles. Saving a Library source does not prove that its registered resource or any consumer has updated. Trace the actual source-to-registration-to-consumer relationship; some setups use a separate registered copy, others do not.
 
@@ -27,5 +35,7 @@ Before authorized resource removal, migrate real consumers and follow [native co
 ### Native Overrides and Reference Integrity
 
 Drive supported variations with `commonOverrideIDPrefix + '_' + property`, without arbitrary `detach()`. Relevant properties include `stringValue`, `symbolID`, `isVisible`, `preservesSpaceWhenHidden`, `swatchValue`, `color:fill-N`, `color:border-N`, `textColor`, `fillColor`, `textStyle`, `layerStyle`, `horizontalSizing`, `verticalSizing`, `image`, `imageResizeBehavior`, and `flowDestination`. Preserve API semantics, such as image resize values `2` for Fit and `3` for Fill, as defined by the installed guide; these are not visual tokens.
+
+Check `override.editable === true` because masters can lock individual overrides. Keep Color Variable links alive by assigning a `Swatch` via `override.swatchValue` (or `override.value = swatch`) instead of raw `#hex` literals whenever tokens exist. Batch multiple override updates on one `SymbolInstance` with `instance.updateOverrides(callback)` (mutating the callback's `overrides` parameter), and resolve nested-symbol overrides with `instance.overridesForExpandedLayer(nestedLayer)`.
 
 After a nested symbol swap or during override review, follow [public override verification](identity-and-mutations.md#public-override-verification). Preserve intended overrides and verify references and rendering. An undefined `unresolvedOverrides` is not a zero count or proof of exhaustive cleanup.
