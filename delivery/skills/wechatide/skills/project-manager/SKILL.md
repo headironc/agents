@@ -20,7 +20,7 @@ These operations act on the project list inside DevTools, not on a project windo
 | Import a code snippet | `import_minicode --link LINK` | Downloads and unpacks the snippet into a directory DevTools chooses, registers it and returns its `projectPath` |
 | Remove a project from the list | `project_remove --project PATH` | Drops the list entry and closes that project's open window; deletes nothing on disk |
 
-Check flags with `OPERATION -h` before first use. `project_import` validates the path, `project.config.json` and AppID the way a project window does; `project_remove` does not.
+Check flags with `OPERATION -h` before first use. Before entering their handlers, `project_import` validates the path, `project.config.json`, and `appid` (and `alreadyImported` or a successful import proves only list registration, not that the project is runnable or that `--project` targets the right directory), `share_minicode` validates the path and `project.config.json` without validating `appid`, and `project_remove` skips path, configuration, and `appid` validation.
 
 ## Sharing
 
@@ -42,7 +42,7 @@ When an operation returns `pending` with a `taskId`, retain the task without pol
 
 | Error | Handling |
 | --- | --- |
-| `PROJECT_PATH_NOT_FOUND`, `PROJECT_CONFIG_JSON_ERROR`, `APPID_ERROR` from `project_import` | When project creation was not requested, report `PROJECT_PATH_NOT_FOUND`; when creating a project from scratch on explicit request, prepare the starter directory and configuration via `project-config` and retry `project_import`. Configuration or AppID errors go through `initializer`'s project-config handoff and its single retry |
+| `PROJECT_PATH_NOT_FOUND`, `PROJECT_CONFIG_JSON_ERROR`, `APPID_ERROR` from `project_import`; `PROJECT_PATH_NOT_FOUND`, `PROJECT_CONFIG_JSON_ERROR` from `share_minicode` | Route through `initializer`'s project-directory and `project-config` handling with one retry: locate existing or build-output directories for an existing project, create starter files and configuration only when project creation was explicitly requested, and never require binding an `appid` to repair `share_minicode` |
 | Login expired or an account failure on `share_minicode` | Log in through initializer, then share again only under the original request |
 | An empty `project_list` | Report that nothing is imported; create and register a project only when the user explicitly requests creating one |
 | Timeout or unknown outcome of a share, import or removal | Report it as unknown; before considering a repeat, check the list for an import or removal, and only the retained task for a share, which the list cannot show |

@@ -46,5 +46,5 @@ Cite only exact online URLs returned by `read_doc` (`metadata`) or `list_knowled
 ## Precedence when sources disagree
 
 1. **Project configuration semantics**: The [field reference](../skills/project-config/references/fields.md) and [project-config](../skills/project-config/SKILL.md) govern every field and `common` vs. `private` rule they document. Use online `projectconfig.md` only for unlisted fields, marked as documentation supplements.
-2. **`wechatide` CLI tools, flags, and authentication**: [SKILL.md](../SKILL.md), [capabilities.md](capabilities.md), [cli.md](cli.md), the owning child entries, and `OPERATION -h` govern execution. If online documentation (including the public Skills page) names older tool names or layouts, follow this package and note that the web documentation lags bundled skill `0.3.17`.
+2. **`wechatide` CLI tools, flags, and authentication**: [SKILL.md](../SKILL.md), [capabilities.md](capabilities.md), [cli.md](cli.md), the owning child entries, and `OPERATION -h` govern execution. If online documentation (including the public Skills page) names older tool names or layouts, follow this package and note that the web documentation lags bundled skill `0.3.18`.
 3. **IDE menus, release-line differences, frameworks, and platform APIs**: Follow the verified official documentation read in the current turn.

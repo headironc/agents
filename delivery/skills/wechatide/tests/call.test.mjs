@@ -23,7 +23,7 @@ const status = [
   "ClaudeCode",
   "check_wechatide_status",
   "--skill-version",
-  "0.3.17",
+  "0.3.18",
 ];
 
 function fixture(t, options = {}) {
@@ -97,7 +97,7 @@ test("calls the bundled CLI without a token even when keychain access is unavail
     '{"ok":true,"tool":"check_wechatide_status","result":{"loginExpired":false}}\n',
   );
   assert.deepEqual(result.calls, [
-    `cli [-c] [ClaudeCode] [check_wechatide_status] [--skill-version] [0.3.17]`,
+    `cli [-c] [ClaudeCode] [check_wechatide_status] [--skill-version] [0.3.18]`,
   ]);
 });
 
@@ -106,11 +106,11 @@ test("calls the bundled CLI for Antigravity without a token", (t) => {
     "Antigravity",
     "check_wechatide_status",
     "--skill-version",
-    "0.3.17",
+    "0.3.18",
   ]);
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.calls, [
-    `cli [-c] [Antigravity] [check_wechatide_status] [--skill-version] [0.3.17]`,
+    `cli [-c] [Antigravity] [check_wechatide_status] [--skill-version] [0.3.18]`,
   ]);
 });
 
@@ -798,7 +798,7 @@ for (const result of [
     assert.equal(output.status, 0);
     assert.equal(output.stdout, `${stdout}\n`);
     assert.deepEqual(output.calls, [
-      "cli [-c] [ClaudeCode] [check_wechatide_status] [--skill-version] [0.3.17]",
+      "cli [-c] [ClaudeCode] [check_wechatide_status] [--skill-version] [0.3.18]",
     ]);
   });
 
