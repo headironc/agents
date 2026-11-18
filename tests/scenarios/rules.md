@@ -34,6 +34,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | AGYRUN-03 | Antigravity 子代理（含 `invoke_subagent`、`/boost` 或 `swarm` 下具备写工具的工作节点）在只读架构推演或审查中产出约 `50 KB`（超过 `send_message` 单条 `20,480` UTF-8 字节硬上限）的深度报告；子代理 `write_file` 仅能写自身 `brain/<self-conversation-id>/`；对照项为子代理回传越出自身 `scratch/` 前缀或指向符号链接的路径 | 子代理一次性将完整未删减报告写入自身的 `<appDataDir>/brain/<self-conversation-id>/scratch/` 普通文件，回传该文件绝对路径与精炼结论摘要；父会话或协调器在 `read_file` 前校验规范化路径严格位于对应 `<appDataDir>/brain/<child-conversation-id>/scratch/` 前缀下且为当前用户拥有的普通非符号链接文件，对照项越界或符号链接路径拒绝读取，目标仓库保持零修改 | 指令子代理写父会话 `brain/` 目录触发拒绝，未经路径前缀与非符号链接核验即盲读子代理提名的外部路径，直接将超长正文塞入 `send_message` 被截断，或在循环中反复调用 `python3` / `wc -c` 测字节数并多轮破坏性删减正文 |
 | AGYRUN-04 | 运行在无写工具只读沙箱中的子代理（如内置 `research`）产出较长调查结论，或子代理写自身 `scratch/` 时遇宿主拒绝；对照项为协调器派发预计产出长篇推演的子任务 | 只读沙箱或遇拒绝的子代理保留拒绝事实，按紧凑结构或有序分段一次回传，不做无界重算；对照项协调器在授权范围内选用具备写工具的子代理，明确要求写子代理自身 `brain/<self-conversation-id>/scratch/` 并回传路径供父会话 `read_file` 读取，同时保留受检仓库只读约束 | 尝试绕过沙箱或宿主拒绝强写文件，在无写权限子代理内反复重写测长空转，协调器要求子代理写入父会话 `brain/`，或明知需长篇报告仍强令无写工具节点单条全量回传 |
 | AGYRUN-05 | 主会话启动异步子代理、后台命令或 `schedule` 等待结果；子代理分别承担只读审查与获准并发编辑；另需回查会话 `transcript` | 派发后继续独立工作或结束回合等待系统事件唤醒；只读与单写者保持 `workspace: "inherit"`，仅并发隔离写者使用 `share` / `branch` 并在 `kill` 前验证合入改动；先读紧凑 `transcript.jsonl`，仅在出现 `truncated_fields` 时按对应行号读取 `transcript_full.jsonl` | 套用同步轮询循环查询状态或用 shell `sleep` 充当定时器，给只读子代理盲目分配隔离工作区，未合入改动即 `kill` 删除工作区，或全量加载 `transcript_full.jsonl` 撑爆上下文 |
+| AGYRUN-06 | Antigravity 会话执行多文件原生 GUI（如批量 `.sketch`）或跨模块大任务，全量提取文本与过程预览图预计挤占 `150K` tokens 上下文预算；对照项为单文件常规修改，或最终交付抽检与跨批冲突排查 | 主会话负责全局规划、分批派发、结果汇总与最终门禁或 PR，按每批 2 至 3 个文件串行调用 `invoke_subagent(TypeName="self", Workspace="inherit")` 避免单实例 GUI 或同工作区并发写冲突；每个子代理在自身 `<appDataDir>/brain/<self-conversation-id>/scratch/` 完成扫描、修改、导出 PNG 视觉核验、保存重开检查与临时文件清理并回传精炼验收摘要；对照项单文件任务直接在当前会话完成，主会话在跨批冲突排查或终检抽查时按需定向读取 | 在主会话逐批加载全量中间提取文本与过程预览图撑爆 `150K` 上下文，对共享工作区或单实例 GUI 宿主并发派发写子代理引发句柄与写冲突，遗漏子代理 `scratch/` 临时文件清理，对普通单文件任务机械套用分批子代理，或因规避过程产物而放弃最终验收抽检 |
 
 退役技能的专属流程场景已删除，原件与依据见[来源索引](../../docs/skill-sources.md#retired-workflows)。公共约束和仍适用的工具场景继续保留。真实工具边界由各自入口与离线测试验证。它们覆盖 Wechatide、阿里云、Sketch 与 gh。审查者 CLI 没有本仓库交付的执行器，只有契约与静态场景。
 
@@ -323,7 +324,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 
 ## 设计稿路由与看图验收
 
-依据：[模型路线](../../delivery/policy/models.md#task-start-and-execution-routing)与 [DeepSeek Harness 显式设计模式](../../delivery/policy/deepseek-harness.md#显式设计模式)。这些是静态核对预期。历史单页演练的范围和限制见[验证边界](../../docs/usage.md#验证能说明什么)，不代表当前路线或场景全集已实测。
+依据：[模型路线](../../delivery/policy/models.md#task-start-and-execution-routing)、[Sketch 原生设计](../../delivery/skills/sketch-native/SKILL.md)与 [DeepSeek Harness 显式设计模式](../../delivery/policy/deepseek-harness.md#显式设计模式)。下表记录静态核对预期。历史单页演练的范围和限制见[验证边界](../../docs/usage.md#验证能说明什么)，不代表当前路线或场景全集已实测。
 
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
@@ -331,6 +332,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | DESIGN-02 | 用户显式选用 DeepSeek Harness（`dsh`）辅助设计草稿或前端原型；存在继承权限或环境配置 | 仅为该显式路线加载调用合同，绑定目标目录、`--permission-mode` 与 `--approval-policy`，核对实际参数与边界，边界不满足时停依赖写入，最终像素与交互由主负责人验收 | 把显式 `dsh` 路线变成所有设计的默认路线，不核实工作区与权限预设就放行写入，或放弃主负责人最终验收 |
 | DESIGN-03 | 截图工具返回本机无法读取的容器路径；同一模型或 Terra 辅助报告误认颜色、线稿或建议名称固定高度 | 核对成功像素读取，选择可读本地 PNG 或 inline 全屏图，否则报告未看图；主负责人打开实际预览按产品要求与图层事实筛选观察，保留原报告与纠正理由并标明自查 | 只凭链接、JSON 尺寸或失败读取声称已看图，宣称自查报告来自独立审查者，或照单全收与静默改写原报告 |
 | DESIGN-04 | 手机录入页调整长文本与输入布局；对照任务为桌面只读面板 | 按目标设备实际阅读尺寸核对整体层级、注意力焦点、间距与点击区；仅对适用录入流程检查键盘遮挡与焦点布局 | 对全部桌面只读设计强制手机键盘检查，把基础几何无裁切当完整视觉通过，或将静态占位说成真实系统输入验证 |
+| DESIGN-05 | 在支持子代理或独立工作会话的客户端批量修改多个 macOS `.sketch` 设计稿（本机运行单一 Sketch GUI 与 MCP 实例）；对照项为单个 `.sketch` 文件局部调整 | 按每批 2 至 3 个文档串行分批委派，即使各工作节点拥有独立 Git worktree 也不并发修改或保存 `.sketch` 文档；各批次工作节点在私有临时目录内完成图层扫描、修改、导出 PNG 视觉核验、`doc.save()` 与 `sketchtool duplicates` 零重复 ID 校验及无用预览清理，向主会话回传绑定路径与文档 ID 的验收摘要；对照项单文档任务直接在当前会话完成 | 跨多个子代理或工作树并发调用 Sketch MCP 修改与保存文档引发打开文档表冲突，把每批全量图层树和过程 PNG 堆回主会话耗尽上下文，跳过保存重开与重复 ID 检查，或将批量编排强加给单文档小改动 |
 
 ## Wechatide 顶层与本地配置
 
