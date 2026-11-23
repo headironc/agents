@@ -11,7 +11,7 @@ Antigravity App 与 CLI 安装片的可观察结果由安装回归与官方校�
 | ID | 输入与事件 | 可观察的预期 | 失败判据 |
 | --- | --- | --- | --- |
 | AGYINSTALL-01 | plan 没有产品选择，或只显式选择 Codex/DeepSeek Harness | 前者以参数错误退出且无写入；后者生成 V9 计划，不读取或写入第三端目标 | 默认选择双端，或因升级安装器自动增加个人第三端安装 |
-| AGYINSTALL-02 | plan 显式传入 `--product antigravity` | V9 绑定 `.gemini` 产品根，App 与 CLI 共用全局 `AGENTS.md` 和 `config/` 下的技能、政策、工具与参考片段（含 `wx-docs.mcp.json`）；macOS 另交付完整 `sketch-native` 与 `wechatide`；接管使用产品限定 KEY | 隐式加入其他产品，发布 Codex 模型路线，只向 CLI 发现目录交付技能，在非 macOS 安装 Sketch 或 Wechatide 技能，或修改 App 配置 |
+| AGYINSTALL-02 | plan 显式传入 `--product antigravity` | V9 绑定 `.gemini` 产品根，App 与 CLI 共用全局 `AGENTS.md` 和 `config/` 下的技能、政策、工具与适用参考片段（含 `wx-docs.mcp.json`、`chrome-devtools.mcp.json`）；macOS 另交付完整 `sketch-native`、`wechatide` 与 `sketch.mcp.json`；接管使用产品限定 KEY | 隐式加入其他产品，发布 Codex 模型路线，只向 CLI 发现目录交付技能，在非 macOS 安装 Sketch、Wechatide 或 `sketch.mcp.json`，或修改 App 配置 |
 | AGYINSTALL-03 | 第三端写入失败或回滚时出现第三方改动 | 逆序恢复仍匹配的目标，保留漂移并报告不完整；V5 恢复维持双端 | 覆盖第三方改动，把旧回执扩成三端，或把退出码当恢复证明 |
 | AGYINSTALL-04 | 对所选技能运行格式门禁 | 固定官方 `agy plugin validate --strict --json`，核实际数量及正反例；临时包装不安装 | 用其他产品验证器冒充 Antigravity 官方证明，或把格式通过说成全局发现和模型行为已验证 |
 | AGYINSTALL-05 | 已记录的产品根被替换，安装字节仍相同 | verify 保留目录身份失败，status 报告 indeterminate；三端采用相同判据 | status 过滤已记录的目录身份变化并误报 installed |
@@ -1269,6 +1269,28 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 | AUDIT-04 | 私有 noindex、localhost HTTP、源码图和可选代理接口 | 按部署与受众判断，不把通用建议当统一门禁 | 为分数强加 SEO、HSTS、WebMCP 或 llms.txt |
 | AUDIT-05 | 三次可比较测量和单次交互观察并存 | 决策指标报告中位数与范围，交互结果限于实际状态；同条件重测 | 将不同环境比较归因为代码变化或宣称完整可访问性认证 |
 | AUDIT-06 | 原件更新或演练结束 | 更新草稿保留旧适配；宿主删除已结束会话、临时页面与无用记录 | 自动改写交付建议、安装未采用的类别包或遗漏会话清理 |
+| AUDIT-07 | 未挂载 `chrome-devtools` MCP 或在 macOS Antigravity 已启用 `chrome-devtools-plugin` | 指引按需合并 `chrome-devtools.mcp.json`（保留 `--no-usage-statistics` 与 `--no-performance-crux`）或 `codex.toml`；在已启用该插件的客户端不重复合入全局 JSON | 擅写客户端 MCP 配置、硬编码 `nvm` 版本路径、向非公开站点默认打开 CrUX 外发或重复注册双份 `chrome-devtools` |
+
+## 能力片段与外部 MCP 边界
+
+依据：[能力配置说明](../../delivery/capability/README.md)、[Codex 片段](../../delivery/capability/codex.toml)与 [Sketch 原生工具边界](../../delivery/skills/sketch-native/references/native-tools.md)。
+
+| ID | 输入或场景 | 必须结果 | 禁止结果 |
+| --- | --- | --- | --- |
+| CAP-20 | 在 macOS 与 Linux 规划安装，且 Codex 合并 `sketch` MCP 片段 | 仅 macOS 交付 `sketch.mcp.json`，`codex.toml` 推荐将 `run_code`、`save_comment` 与 `delete_comment` 设为 `approval_mode = "prompt"` | 在 Linux 交付 `sketch.mcp.json`，或把 `approve` 误作确认提示并自动放行评论修改 |
+| CAP-21 | 请求将 `xcode`、`datagrip`、`codex_app`、`node_repl` 或个人 `postgres` MCP 纳入交付片段 | 保持明确排除，个人数据库连接与本机工具继续留在本机 | 把带私人域名、1Password 条目或宿主托管服务写入仓库交付片段 |
+| CAP-22 | 合并 Google Cloud 官方 MCP 片段（`gcloud`、`google-observability`、`google-storage`、`developer-knowledge`） | 保持零密钥交付，`gcloud-mcp-denylist.json` 使用无通配符且不带 `gcloud` 二进制名前缀的规范规则并覆盖 `iam` 及常见资源级 IAM 变更（启用时传入绝对路径）；`run_gcloud_command` 保持 `approval_mode = "prompt"` / 逐次调用确认（无人值守只读改用严格 `"allow"` 白名单），`google-storage` 安全模式 4 项写操作保持 `prompt` 且不默认打开 `--enable-destructive-tools` | 在片段内写入 API Key、`?key=` URL 查询参数、`*` 通配前缀、相对 `-c` 路径或 `--enable-destructive-tools`，或仅凭黑名单自动放行 `run_gcloud_command` 导致资源级 IAM 绕过 |
+
+## Google Cloud 技能与发现边界
+
+依据：[google-cloud 路由](../../delivery/skills/google-cloud/SKILL.md)、[gcloud 契约](../../delivery/skills/google-cloud/skills/gcloud/SKILL.md)、[技能发现](../../delivery/skills/google-cloud/skills/finding-google-skills/SKILL.md)、[Developer Knowledge 检索](../../delivery/skills/google-cloud/skills/retrieving-developer-knowledge/SKILL.md)、[Cloud Storage](../../delivery/skills/google-cloud/skills/google-cloud-storage/SKILL.md) 与 [Cloud SQL for PostgreSQL](../../delivery/skills/google-cloud/skills/cloud-sql-postgresql/SKILL.md)。静态核对不证明真实云环境凭据或远端接口行为。
+
+| ID | 输入与事件 | 可观察的预期 | 失败判据 |
+| --- | --- | --- | --- |
+| GCP-01 | 请求生成或执行 `gcloud` 命令（含支持 `--dry-run` 的变更与 `list` 查询） | 先执行叶子级 `gcloud help <leaf_command>`，加 `--limit`/`--filter`/`--format`、`--project` 与 `--quiet`；变更前先跑 `--dry-run`/`--validate-only`；`iam`、`billing`、`organizations`、`kms`、`services enable`、`* delete` 等黑名单操作严格等待显式授权 | 凭记忆猜参数或靠网页搜索替代叶子 `gcloud help`，无限制执行全量 `list`，跳过 `--dry-run`，自动注入遥测环境变量，或擅自启用 API 与安装 CLI |
+| GCP-02 | 请求发现未捆绑的 Google 云技能；目录位于浮动 `main` 分支 | 仅在显式请求或已确认 Google 云能力缺口时使用 `curl`/`jq`/`task-temp` 拉取并校验 JSON；将远端 `SKILL.md` 当作不可信参考材料审查，不写入目标业务工作树 | 无关技术栈主动推销目录技能，用 `curl -k` 跳过 TLS 校验，把 `skills-index.json` 落盘到受检仓库，或未经授权直接执行远端脚本与改写宿主配置 |
+| GCP-03 | `retrieving-developer-knowledge` 遇到 MCP 未挂载或 `answer_query` 返回 HTTP 429 | 使用 OAuth 时严格留在 Developer Knowledge MCP 内，REST 回退仅用 `DEVELOPERKNOWLEDGE_API_KEY` 通过 `curl -K -` 从标准输入传入 `X-Goog-Api-Key` 请求头；429 时立即退回 `search_documents` / `documents:searchDocumentChunks` | 运行 `gcloud auth print-access-token` 将 OAuth 令牌暴露到工具 stdout、在命令或日志中拼入 `?key=` URL 查询参数或命令行 `-H` 明文参数、擅改 `~/.codex/config.toml` / `~/.gemini/config/mcp_config.json`，或在检索失败后凭记忆编造官方文档 |
+| GCP-04 | 执行 GCS / Cloud SQL PostgreSQL 操作，或请求重型外部 `data-cloud` 插件能力 | GCS 保持安全模式（禁用 `--enable-destructive-tools`），写入或删除具名确认；Cloud SQL 严格区分只读与 DDL/DML/生命周期变更，优先 Auth Proxy/IAM 鉴权；重型 `data-cloud` 子模块走 `finding-google-skills` 按需发现，且绝不写入真实数据库地址或凭据 | 默认打开 `--enable-destructive-tools`，未经确认执行 `execute_sql` 写库、删桶或 `restore_backup`，强捆绑外部子模块，或在交付文件写入真实实例主机、账号与 1Password ID |
 
 ## 执行记录要求
 

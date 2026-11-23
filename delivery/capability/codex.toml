@@ -11,3 +11,61 @@
 # Optional read-only WeChat official documentation MCP server (Streamable HTTP, no authentication).
 # [mcp_servers.wx-docs]
 # url = "https://developers.weixin.qq.com/doc/mcp"
+
+# Optional macOS-only Sketch 2026.4+ built-in local MCP server (requires Sketch running with MCP enabled).
+# Codex AppToolApproval modes: "prompt" always asks, "writes" prompts writes, "auto" uses tool hints,
+# and "approve" auto-allows. Keep `run_code`, `save_comment`, and `delete_comment` on "prompt" by default
+# (you may relax `run_code` locally on trusted design files while keeping Workspace comments on "prompt").
+# [mcp_servers.sketch]
+# url = "http://localhost:31126/mcp"
+# [mcp_servers.sketch.tools.run_code]
+# approval_mode = "prompt"
+# [mcp_servers.sketch.tools.save_comment]
+# approval_mode = "prompt"
+# [mcp_servers.sketch.tools.delete_comment]
+# approval_mode = "prompt"
+
+# Optional Chrome DevTools MCP server (requires Node >=20.19 / >=22.12 on PATH; no hardcoded nvm path).
+# Keeps telemetry and external CrUX trace uploads disabled by default; add `--isolated` as needed, or
+# remove `--no-performance-crux` only when auditing public URLs with explicit consent.
+# [mcp_servers.chrome-devtools]
+# command = "npx"
+# args = ["-y", "chrome-devtools-mcp@1.13.0", "--no-usage-statistics", "--no-performance-crux"]
+
+# Optional Google Cloud CLI MCP server (Preview, requires Node >=20 and authenticated local gcloud/ADC).
+# Upstream default_deny only blocks interactive/SSH commands; pass `-c` with the absolute path to
+# `gcloud-mcp-denylist.json` to block top-level and common resource-scoped IAM/delete/billing groups.
+# Because prefix denylists cannot exhaustively cover every GCP service group, keep
+# `run_gcloud_command` on "prompt" approval; unattended read-only clients must use an explicit
+# read-only `"allow"` allowlist config instead (mutually exclusive with `"deny"` in `-c`).
+# [mcp_servers.gcloud]
+# command = "npx"
+# args = ["-y", "@google-cloud/gcloud-mcp@0.5.3"]
+# [mcp_servers.gcloud.tools.run_gcloud_command]
+# approval_mode = "prompt"
+
+# Optional read-only Google Cloud Observability MCP server (12 read-only Logging/Monitoring/Trace/Error tools;
+# requires Node >=20, ADC, and an enabled quota project).
+# [mcp_servers.google-observability]
+# command = "npx"
+# args = ["-y", "@google-cloud/observability-mcp@0.2.3"]
+
+# Optional Google Cloud Storage MCP server (safe mode only; NEVER add `--enable-destructive-tools` by default).
+# The 4 create/write tools in safe mode are marked "prompt" while the 11 read-only inspection tools remain automatic.
+# [mcp_servers.google-storage]
+# command = "npx"
+# args = ["-y", "@google-cloud/storage-mcp@0.6.0"]
+# [mcp_servers.google-storage.tools.create_bucket]
+# approval_mode = "prompt"
+# [mcp_servers.google-storage.tools.write_object_new]
+# approval_mode = "prompt"
+# [mcp_servers.google-storage.tools.upload_object_new]
+# approval_mode = "prompt"
+# [mcp_servers.google-storage.tools.copy_object_new]
+# approval_mode = "prompt"
+
+# Optional read-only Google Developer Knowledge remote MCP server (Streamable HTTP).
+# Set DEVELOPERKNOWLEDGE_API_KEY in the shell environment before launching Codex.
+# [mcp_servers.developer-knowledge]
+# url = "https://developerknowledge.googleapis.com/mcp"
+# env_http_headers = { "X-Goog-Api-Key" = "DEVELOPERKNOWLEDGE_API_KEY" }

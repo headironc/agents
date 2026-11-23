@@ -124,4 +124,14 @@ binding	scripts/tool-bootstrap.sh	script	skill-validation	scripts/check-skills.t
 binding	scripts/skill-validator.py	script	curl	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md	skill	curl	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	delivery/skills/alibabacloud-find-skills/references/verification-method.md	skill	jq	delivery/policy/tool-contracts.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/finding-google-skills/SKILL.md	skill	curl	delivery/policy/tool-contracts.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/finding-google-skills/SKILL.md	skill	jq	delivery/policy/tool-contracts.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/finding-google-skills/SKILL.md	skill	task-temp	delivery/policy/tool-contracts.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/cloud-sql-postgresql/SKILL.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/gcloud/references/cli-usage.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/google-cloud-auth/SKILL.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/google-cloud-onboarding/SKILL.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/google-cloud-storage/SKILL.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/retrieving-developer-knowledge/SKILL.md	skill	curl	delivery/policy/tool-contracts.md	read-before-use	defined
+binding	delivery/skills/google-cloud/skills/retrieving-developer-knowledge/references/api-fallback.md	skill	curl	delivery/policy/tool-contracts.md	read-before-use	defined
 binding	scripts/check-docs.ts	script	node	scripts/check.ts	read-before-use	defined

@@ -108,19 +108,193 @@ test("delivery/capability/codex.toml's commented recommendations parse once unco
   assert.equal(fullParsed.status, 0, fullParsed.stderr.trim());
   assert.deepEqual(JSON.parse(fullParsed.stdout.trim()), {
     "wx-docs": { url: "https://developers.weixin.qq.com/doc/mcp" },
+    sketch: {
+      url: "http://localhost:31126/mcp",
+      tools: {
+        run_code: { approval_mode: "prompt" },
+        save_comment: { approval_mode: "prompt" },
+        delete_comment: { approval_mode: "prompt" },
+      },
+    },
+    "chrome-devtools": {
+      command: "npx",
+      args: [
+        "-y",
+        "chrome-devtools-mcp@1.13.0",
+        "--no-usage-statistics",
+        "--no-performance-crux",
+      ],
+    },
+    gcloud: {
+      command: "npx",
+      args: ["-y", "@google-cloud/gcloud-mcp@0.5.3"],
+      tools: {
+        run_gcloud_command: { approval_mode: "prompt" },
+      },
+    },
+    "google-observability": {
+      command: "npx",
+      args: ["-y", "@google-cloud/observability-mcp@0.2.3"],
+    },
+    "google-storage": {
+      command: "npx",
+      args: ["-y", "@google-cloud/storage-mcp@0.6.0"],
+      tools: {
+        create_bucket: { approval_mode: "prompt" },
+        write_object_new: { approval_mode: "prompt" },
+        upload_object_new: { approval_mode: "prompt" },
+        copy_object_new: { approval_mode: "prompt" },
+      },
+    },
+    "developer-knowledge": {
+      url: "https://developerknowledge.googleapis.com/mcp",
+      env_http_headers: {
+        "X-Goog-Api-Key": "DEVELOPERKNOWLEDGE_API_KEY",
+      },
+    },
   });
 });
 
-test("delivery/capability/wx-docs.mcp.json parses as a valid MCP server fragment", () => {
-  const body = readFileSync(
-    path.join(root, "delivery/capability/wx-docs.mcp.json"),
-    "utf8",
-  );
-  assert.deepEqual(JSON.parse(body), {
+test("delivery/capability MCP JSON fragments parse with expected zero-secret definitions", () => {
+  const readJson = (name: string) =>
+    JSON.parse(
+      readFileSync(path.join(root, "delivery/capability", name), "utf8"),
+    );
+  assert.deepEqual(readJson("wx-docs.mcp.json"), {
     mcpServers: {
       "wx-docs": { url: "https://developers.weixin.qq.com/doc/mcp" },
     },
   });
+  assert.deepEqual(readJson("sketch.mcp.json"), {
+    mcpServers: {
+      sketch: { url: "http://localhost:31126/mcp" },
+    },
+  });
+  assert.deepEqual(readJson("chrome-devtools.mcp.json"), {
+    mcpServers: {
+      "chrome-devtools": {
+        command: "npx",
+        args: [
+          "-y",
+          "chrome-devtools-mcp@1.13.0",
+          "--no-usage-statistics",
+          "--no-performance-crux",
+        ],
+      },
+    },
+  });
+  assert.deepEqual(readJson("gcloud.mcp.json"), {
+    mcpServers: {
+      gcloud: {
+        command: "npx",
+        args: ["-y", "@google-cloud/gcloud-mcp@0.5.3"],
+      },
+    },
+  });
+  assert.deepEqual(readJson("google-observability.mcp.json"), {
+    mcpServers: {
+      "google-observability": {
+        command: "npx",
+        args: ["-y", "@google-cloud/observability-mcp@0.2.3"],
+      },
+    },
+  });
+  const storageMcp = readJson("google-storage.mcp.json");
+  assert.deepEqual(storageMcp, {
+    mcpServers: {
+      "google-storage": {
+        command: "npx",
+        args: ["-y", "@google-cloud/storage-mcp@0.6.0"],
+      },
+    },
+  });
+  assert.ok(
+    !storageMcp.mcpServers["google-storage"].args.includes(
+      "--enable-destructive-tools",
+    ),
+  );
+  assert.deepEqual(readJson("google-developer-knowledge.mcp.json"), {
+    mcpServers: {
+      "developer-knowledge": {
+        url: "https://developerknowledge.googleapis.com/mcp",
+        authProviderType: "google_credentials",
+      },
+    },
+  });
+  const denylist = readJson("gcloud-mcp-denylist.json") as {
+    allow?: unknown;
+    deny: string[];
+  };
+  assert.equal(denylist.allow, undefined);
+  assert.ok(Array.isArray(denylist.deny) && denylist.deny.length > 0);
+  assert.deepEqual(
+    [...new Set(denylist.deny)].sort(),
+    denylist.deny,
+    "gcloud-mcp-denylist.json entries must be unique and sorted",
+  );
+  assert.ok(
+    denylist.deny.every((item) => !item.includes("*")),
+    "gcloud-mcp prefix matcher must not contain glob wildcards",
+  );
+  assert.ok(
+    denylist.deny.every((item) => !/^gcloud\b/i.test(item.trim())),
+    "gcloud-mcp lints command strings without the leading gcloud binary name",
+  );
+
+  // Mirror @google-cloud/gcloud-mcp denyCommands prefix normalization and release-track matching.
+  const normalizeGcloud = (value: string) =>
+    `${value.toLowerCase().trim()} `;
+  const isDenied = (parsedCommand: string) => {
+    const cmd = normalizeGcloud(parsedCommand);
+    return denylist.deny.some((entry) =>
+      ["", "alpha", "beta", "preview"].some((track) =>
+        cmd.startsWith(normalizeGcloud(`${track} ${entry}`)),
+      ),
+    );
+  };
+  for (const blocked of [
+    "projects add-iam-policy-binding my-proj",
+    "beta projects add-iam-policy-binding my-proj",
+    "alpha projects set-iam-policy my-proj policy.json",
+    "projects remove-iam-policy-binding my-proj",
+    "resource-manager folders add-iam-policy-binding 123",
+    "resource-manager folders set-iam-policy 123 policy.json",
+    "storage buckets add-iam-policy-binding gs://b",
+    "storage buckets set-iam-policy gs://b p.json",
+    "secrets add-iam-policy-binding s",
+    "secrets set-iam-policy s p.json",
+    "run services add-iam-policy-binding svc",
+    "run jobs set-iam-policy job p.json",
+    "functions add-iam-policy-binding fn",
+    "functions add-invoker-policy-binding fn",
+    "pubsub topics add-iam-policy-binding t",
+    "pubsub subscriptions set-iam-policy s p.json",
+    "artifacts repositories add-iam-policy-binding r",
+    "compute instances set-iam-policy vm p.json",
+    "iap web add-iam-policy-binding",
+    "org-policies set-policy p.yaml",
+    "services api-keys create",
+    "iam service-accounts keys create k.json",
+    "preview iam roles update r",
+  ]) {
+    assert.equal(isDenied(blocked), true, `Expected denylist to block: ${blocked}`);
+  }
+  for (const permitted of [
+    "projects list",
+    "projects describe my-proj",
+    "projects get-iam-policy my-proj",
+    "storage buckets describe gs://b",
+    "storage buckets get-iam-policy gs://b",
+    "secrets describe s",
+    "run services describe svc",
+    "compute instances list",
+  ]) {
+    assert.equal(
+      isDenied(permitted),
+      false,
+      `Expected read-only command not to match denylist: ${permitted}`,
+    );
+  }
   assert.throws(() => JSON.parse("{invalid"), SyntaxError);
 });
 

@@ -32,16 +32,17 @@
 | 文档检查器 | [工具契约](delivery/policy/tool-contracts.md) | 提示中文句长，阻塞混排空格及表格编号错误 |
 | 任务临时资源与演练清理 | [目录生命周期](delivery/policy/execution.md#task-temporary-directories)、[演练清理](delivery/policy/execution.md#test-and-exercise-cleanup)、[调用入口](delivery/policy/tool-contracts.md#task-temp) | 演练结束清理本次临时资源与无用记录；保留在用资源、当前安装及必要恢复材料 |
 | 官方 Codex 跨设备协作 | [协作规则](delivery/policy/models.md#official-codex-coordination-across-devices)、[Mac 与 dev 示例](docs/usage.md#mac-与-dev-的结果回传) | 用官方交互会话满足跨端可见性；绑定各端授权、回报路径及现任协调者 |
-| 推荐配置 | [配置说明](delivery/capability/README.md) | 提供片段，由使用者合并到自己的配置 |
+| 推荐配置 | [配置说明](delivery/capability/README.md) | 提供零密钥片段（含 `sketch.mcp.json`、`chrome-devtools.mcp.json` 与 Google Cloud 官方 MCP 片段），由使用者合并到自己的配置 |
 | GitHub 操作 | [gh](delivery/skills/gh/SKILL.md)、[身份就绪](delivery/skills/gh/references/auth-readiness.md) | 调用、工作流与按需身份恢复由同一技能拥有 |
 | 项目导航与验证 | [project-guide](delivery/skills/project-guide/SKILL.md) | 共享技能；发现项目版本、权威资料与原生检查，报告实际证据；演练范围见[来源登记](docs/skill-sources.md#project-guide) |
 | 浏览器开发与审查 | [modern-web-guidance](delivery/skills/modern-web-guidance/SKILL.md) | 三端共享；使用同一官方 npm 发布包的 CLI、索引和指南；保留项目兼容要求与只读边界 |
 | 属性测试 | [property-based-testing](delivery/skills/property-based-testing/SKILL.md) | 三端共享；从独立性质设计生成器、审查测试并诊断反例；保留项目依赖选择与只读边界 |
 | Rust 专项风险审查 | [rust-risk-review](delivery/skills/rust-risk-review/SKILL.md) | 三端共享；按调用链核对 unsafe、FFI、并发、取消安全及资源边界，保留误报排除和只读约束 |
 | Web 质量审查 | [web-quality-audit](delivery/skills/web-quality-audit/SKILL.md) | 三端共享；用真实页面与条件明确的测量审查交互和质量，区分现场数据、单次观察与源码假设 |
-| 上游内容更新 | [每周更新流程](docs/tooling.md#官方内容自动更新) | Modern Web 发布包、两组 Rust 参考章节、属性测试、Rust 专项审查与 Web 质量审查分别创建更新 PR；参考评估和技能适配完成后才能交付 |
+| 上游内容更新 | [每周更新流程](docs/tooling.md#官方内容自动更新) | Modern Web 发布包、两组 Rust 参考章节、属性测试、Rust 专项审查、Web 质量审查与 Google Cloud 分别创建更新 PR；参考评估和技能适配完成后才能交付 |
 | 原生 CI 与交付 | [运行合同](docs/tooling.md#ci-与审查边界)、[实例与证据边界](docs/review-gate.md#实例与证据边界) | 两平台复用完整检查；实际配置、运行与独立审查分别绑定实例验证 |
 | 阿里云技能发现与短信 | [技能发现](delivery/skills/alibabacloud-find-skills/SKILL.md)、[短信](delivery/skills/alibabacloud-sms-send-short-message/SKILL.md) | 发现、安装及发送遵循各自授权 |
+| Google Cloud 能力套件 | [google-cloud](delivery/skills/google-cloud/SKILL.md) | 七个子入口（五个核心与两项精选基础数据云能力）已交付，配套零密钥官方 MCP 片段；按需路由公开目录，默认关闭遥测且不增加常驻指令体积 |
 | 微信开发者工具 | [wechatide](delivery/skills/wechatide/SKILL.md) | 十个子入口及官方文档检索参考已交付；限 macOS 安装与运行，三端共享 |
 | 安装与恢复 | [安装合同](docs/usage.md#产品选择与安装) | 显式选择一个或多个产品；支持受管文件和完整技能选择、Codex 工作树来源、回读与恢复 |
 

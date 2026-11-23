@@ -348,8 +348,15 @@ function installDistinctProducts(
   ]);
   assert.deepEqual(readdirSync(path.join(dsh, "capability")).sort(), [
     "README.md",
+    "chrome-devtools.mcp.json",
     "dsh-headless.patch.yml",
+    "gcloud-mcp-denylist.json",
+    "gcloud.mcp.json",
+    "google-developer-knowledge.mcp.json",
+    "google-observability.mcp.json",
+    "google-storage.mcp.json",
     "rust-lints.toml",
+    ...(process.platform === "darwin" ? ["sketch.mcp.json"] : []),
     "wx-docs.mcp.json",
   ]);
   assert.deepEqual(readdirSync(path.join(dsh, "skills")).sort(), skills.dsh);
@@ -409,11 +416,21 @@ test("explicit Antigravity selection contains its platform-compatible skills and
     selected.map((target) => target.key).sort(),
     [
       "antigravity:AGENTS.md",
+      "antigravity:capability/chrome-devtools.mcp.json",
+      "antigravity:capability/gcloud-mcp-denylist.json",
+      "antigravity:capability/gcloud.mcp.json",
+      "antigravity:capability/google-developer-knowledge.mcp.json",
+      "antigravity:capability/google-observability.mcp.json",
+      "antigravity:capability/google-storage.mcp.json",
       "antigravity:capability/rust-lints.toml",
+      ...(process.platform === "darwin"
+        ? ["antigravity:capability/sketch.mcp.json"]
+        : []),
       "antigravity:capability/wx-docs.mcp.json",
       "antigravity:alibabacloud-find-skills",
       "antigravity:alibabacloud-sms-send-short-message",
       "antigravity:gh",
+      "antigravity:google-cloud",
       "antigravity:modern-web-guidance",
       "antigravity:policy/antigravity.md",
       "antigravity:policy/review.md",

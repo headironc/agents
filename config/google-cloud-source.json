@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 1,
+  "repository": "google/skills",
+  "repositoryId": 1197652028,
+  "branch": "main",
+  "revision": "4bb21ebfa085f6307d5d62bc21765e1d3433f11d",
+  "files": [
+    {
+      "source": "LICENSE",
+      "target": "config/upstream/google-cloud/LICENSE.txt",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "blob": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/rules/google-cloud-discovery.md",
+      "target": "config/upstream/google-cloud/google-cloud-discovery.md.txt",
+      "bytes": 2417,
+      "sha256": "8c27e2e7f838d7a4f67e7efa3a800e913d035a5c15fa392cc0e3af18fe51744e",
+      "blob": "7952039a43f80f231ac9cd6dadb4f7674163b7a7"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/gcloud/SKILL.md",
+      "target": "config/upstream/google-cloud/gcloud--SKILL.md.txt",
+      "bytes": 15594,
+      "sha256": "a16e7688f5b64c155b2d8ca452f9196df259ef1bd3c0a35f23e4a5f941eb037b",
+      "blob": "37e82a3a27822ecd4f495e5e51392c6563d40f92"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/gcloud/references/cli-usage.md",
+      "target": "config/upstream/google-cloud/gcloud--cli-usage.md.txt",
+      "bytes": 4880,
+      "sha256": "7a8b5b2499a02cb397d1064663616d21c338c4b2a6fc6eeb77a6de749fc33e1b",
+      "blob": "e459441e33fb5d52e470f295e5c2bd60afa8a342"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/gcloud/references/mcp-usage.md",
+      "target": "config/upstream/google-cloud/gcloud--mcp-usage.md.txt",
+      "bytes": 7931,
+      "sha256": "04645f54167f5cd917baa2e5caab91a9db9f56451fef7145c1361cc7e050f5b1",
+      "blob": "de98daa4b5787d33eab7f66a6ce2ab2634ca8fb6"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/google-cloud-recipe-auth/SKILL.md",
+      "target": "config/upstream/google-cloud/google-cloud-recipe-auth--SKILL.md.txt",
+      "bytes": 12769,
+      "sha256": "ecc4a5a8b52de9962633abda668b38dcf88036058b7d89e582db5bee650d0a28",
+      "blob": "6d66726176d149f5fbd204d13f74861cf2f4f58a"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/google-cloud-recipe-onboarding/SKILL.md",
+      "target": "config/upstream/google-cloud/google-cloud-recipe-onboarding--SKILL.md.txt",
+      "bytes": 13098,
+      "sha256": "f922dea42e381cad35279bf39432e2371abaf009255183e7340e4703f8ab5b61",
+      "blob": "220c46438dd314f753ff6650ce08cde07b835b63"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/finding-google-skills/SKILL.md",
+      "target": "config/upstream/google-cloud/finding-google-skills--SKILL.md.txt",
+      "bytes": 6842,
+      "sha256": "8b44ec77a39e0ef0bb428ae6dc646d61edd9d0ceac749e7be8175108991cf8c1",
+      "blob": "f4f5b2daf83631bf0412f325a983120fc9eb04df"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/SKILL.md",
+      "target": "config/upstream/google-cloud/retrieving-developer-knowledge--SKILL.md.txt",
+      "bytes": 8384,
+      "sha256": "c3d991be534984082d6f6232b3cc213c9f94556ccee2657b527f95dc427be0a1",
+      "blob": "123a151f2ad4b4acc08e0814cbb12a1abeb50f55"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/mcp-usage.md",
+      "target": "config/upstream/google-cloud/retrieving-developer-knowledge--mcp-usage.md.txt",
+      "bytes": 1042,
+      "sha256": "b4c0a6d6638796c6a2fd89c6cf3fa7a11162fb864a6072d04c9ca8d49e07872f",
+      "blob": "6965740d9e5acdeb9179f7a6c6b663fe0671c9f2"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/api-fallback.md",
+      "target": "config/upstream/google-cloud/retrieving-developer-knowledge--api-fallback.md.txt",
+      "bytes": 6611,
+      "sha256": "657ade2d78217408dd705cae56b074048ec2a3aeb6309fbca98aa17163d3e894",
+      "blob": "b460ab78d2cbdbb9590967831e65e6b9e08bc041"
+    },
+    {
+      "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/supported-domains.md",
+      "target": "config/upstream/google-cloud/retrieving-developer-knowledge--supported-domains.md.txt",
+      "bytes": 1580,
+      "sha256": "663123a624a105e80d60bda6f312abfc58034e0c60ee2123b437ebe91388c6d4",
+      "blob": "81778968b974bc5c4c4cb7eadfd38a4e3867c3b1"
+    },
+    {
+      "source": "skills/cloud/google-cloud-storage-basics/SKILL.md",
+      "target": "config/upstream/google-cloud/google-cloud-storage-basics--SKILL.md.txt",
+      "bytes": 17759,
+      "sha256": "e0bcd86d98b4d0ff37d183593c7bfad857623e94b0a653f10b53c012ba6fb93b",
+      "blob": "d4860d7126fe4e38daa42a6aca498609357004bf"
+    },
+    {
+      "source": "skills/cloud/google-cloud-storage-basics/references/mcp-usage.md",
+      "target": "config/upstream/google-cloud/google-cloud-storage-basics--mcp-usage.md.txt",
+      "bytes": 14041,
+      "sha256": "fa5d96765fbe3e9a9e5874c69934f1f4ef0bc1e47c7d0360e9458ce1ff86d1d2",
+      "blob": "f777029da46279f150f04f6d9980992dafa7e829"
+    },
+    {
+      "source": "skills/cloud/cloud-sql-basics/SKILL.md",
+      "target": "config/upstream/google-cloud/cloud-sql-basics--SKILL.md.txt",
+      "bytes": 4357,
+      "sha256": "d5f511b7876db1c11301274c0b6bc1c6ec3f26bc42a99ad493341a4691f0d6d4",
+      "blob": "2ed249f9064ebf7e43eb1763d5898814e3761f42"
+    },
+    {
+      "source": "skills/cloud/cloud-sql-basics/references/mcp-usage.md",
+      "target": "config/upstream/google-cloud/cloud-sql-basics--mcp-usage.md.txt",
+      "bytes": 3282,
+      "sha256": "b20630471b59961d85b05c2116f58ed4f3f271146f65a3059f9b0b6a84da1143",
+      "blob": "1a9c005b72914ec99f81fd20af845cc700773946"
+    }
+  ],
+  "adaptation": {
+    "revision": "4bb21ebfa085f6307d5d62bc21765e1d3433f11d",
+    "files": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      {
+        "path": "SKILL.md",
+        "sha256": "9396f0ab60a1d3ac9111578da6ec3e08e94330a5dc6d384d6bb34cc0a28646ac"
+      },
+      {
+        "path": "references/capabilities.md",
+        "sha256": "03237d934a5247b2872a7a08a3aade59aa4e99f10b2d2b6f6d4149155176b4d6"
+      },
+      {
+        "path": "skills/cloud-sql-postgresql/SKILL.md",
+        "sha256": "3b635d623ca79eff174d6a2e8cca295252a7f9498a3c4192c034392729848de3"
+      },
+      {
+        "path": "skills/finding-google-skills/SKILL.md",
+        "sha256": "21b4fdb8809996e1c0e8ad0ca32ce50d831b6772563dc4158d4bf332b1abf499"
+      },
+      {
+        "path": "skills/gcloud/SKILL.md",
+        "sha256": "a40e948f779d7021ef2b022a17bce0753b856916a38d7ee446a23cb98654f1a9"
+      },
+      {
+        "path": "skills/gcloud/references/cli-usage.md",
+        "sha256": "490982dd606a66410e36a75a44041020f1b70e199e7ceff60cb962af1b40d976"
+      },
+      {
+        "path": "skills/gcloud/references/mcp-usage.md",
+        "sha256": "1de44e8f7de07cf142d5415a8a9a176909e9dfd2b6c7482bd0ce00f372f5a9f6"
+      },
+      {
+        "path": "skills/google-cloud-auth/SKILL.md",
+        "sha256": "7e453d3a73492f059cacf0143cb6e5755d7df134d23ae314cb84c1ca5a3e4511"
+      },
+      {
+        "path": "skills/google-cloud-onboarding/SKILL.md",
+        "sha256": "cc5cae9a7ba03ac97ecd7b66162fa84673b6bfd7efea52742c766ef858a9b2ef"
+      },
+      {
+        "path": "skills/google-cloud-storage/SKILL.md",
+        "sha256": "1235737a56f48c72aaa99f83670f5a0bc6710ca4a58e1132d766de4c58460bc2"
+      },
+      {
+        "path": "skills/retrieving-developer-knowledge/SKILL.md",
+        "sha256": "2cc46d0b443861f1c14bf71f413405faa10e847838ede68390a326d8aad704ee"
+      },
+      {
+        "path": "skills/retrieving-developer-knowledge/references/api-fallback.md",
+        "sha256": "15f2351068836fd3a8e42cd6362ab9dbaa95767a64e3d70e088c44b58b602ec5"
+      },
+      {
+        "path": "skills/retrieving-developer-knowledge/references/mcp-usage.md",
+        "sha256": "afd1efa47e9ed7d6df53bf0d1fb0c0e957c3235600adcbfabe0eedf4d18b53f4"
+      },
+      {
+        "path": "skills/retrieving-developer-knowledge/references/supported-domains.md",
+        "sha256": "29e248db248cf122ec7eda8896d984555bab65176c1992203372d97688b888fe"
+      }
+    ],
+    "decisions": [
+      {
+        "source": "LICENSE",
+        "decision": "retained",
+        "reason": "Retain the complete Apache-2.0 license from google/skills byte-identically as LICENSE.txt under the google-cloud package root."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/rules/google-cloud-discovery.md",
+        "decision": "adapted",
+        "reason": "Move catalog routing and non-inference guardrails from an always-on global rule into the google-cloud top-level SKILL.md router to preserve global AGENTS.md byte budgets."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/gcloud/SKILL.md",
+        "decision": "adapted",
+        "reason": "Establish Contract subject gcloud with leaf-level gcloud help validation, data reduction, dry-run preview, explicit scoping, and denylist consent while dropping rigid English templates and default telemetry attribution."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/gcloud/references/cli-usage.md",
+        "decision": "adapted",
+        "reason": "Adapt CLI setup, ADC, service account impersonation, and WIF guidance with command -v gcloud, explicit installation consent, and client-neutral phrasing."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/gcloud/references/mcp-usage.md",
+        "decision": "adapted",
+        "reason": "Document both local @google-cloud/gcloud-mcp with prefix denylist and @google-cloud/observability-mcp fragments plus hosted cloudcli.googleapis.com/mcp without mutating personal client configs."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/google-cloud-recipe-auth/SKILL.md",
+        "decision": "adapted",
+        "reason": "Adapt IAM, ADC, impersonation, WIF, OIDC, and restricted API key practices as google-cloud-auth nested child skill with gcloud contract routing and header-only API key rules."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/google-cloud-recipe-onboarding/SKILL.md",
+        "decision": "adapted",
+        "reason": "Adapt standalone developer onboarding, enterprise org guardrail, project reuse, and billing confirmation gates as google-cloud-onboarding while dropping rigid verbatim dialogue templates and silent config writes."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/finding-google-skills/SKILL.md",
+        "decision": "adapted",
+        "reason": "Narrow trigger to explicit discovery or confirmed Google Cloud gaps; route curl, jq, and task-temp contracts and enforce untrusted external input boundaries without polluting target working trees."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/SKILL.md",
+        "decision": "adapted",
+        "reason": "Prefer Developer Knowledge MCP (including OAuth via google_credentials), forbid agent-run gcloud auth print-access-token commands so OAuth tokens stay out of tool stdout, route curl for DEVELOPERKNOWLEDGE_API_KEY REST fallback via stdin curl -K -, and handle 429 fallback without ?key= query strings."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/mcp-usage.md",
+        "decision": "adapted",
+        "reason": "Preserve search_documents, answer_query, and get_documents usage and point unmounted clients to zero-secret capability fragments instead of editing personal configs."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/api-fallback.md",
+        "decision": "adapted",
+        "reason": "Keep OAuth inside Developer Knowledge MCP by forbidding agent-run gcloud auth print-access-token commands and rewrite Developer Knowledge v1 REST examples to pass DEVELOPERKNOWLEDGE_API_KEY over stdin via curl -K - instead of ?key= query strings or inline -H argv."
+      },
+      {
+        "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/supported-domains.md",
+        "decision": "adopted",
+        "reason": "Adopt the official list of Developer Knowledge indexed public developer domains under concise formatting without mandatory attribution tags."
+      },
+      {
+        "source": "skills/cloud/google-cloud-storage-basics/SKILL.md",
+        "decision": "adapted",
+        "reason": "Adapt GCS bucket/object guidance as google-cloud-storage nested child skill routing gcloud contract, snake_case projections, safe-mode MCP confirmation bounds, and on-demand heavy plugin discovery while omitting default telemetry tags."
+      },
+      {
+        "source": "skills/cloud/google-cloud-storage-basics/references/mcp-usage.md",
+        "decision": "adapted",
+        "reason": "Fold GCS MCP server mode boundaries (companion @google-cloud/storage-mcp safe mode without --enable-destructive-tools, remote 8 MiB/Model Armor, and Toolbox CLOUD_STORAGE_PROJECT) into google-cloud-storage without mutating client configs."
+      },
+      {
+        "source": "skills/cloud/cloud-sql-basics/SKILL.md",
+        "decision": "adapted",
+        "reason": "Adapt Cloud SQL basics as PostgreSQL-focused cloud-sql-postgresql nested child skill enforcing gcloud contract routing, Auth Proxy/IAM auth, explicit mutation confirmations, and strict exclusion of real private hosts or credentials."
+      },
+      {
+        "source": "skills/cloud/cloud-sql-basics/references/mcp-usage.md",
+        "decision": "adapted",
+        "reason": "Fold Cloud SQL MCP readonly vs mutating tool boundaries (execute_sql_readonly vs DDL/DML/backup/lifecycle mutations) into cloud-sql-postgresql without bundling private database configs or external data-cloud submodules."
+      }
+    ]
+  }
+}

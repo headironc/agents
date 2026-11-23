@@ -35,7 +35,7 @@ const absolutePath = z
   .refine(isNormalizedAbsolute, "Expected a normalized absolute path");
 
 export const activeAdoptKeyPattern =
-  /^(?:codex|dsh|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|codex\.toml|codex-sessions\.toml|dsh-headless\.patch\.yml|rust-lints\.toml|wx-docs\.mcp\.json))$/;
+  /^(?:codex|dsh|antigravity):(?:[a-z0-9]+(?:-[a-z0-9]+)*|AGENTS\.md|README\.md|policy\/[a-z-]+\.md|tools\/[a-z-]+\.mjs|capability\/(?:README\.md|chrome-devtools\.mcp\.json|codex\.toml|codex-sessions\.toml|dsh-headless\.patch\.yml|gcloud-mcp-denylist\.json|gcloud\.mcp\.json|google-developer-knowledge\.mcp\.json|google-observability\.mcp\.json|google-storage\.mcp\.json|rust-lints\.toml|sketch\.mcp\.json|wx-docs\.mcp\.json))$/;
 const adoptKey = z.string().regex(adoptKeyPattern);
 
 /** Build outputs and host tool files copied into each persistent runtime. */

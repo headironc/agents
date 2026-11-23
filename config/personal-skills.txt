@@ -3,6 +3,14 @@
 # Nested paths are validation members, not install targets.
 sketch-native	codex,dsh,antigravity
 gh	codex,dsh,antigravity
+google-cloud	codex,dsh,antigravity
+google-cloud/skills/cloud-sql-postgresql	codex,dsh,antigravity
+google-cloud/skills/finding-google-skills	codex,dsh,antigravity
+google-cloud/skills/gcloud	codex,dsh,antigravity
+google-cloud/skills/google-cloud-auth	codex,dsh,antigravity
+google-cloud/skills/google-cloud-onboarding	codex,dsh,antigravity
+google-cloud/skills/google-cloud-storage	codex,dsh,antigravity
+google-cloud/skills/retrieving-developer-knowledge	codex,dsh,antigravity
 project-guide	codex,dsh,antigravity
 modern-web-guidance	codex,dsh,antigravity
 property-based-testing	codex,dsh,antigravity

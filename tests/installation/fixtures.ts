@@ -39,6 +39,7 @@ export const skills = {
     "alibabacloud-find-skills",
     "alibabacloud-sms-send-short-message",
     "gh",
+    "google-cloud",
     "modern-web-guidance",
     "project-guide",
     "property-based-testing",
@@ -51,6 +52,7 @@ export const skills = {
     "alibabacloud-find-skills",
     "alibabacloud-sms-send-short-message",
     "gh",
+    "google-cloud",
     "modern-web-guidance",
     "project-guide",
     "property-based-testing",
@@ -63,6 +65,7 @@ export const skills = {
     "alibabacloud-find-skills",
     "alibabacloud-sms-send-short-message",
     "gh",
+    "google-cloud",
     "modern-web-guidance",
     "project-guide",
     "property-based-testing",
@@ -108,15 +111,91 @@ export const tools = ["check-ids.mjs", "check-prose.mjs", "task-temp.mjs"];
 // The capability category, written out here the way the installation target table names it.
 export const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
+  [
+    "chrome-devtools.mcp.json",
+    "delivery/capability/chrome-devtools.mcp.json",
+  ],
   ["codex.toml", "delivery/capability/codex.toml"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
+  [
+    "gcloud-mcp-denylist.json",
+    "delivery/capability/gcloud-mcp-denylist.json",
+  ],
+  ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
+  [
+    "google-developer-knowledge.mcp.json",
+    "delivery/capability/google-developer-knowledge.mcp.json",
+  ],
+  [
+    "google-observability.mcp.json",
+    "delivery/capability/google-observability.mcp.json",
+  ],
+  ["google-storage.mcp.json", "delivery/capability/google-storage.mcp.json"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ...(process.platform === "darwin"
+    ? ([["sketch.mcp.json", "delivery/capability/sketch.mcp.json"]] as [
+        string,
+        string,
+      ][])
+    : []),
   ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 export const dshCapability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
+  [
+    "chrome-devtools.mcp.json",
+    "delivery/capability/chrome-devtools.mcp.json",
+  ],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
+  [
+    "gcloud-mcp-denylist.json",
+    "delivery/capability/gcloud-mcp-denylist.json",
+  ],
+  ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
+  [
+    "google-developer-knowledge.mcp.json",
+    "delivery/capability/google-developer-knowledge.mcp.json",
+  ],
+  [
+    "google-observability.mcp.json",
+    "delivery/capability/google-observability.mcp.json",
+  ],
+  ["google-storage.mcp.json", "delivery/capability/google-storage.mcp.json"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ...(process.platform === "darwin"
+    ? ([["sketch.mcp.json", "delivery/capability/sketch.mcp.json"]] as [
+        string,
+        string,
+      ][])
+    : []),
+  ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
+];
+export const antigravityCapability: [string, string][] = [
+  [
+    "chrome-devtools.mcp.json",
+    "delivery/capability/chrome-devtools.mcp.json",
+  ],
+  [
+    "gcloud-mcp-denylist.json",
+    "delivery/capability/gcloud-mcp-denylist.json",
+  ],
+  ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
+  [
+    "google-developer-knowledge.mcp.json",
+    "delivery/capability/google-developer-knowledge.mcp.json",
+  ],
+  [
+    "google-observability.mcp.json",
+    "delivery/capability/google-observability.mcp.json",
+  ],
+  ["google-storage.mcp.json", "delivery/capability/google-storage.mcp.json"],
+  ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ...(process.platform === "darwin"
+    ? ([["sketch.mcp.json", "delivery/capability/sketch.mcp.json"]] as [
+        string,
+        string,
+      ][])
+    : []),
   ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 export const runtimeInputs = [
@@ -186,13 +265,8 @@ export function expectedTargets(
         `${snapshot}/delivery/tools/${name}`,
       ),
     ),
-    pair(
-      `${antigravity}/capability/rust-lints.toml`,
-      `${snapshot}/delivery/capability/rust-lints.toml`,
-    ),
-    pair(
-      `${antigravity}/capability/wx-docs.mcp.json`,
-      `${snapshot}/delivery/capability/wx-docs.mcp.json`,
+    ...antigravityCapability.map(([name, source]) =>
+      pair(`${antigravity}/capability/${name}`, `${snapshot}/${source}`),
     ),
     pair(
       `${home}/.gemini/AGENTS.md`,
@@ -528,6 +602,21 @@ function useLegacyAntigravityAssets(plan: InstallPlan): void {
   plan.newDirectories = [...missing].sort();
 }
 
+const postV8CapabilityKeys = new Set([
+  "chrome-devtools.mcp.json",
+  "gcloud-mcp-denylist.json",
+  "gcloud.mcp.json",
+  "google-developer-knowledge.mcp.json",
+  "google-observability.mcp.json",
+  "google-storage.mcp.json",
+  "sketch.mcp.json",
+  "wx-docs.mcp.json",
+]);
+const postLegacyCapabilityFiles = [
+  "dsh-headless.patch.yml",
+  ...postV8CapabilityKeys,
+];
+
 /** Freeze V8 paths independently of the current publication layout. */
 export function v8Plan(prepared: { plan: InstallPlan; review: string }): {
   plan: InstallPlan;
@@ -537,7 +626,9 @@ export function v8Plan(prepared: { plan: InstallPlan; review: string }): {
   useLegacyAntigravityAssets(plan);
   const isPostV8Key = (key: string) =>
     key === "antigravity:policy/antigravity.md" ||
-    key.endsWith(":capability/wx-docs.mcp.json");
+    [...postV8CapabilityKeys].some((name) =>
+      key.endsWith(`:capability/${name}`),
+    );
   plan.targets = plan.targets
     .filter((target) => !isPostV8Key(target.key))
     .map((target, order) => ({
@@ -615,8 +706,9 @@ export function legacyPlan(
       }
       if (target.product === "codex") {
         if (
-          target.key === "codex:capability/dsh-headless.patch.yml" ||
-          target.key === "codex:capability/wx-docs.mcp.json"
+          postLegacyCapabilityFiles.some(
+            (name) => target.key === `codex:capability/${name}`,
+          )
         )
           return [];
         if (target.key === "codex:policy/deepseek-harness.md") {
@@ -659,12 +751,14 @@ export function legacyPlan(
           ? null
           : path.join(plan.roots.backup.path, plan.run.id, String(order)),
     }));
-  plan.adopt = plan.adopt.filter(
-    (key) => !key.endsWith(":capability/wx-docs.mcp.json"),
-  );
+  const isPostLegacyCapability = (key: string) =>
+    postLegacyCapabilityFiles.some((name) =>
+      key.endsWith(`:capability/${name}`),
+    );
+  plan.adopt = plan.adopt.filter((key) => !isPostLegacyCapability(key));
   if (plan.selectedTargets)
     plan.selectedTargets = plan.selectedTargets.filter(
-      (key) => !key.endsWith(":capability/wx-docs.mcp.json"),
+      (key) => !isPostLegacyCapability(key),
     );
   if (plan.roots.antigravity)
     plan.roots.antigravity.path = path.join(
@@ -682,13 +776,11 @@ export function legacyPlan(
     path.join(plan.run.source, "delivery/policy/deepseek-harness.md"),
     path.join(plan.run.source, "delivery/policy/claude-code.md"),
   );
-  rmSync(
-    path.join(plan.run.source, "delivery/capability/dsh-headless.patch.yml"),
-    { force: true },
-  );
-  rmSync(path.join(plan.run.source, "delivery/capability/wx-docs.mcp.json"), {
-    force: true,
-  });
+  for (const name of postLegacyCapabilityFiles) {
+    rmSync(path.join(plan.run.source, "delivery/capability", name), {
+      force: true,
+    });
+  }
   for (const file of plan.runtime.files)
     file.path = path.join(plan.run.runtime, path.basename(file.path));
   for (const target of plan.targets)
@@ -696,6 +788,9 @@ export function legacyPlan(
       privateRun,
       path.relative(previous, target.source),
     );
+  const removedSources = new Set(
+    postLegacyCapabilityFiles.map((name) => `delivery/capability/${name}`),
+  );
   plan.candidate.entries = readSourceEntries(
     plan.run.source,
     plan.candidate.entries
@@ -704,11 +799,7 @@ export function legacyPlan(
           ? "delivery/policy/claude-code.md"
           : entry.path,
       )
-      .filter(
-        (entryPath) =>
-          entryPath !== "delivery/capability/dsh-headless.patch.yml" &&
-          entryPath !== "delivery/capability/wx-docs.mcp.json",
-      ),
+      .filter((entryPath) => !removedSources.has(entryPath)),
   );
   plan.candidate.sha256 = canonicalDigest(plan.candidate.entries);
   plan.newDirectories = [
