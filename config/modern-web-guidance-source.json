@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "package": "modern-web-guidance",
-  "version": "1.0.0",
-  "gitHead": "544c250575f7811d87fef8b1c064bc9571cbfb80",
-  "tarball": "https://registry.npmjs.org/modern-web-guidance/-/modern-web-guidance-1.0.0.tgz",
-  "integrity": "sha512-vafIZwC8AS6QjM2yyoflZbnc7n3/TVOMLbEMRdPTwcFy0f9/Tq8s5rJQ8UIqRt2KPl9ixravyaMR4nTGuUrcmg==",
+  "version": "1.0.1",
+  "gitHead": "6971ebbec2b127d57aaa24ba63bab7b9de9e656b",
+  "tarball": "https://registry.npmjs.org/modern-web-guidance/-/modern-web-guidance-1.0.1.tgz",
+  "integrity": "sha512-5ztUh5F1p2PewnSkA6EhsGUXqomaZY9qe6iWJCU4JbIQxHTky7s5lMJcPE4EbD1uhbQZIhl0HROH0+s6fIiGzg==",
   "files": [
     {
       "source": "package/LICENSE",
@@ -15,32 +15,32 @@
     {
       "source": "package/README.md",
       "target": "delivery/skills/modern-web-guidance/upstream/README.upstream.txt",
-      "bytes": 107726,
-      "sha256": "86ccaebf4f0412f7082ce98cc138f2c67539d06b7c2c18225033e13a9517a381"
+      "bytes": 110062,
+      "sha256": "d9457494a37ba133d11808ea13ed7f1963ef61f49f58d1369ea0330b08bee232"
     },
     {
       "source": "package/skills/modern-web-guidance/gen/guide-chunks.i8",
       "target": "delivery/skills/modern-web-guidance/upstream/gen/guide-chunks.i8",
-      "bytes": 516096,
-      "sha256": "177ace6291bb93ceed20fb642a730829e946776e50928ce69104e13b235131ee"
+      "bytes": 525568,
+      "sha256": "762246ed36f50de9c1977016f231faf954760593b8c8305842436033a3ee1b1f"
     },
     {
       "source": "package/skills/modern-web-guidance/gen/guide-chunks.json.gz",
       "target": "delivery/skills/modern-web-guidance/upstream/gen/guide-chunks.json.gz",
-      "bytes": 652475,
-      "sha256": "ccdd8b62634b411e06411d2a188809c87b252580bee22c1b8c0ab2944cc72365"
+      "bytes": 671182,
+      "sha256": "100fe6c1bde649895f2a358b79f4d5b3d22d196db5f332c5fda17887ee4cc1aa"
     },
     {
       "source": "package/skills/modern-web-guidance/gen/guide-chunks.scale.f32",
       "target": "delivery/skills/modern-web-guidance/upstream/gen/guide-chunks.scale.f32",
-      "bytes": 8064,
-      "sha256": "7da0cea8b42579a8f35c79725131b21c9c72e810613fbf464fef73e5d4a8f62e"
+      "bytes": 8212,
+      "sha256": "b34a5aedbad1eee74a9453a8c9a3db03917bd8b07b254d04d213b78e33700c51"
     },
     {
       "source": "package/skills/modern-web-guidance/gen/guides.json",
       "target": "delivery/skills/modern-web-guidance/upstream/gen/guides.json",
-      "bytes": 80329,
-      "sha256": "c735c165775daea030a87f039adfddbaad43845231884b5fb010a58077752e1c"
+      "bytes": 80965,
+      "sha256": "91fbc01b415e6e3b880a3bdaabd42fc0fb1e804032c966ec649684e2d165fa49"
     },
     {
       "source": "package/skills/modern-web-guidance/gen/query-words.i8",
@@ -111,8 +111,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/built-in-ai/translator.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/built-in-ai/translator.md",
-      "bytes": 7402,
-      "sha256": "512b221cdc00b2e60a6e2196c3a48d0c595b91e1ae8de1b5aece4bdaa0d1a20f"
+      "bytes": 7657,
+      "sha256": "31f95e20234b6b5e44e878dbfa15d66887afc9d8b581777713c4f455465974b5"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/css/animate-to-intrinsic-sizes.md",
@@ -147,8 +147,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/css/css-layout.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/css/css-layout.md",
-      "bytes": 21659,
-      "sha256": "c5c8cd89b7fa3a6030b0775bbc8c120efc07aa7a603dc850c73214cc8e8468fe"
+      "bytes": 21833,
+      "sha256": "da7fa26230536bdde5a32fb1d3b529c711b5f25baeaf828e111cef4859e88f01"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/css/css.md",
@@ -255,8 +255,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/forms/autofill-sign-up-form.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/forms/autofill-sign-up-form.md",
-      "bytes": 11864,
-      "sha256": "851e3947e64fd12b68c65b4e27a0f4487e9f70042d1a5605271fa73889b646ec"
+      "bytes": 11865,
+      "sha256": "ffeec44068317c566fc97966b744849af174a21fc90ae4ee53ced268afacf55a"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/forms/brand-consistent-forms.md",
@@ -315,8 +315,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/forms/slider.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/forms/slider.md",
-      "bytes": 6692,
-      "sha256": "1c27649b2088661ac67ba5206ac40b197160f2c19a20b714b78f1a9b68784b0b"
+      "bytes": 6885,
+      "sha256": "1ee48919f3566a852bbf2b2e737444ee8d124d89e2fd3451e303c99cd40851a7"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/forms/sms-otp-form.md",
@@ -327,8 +327,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/forms/switch.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/forms/switch.md",
-      "bytes": 2595,
-      "sha256": "9251d982dfae5599c5ceb84787af6bebf341e14ca8ef232cb44c17c5a75d060d"
+      "bytes": 2689,
+      "sha256": "5672a65984dec3f24fa4eb32c3eed494c2c4d38dc06c4fa71366065f89a638fd"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/forms/validate-input-after-interaction.md",
@@ -345,8 +345,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/html/custom-elements.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/html/custom-elements.md",
-      "bytes": 9472,
-      "sha256": "164a51a2ec0c5ee15595ce12b71a4b326e84e17992d02b4cc34a7fe00b9f59d5"
+      "bytes": 12508,
+      "sha256": "4466622b5123418a5260bf8898c91b502fe2b8f4b1417ffb8ce2db9c7d2d9ae3"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/html/form-associated-custom-elements.md",
@@ -403,6 +403,12 @@
       "sha256": "9cd071b748235939c90490752555df5a8c14ac9a3f9f9820b7f15ab060e1ce9a"
     },
     {
+      "source": "package/skills/modern-web-guidance/guides/js/js.md",
+      "target": "delivery/skills/modern-web-guidance/upstream/guides/js/js.md",
+      "bytes": 30395,
+      "sha256": "54dffd0bd882f296f7a4b6f5cb0c6045e09ec011987e32f2c93dc61ab269c961"
+    },
+    {
       "source": "package/skills/modern-web-guidance/guides/js/sort-high-precision-timestamps.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/js/sort-high-precision-timestamps.md",
       "bytes": 6708,
@@ -411,8 +417,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/js/support-global-calendar-systems.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/js/support-global-calendar-systems.md",
-      "bytes": 5961,
-      "sha256": "439a247067bef99f4ce760359ad45ac0cdcfa95791d1946eb748913af8ea6470"
+      "bytes": 5988,
+      "sha256": "5bb6d639330117efe1b9b6b8ced7d93c1a1443cfe86e013ac764465016244aae"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/performance/batch-analytics-events.md",
@@ -423,8 +429,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/performance/break-up-long-tasks.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/performance/break-up-long-tasks.md",
-      "bytes": 2287,
-      "sha256": "98c4326c7dd895e7f90db4eeb2ea6dad2daeb25e8171bd2795d74bdabf27189b"
+      "bytes": 3190,
+      "sha256": "f59316388b8bf1e1a5ac2e655ad3231195de98c71caa5e0da3702ed88f1c0d35"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/performance/calculate-total-foreground-time.md",
@@ -447,8 +453,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/performance/defer-work-until-scroll-ends.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/performance/defer-work-until-scroll-ends.md",
-      "bytes": 3382,
-      "sha256": "3e69a3fb9e3e8a748bec61392e013839c690322424ea8e84a42b6e1cf178f758"
+      "bytes": 3367,
+      "sha256": "f7e93312844a9da5f81d2092072f326a5b6041606f9945992781b01ee83e38ac"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/performance/deliver-optimized-decorative-images.md",
@@ -525,8 +531,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/performance/lazy-load-video-and-audio.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/performance/lazy-load-video-and-audio.md",
-      "bytes": 9561,
-      "sha256": "b794c32132b0a14306d1fff07645a563a89a652ea8887ef06f46203c958ff754"
+      "bytes": 9789,
+      "sha256": "c0e4753df3153663faa3ecad330dec3cd8d4d18ddf9cff1edb71b4ca13c9e9f1"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/performance/optimize-image-priority.md",
@@ -549,14 +555,14 @@
     {
       "source": "package/skills/modern-web-guidance/guides/performance/out-of-order-html-streaming.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/performance/out-of-order-html-streaming.md",
-      "bytes": 12432,
-      "sha256": "f4e437706652abe391fee3105a4f585015fed0cf370a16eeb2de12a5d0b038ab"
+      "bytes": 12520,
+      "sha256": "63d94e3c8a026b0eb1795598e86eb483d7d1580826575311b16ca69e4a57fe4c"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/performance/performance.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/performance/performance.md",
-      "bytes": 21118,
-      "sha256": "7db68366e739251d715c894d747da7e44c2138146308a289a1f4d8c42ea53dae"
+      "bytes": 21115,
+      "sha256": "0dde03667a73cb67e56994b7737d33af90ffabb57b594d35a99da2fba2cca273"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/performance/resolution-optimized-pseudo-elements.md",
@@ -567,8 +573,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/performance/schedule-tasks-by-priority.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/performance/schedule-tasks-by-priority.md",
-      "bytes": 2315,
-      "sha256": "3a059a8614821195346ba5e757246866e7467fdf46efb668c2aa455ceaaccdfb"
+      "bytes": 3866,
+      "sha256": "89729b3d10964d3fd25e632a41af23ccd477119c32cc2a727a7051cedc8c0895"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/privacy/privacy.md",
@@ -717,8 +723,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-atoms/pull-to-reveal.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-atoms/pull-to-reveal.md",
-      "bytes": 5144,
-      "sha256": "b5e707afc815a9db02dadd343c1e436fee55bd77cfd1304af9a6335b67e28ce8"
+      "bytes": 5137,
+      "sha256": "5d32443019753701784cb76e3b673174071b6495e7353e5b818503ac2c94d0b5"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-atoms/responsive-table.md",
@@ -729,8 +735,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-atoms/scroll-position-aware-elements.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-atoms/scroll-position-aware-elements.md",
-      "bytes": 3718,
-      "sha256": "dbe940c9693f31524dff7bda5c0027be520af47bc7b3389a89c60d068ace557a"
+      "bytes": 4349,
+      "sha256": "1c3361ee7a9dce6f11e7cbe22725013a1237ef015969f1faca1f2268aa869128"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-atoms/scroll-progress-indicator.md",
@@ -765,8 +771,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-atoms/viewport-aware-dropdowns.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-atoms/viewport-aware-dropdowns.md",
-      "bytes": 10157,
-      "sha256": "61b5fad08d3ab539fd3c9e63bf28d2ec058f7606500f34f5418c12e5563a3860"
+      "bytes": 10187,
+      "sha256": "38a4126043561cb2575c171a3bce31cef0eff0875e92d02ed4b6aea33e5d3961"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/2d-panning.md",
@@ -777,8 +783,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/anchor-positioning-tab-underline.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/anchor-positioning-tab-underline.md",
-      "bytes": 3130,
-      "sha256": "705ee8bff658a5f12c2904ecf1e31618bcc1bed17d9a8d161ed60b8d55794e98"
+      "bytes": 3160,
+      "sha256": "2736d04294581cc2f604abde0b783894f742a347512c16161be8fb362fd6afe9"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/animate-element-entry-exit.md",
@@ -819,8 +825,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/declarative-dialog-popover-control.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/declarative-dialog-popover-control.md",
-      "bytes": 7742,
-      "sha256": "80292b68811216186dd30312133249079006df8c8e3f9d676f38a7a62cde9fea"
+      "bytes": 8401,
+      "sha256": "e403bfbe5e1e4509105b35256efb38c0eb422c1e0fca22c10fe573ec76aa66f2"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/directional-navigation-transitions.md",
@@ -831,26 +837,26 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/drag-and-drop.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/drag-and-drop.md",
-      "bytes": 16814,
-      "sha256": "2c01591b2d98b68c961eba4c73b1d7d6650bba7323b14277b607ae0fb12b0df5"
+      "bytes": 17181,
+      "sha256": "622f59e07e15344f44401cb16e1f77ac3cfc7608513880c406754a3f6db29fd1"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/drag.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/drag.md",
-      "bytes": 6996,
-      "sha256": "ecc3e794629952ab9e1f1435970da0cd5bd5f75919581853b207ae72ac8f3b2c"
+      "bytes": 7033,
+      "sha256": "6cc18565c696f15e1ee613e8cc5c04a22be00954f3a0cc1c0f561c9f6ae2030d"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/dynamic-sibling-animations.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/dynamic-sibling-animations.md",
-      "bytes": 2682,
-      "sha256": "cbe8b5078c2b5450af5fb405ea037a733a8fa0e471c8e4fa4a4123e897cd19d8"
+      "bytes": 4729,
+      "sha256": "2c4c49375ff98a206e3849a753ca53562c56efbc7a550d9e5f2b01e1cfbb08b6"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/dynamic-sort.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/dynamic-sort.md",
-      "bytes": 7039,
-      "sha256": "ed8db7fda22262a60fa8e5658ab7fe813bef049508a4af9c35498aa811550f9d"
+      "bytes": 7149,
+      "sha256": "60eb7cf5f0095565b216f71dd9218c16e0960134a7e2ad63d1316e896bc44f2e"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/group-element-transitions.md",
@@ -873,14 +879,14 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/interest-triggered-action-previews.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/interest-triggered-action-previews.md",
-      "bytes": 4970,
-      "sha256": "166ecb2a90752b9b1c9d5e9eec0fc497b319a5df5f64c06558b9a97f70345295"
+      "bytes": 5255,
+      "sha256": "3f66ba71860b2609de4d552543c1a4fce5ccbbb28b5709674b0cf0233743167a"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/interest-triggered-tooltips.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/interest-triggered-tooltips.md",
-      "bytes": 20315,
-      "sha256": "0cd448e40c24d18f2f396875bfd62d73b1a2cad46550273010cb9b23b84b81fc"
+      "bytes": 20630,
+      "sha256": "f224a3ea9786f0d305e5e47b27103a61719cd06e01f9a8ea19328e8c9f305758"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/light-dismiss-a-dialog.md",
@@ -897,8 +903,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/move-dom-element-without-losing-state.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/move-dom-element-without-losing-state.md",
-      "bytes": 3855,
-      "sha256": "4cad5bc992b3a0deeb3706850f57d12f2e5b83d5ff4fdb6ca2e72c9b4f0355e6"
+      "bytes": 3851,
+      "sha256": "98442d73f34e865e9b4faaf86fc3fe8468e4452851641815e761c97ac4bae130"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/parallax-scroll-effects.md",
@@ -963,8 +969,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/scroll-snap-state-sync.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-behaviors/scroll-snap-state-sync.md",
-      "bytes": 4954,
-      "sha256": "c6a72cf3bfc4b4ad0d0fbc102f0cf379ac458d111add0d9033026980c77cb7a0"
+      "bytes": 5546,
+      "sha256": "f24bedcaab8ea76dcc5b074cee58683d404287fd8fbaf2014914f18f878f0288"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-behaviors/scroll-target-on-load.md",
@@ -1017,8 +1023,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/app-menus.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-components/app-menus.md",
-      "bytes": 16099,
-      "sha256": "6b5eecffdeaf727a5a8f69bec56e31959ddffd0361a52c22222479bde76326a1"
+      "bytes": 16260,
+      "sha256": "1b290233391ed62cd2b15646d5a8a4b383ad9e3878ac544aa74b21b34db773a6"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/breadcrumbs.md",
@@ -1035,8 +1041,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/carousel.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-components/carousel.md",
-      "bytes": 15462,
-      "sha256": "90aa7c0a2b6f9b77bf7548f65eef37e1246f0af38f263076c8b95517bc5142c5"
+      "bytes": 19827,
+      "sha256": "284773a2f0447de1f59424fc6220d7bf12f1025193fe7b305779fe89af184b42"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/checkbox.md",
@@ -1065,20 +1071,20 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/hovercard.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-components/hovercard.md",
-      "bytes": 21358,
-      "sha256": "54957125b29b582d205f1fb610cc0664faebf14ea15cc740ef93c4961aee341a"
+      "bytes": 21867,
+      "sha256": "1d30381f5bbcecdc0cf11aa89928cde01d3b581d5409f5420f6503ffce5a9453"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/menu.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-components/menu.md",
-      "bytes": 31801,
-      "sha256": "9d634b87d91ed72c632c664b7caa8d00d5554ee1d60f24f5bafbe45b3125c10b"
+      "bytes": 31831,
+      "sha256": "a76a4b6690205a6fc931688a20d4fec18b4746f267851ee849d5b3a2acb03fae"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/navbar.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-components/navbar.md",
-      "bytes": 18277,
-      "sha256": "92415e200441f316748103244af8d786ed9a6f939353d46501dffa7f16675750"
+      "bytes": 18307,
+      "sha256": "c1f2fa87d15d60fa7e727721f7b78a81b5ab4a413dcfed1d45d5b9a79ff7b8b5"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/navigation-drawer.md",
@@ -1089,14 +1095,14 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/persistent-app-tours.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-components/persistent-app-tours.md",
-      "bytes": 11505,
-      "sha256": "e5281c7227956fbf6c3cd850ca3aa980304bc51fddb3451b39e2f1f2b3cba996"
+      "bytes": 11535,
+      "sha256": "bdcd798f6e47d4e7ba527bdd72a01a4977754afbe9ef57409cf80abb4f2ccdb0"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/persistent-toast-notifications.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-components/persistent-toast-notifications.md",
-      "bytes": 14092,
-      "sha256": "ddd1a92094f674db9fd2370d3f258d0d53142be13f5f587abe237b43f8a06ff3"
+      "bytes": 14122,
+      "sha256": "312663bd6de058f1c7dee2c471fc11e662c63f9edce147d1e4f8d4080bdb6b0c"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/progress-ring.md",
@@ -1137,8 +1143,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/ui-components/toolbar.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/ui-components/toolbar.md",
-      "bytes": 22057,
-      "sha256": "bb24a1383ef899b586804831b9fb299bcf991408a4f2d07996c75e6ea5a45f88"
+      "bytes": 22257,
+      "sha256": "f6af29776c32e2932f08107a5066dab8646121c4b25b21d5429cba766a116a79"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/user-experience/content-first-noise-reduction.md",
@@ -1149,8 +1155,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/user-experience/form-factor-adaptation.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/user-experience/form-factor-adaptation.md",
-      "bytes": 6122,
-      "sha256": "41c566c3d88dac28cc7cf552c290c67fc01d733cb60600de790403a892ee7cc1"
+      "bytes": 7706,
+      "sha256": "1c9272bca00eb838397061ff4cdfa6fa3833aead68415cb03340d594e8d6ce23"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/user-experience/natural-interactions.md",
@@ -1161,14 +1167,14 @@
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/adapt-scrollbar-to-contrast-preferences.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/adapt-scrollbar-to-contrast-preferences.md",
-      "bytes": 3699,
-      "sha256": "5442cdedc522ba1cc8f398449dcbaf2d6d3e1a2c2eb8082623e11fd63fee2421"
+      "bytes": 3993,
+      "sha256": "77ad439049922b3721cee88302395654536c8918f8db5086c211739e4db58446"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/apply-webgl-shaders.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/apply-webgl-shaders.md",
-      "bytes": 13404,
-      "sha256": "235cb9db64d8857cd70285e6c0139597556d4f6f578ea6a10f32591a11387b2e"
+      "bytes": 13434,
+      "sha256": "46c13d09d47b7e17e8c3f3c8d45e92152fc2f7465cf92b628403368821a163d7"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/browser-ui-theming.md",
@@ -1179,8 +1185,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/color.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/color.md",
-      "bytes": 4481,
-      "sha256": "6fd4045e552d04b1881bce444cd0306339cb561d18df03da464035ce309b1e7b"
+      "bytes": 4843,
+      "sha256": "4a6051491fddc3c9b7c2f88affb3a9b15ac4ff815bf8b271aa1b6f4757965b67"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/complex-shapes.md",
@@ -1203,14 +1209,14 @@
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/customize-scrollbar-color-and-thickness.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/customize-scrollbar-color-and-thickness.md",
-      "bytes": 2771,
-      "sha256": "c83c679e4aafe20f63dd0901b87e02bd3862c1863826ca345294d0104c9a8b57"
+      "bytes": 3298,
+      "sha256": "0da9848aeb53787a1ad062298df38e93ab7d6b1783cf6d5db8a841dfb37a30ab"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/dark-mode.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/dark-mode.md",
-      "bytes": 17170,
-      "sha256": "6398deca0a4596e614ef73f463db4459921531e2869f1ee60010ad3e7a351ab4"
+      "bytes": 17517,
+      "sha256": "888869fa83f3966365090c1c152febac416a9ca53f3132e05f18206676e97ccd"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/equal-width-text-lines.md",
@@ -1221,14 +1227,14 @@
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/export-html-media-from-canvas.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/export-html-media-from-canvas.md",
-      "bytes": 17553,
-      "sha256": "ed64d5e1ce25f5f071691edacfc5a334ef74df59c9eadbd32b5b9e535a867a0d"
+      "bytes": 17583,
+      "sha256": "99d619561dd93d230b1466abb5f5978dea8b0b31404e2812347b9f4098a484f5"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/expose-canvas-content-to-browser-features.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/expose-canvas-content-to-browser-features.md",
-      "bytes": 20075,
-      "sha256": "dc399df120a3650f55c98842652994059aad56a4b33c5c7f1a1fd2c42ec20b37"
+      "bytes": 20105,
+      "sha256": "3cd9d993befe6a612165d6d1c32211a779f705cbd3190358fa12ce6303d71312"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/improve-text-layout-and-legibility.md",
@@ -1239,8 +1245,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/interactive-content-in-3d-scenes.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/interactive-content-in-3d-scenes.md",
-      "bytes": 19627,
-      "sha256": "137337e016db7ebe35ba8263f0dc18c4a191e89a2f5087bd3f34fa4a89d16f31"
+      "bytes": 19599,
+      "sha256": "c0bb3ee4c5d443647c6efdb5f68c6e760a791374e983feacabc53494aa5f9bd3"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/precise-text-alignment.md",
@@ -1269,8 +1275,8 @@
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/visual-effects.md",
       "target": "delivery/skills/modern-web-guidance/upstream/guides/visual-design/visual-effects.md",
-      "bytes": 3599,
-      "sha256": "d31952014d77634aaf62dec245991ff92299d61f0de3c96d6548939f418859c1"
+      "bytes": 4241,
+      "sha256": "e420f2111083e5fae6ce7a5933953314bf275de09dcdfe7cb00a4d2b6b95eb09"
     },
     {
       "source": "package/skills/modern-web-guidance/guides/visual-design/visually-stable-font-fallbacks.md",
@@ -1317,14 +1323,14 @@
     {
       "source": "package/skills/modern-web-guidance/legacy-scan.mjs",
       "target": "delivery/skills/modern-web-guidance/upstream/legacy-scan.mjs",
-      "bytes": 4992779,
-      "sha256": "d752acf0c5a723a8d9cdf89b3187fdb594ab17947c60770a9f871b00119903df"
+      "bytes": 5122573,
+      "sha256": "7ca00dac985faca2871879801860e9c7388298d1868a69b8b599de52617b2725"
     },
     {
       "source": "package/skills/modern-web-guidance/modern-web.mjs",
       "target": "delivery/skills/modern-web-guidance/upstream/modern-web.mjs",
-      "bytes": 38282,
-      "sha256": "ce15b805ce2fd1e0150e36a128955b6dcebcb1a005253d9df55c8b1b3f4e9d41"
+      "bytes": 43366,
+      "sha256": "40ad56075492fda04cc03b3b9b92f9aea0b02dc4a3826486a5f520bcad4bf12d"
     },
     {
       "source": "package/skills/modern-web-guidance/package.json",
@@ -1348,13 +1354,13 @@
       "source": "package/skills/modern-web-guidance/skill-version.txt",
       "target": "delivery/skills/modern-web-guidance/upstream/skill-version.txt",
       "bytes": 19,
-      "sha256": "b70a0e21b080523ab15eda04d5f653b6131668ca4e281674f0cd326d782ca639"
+      "sha256": "14c84492d05b22d46eac2386dac8a683ae32a266969f7e6ac2344de7d1890f78"
     },
     {
       "source": "package/skills/modern-web-guidance/SKILL.md",
       "target": "delivery/skills/modern-web-guidance/upstream/SKILL.upstream.md",
-      "bytes": 9793,
-      "sha256": "37d68a514c25066840299356e5857b750bec3cc27c0cf57dbe88369b051b573e"
+      "bytes": 9801,
+      "sha256": "1292f0ce14794a5bc49af58e99d5f6d4edf10acd9472cade94ab0c5590892716"
     },
     {
       "source": "package/skills/modern-web-guidance/watchdog/main.js",
