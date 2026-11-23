@@ -4,46 +4,30 @@ import { readFileSync, writeFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
-import { modernWebUpdate, prepareModernWeb } from "./upstream-modern-web.ts";
 import { prepareRust, rustUpdate } from "./upstream-rust-api.ts";
-import { preparePbt, pbtUpdate } from "./upstream-property-testing.ts";
 import { microsoftRustUpdate } from "./microsoft-rust-source.ts";
-import { rustRiskUpdate } from "./rust-risk-source.ts";
-import { webAuditUpdate } from "./web-audit-source.ts";
-import { googleCloudUpdate } from "./google-cloud-source.ts";
 import {
   publishPrepared,
   repository,
   repositoryId,
 } from "./upstream-publish.ts";
 import type { Api } from "./upstream-publish.ts";
-export { changes } from "./upstream-modern-web.ts";
-export type { UpdatePlan } from "./upstream-modern-web.ts";
-export { repository, repositoryId } from "./upstream-publish.ts";
+export {
+  publishPrepared,
+  repository,
+  repositoryId,
+} from "./upstream-publish.ts";
 export type { Api } from "./upstream-publish.ts";
 
-// Preserve the existing Modern Web entry for its successive-update regression tests.
-export async function publish(root: string, input: unknown, api: Api) {
-  return publishPrepared(modernWebUpdate(root, input), api);
-}
 export const sources = [
-  "modern-web-guidance",
   "rust-api-guidelines",
-  "property-based-testing",
   "microsoft-rust-guidelines",
-  "rust-risk-review",
-  "web-quality-audit",
-  "google-cloud",
 ] as const;
+
 export function preparedUpdate(root: string, source: string, input: unknown) {
-  if (source === "modern-web-guidance") return modernWebUpdate(root, input);
   if (source === "rust-api-guidelines") return rustUpdate(root, input);
-  if (source === "property-based-testing") return pbtUpdate(root, input);
   if (source === "microsoft-rust-guidelines")
     return microsoftRustUpdate.update(root, input);
-  if (source === "rust-risk-review") return rustRiskUpdate.update(root, input);
-  if (source === "web-quality-audit") return webAuditUpdate.update(root, input);
-  if (source === "google-cloud") return googleCloudUpdate.update(root, input);
   throw new Error("Unknown upstream source");
 }
 
@@ -74,19 +58,9 @@ async function main(): Promise<void> {
     throw new Error("Only the bound main workflow may run");
   if (mode === "prepare") {
     const plan =
-      source === "modern-web-guidance"
-        ? await prepareModernWeb(root, base)
-        : source === "rust-api-guidelines"
-          ? await prepareRust(root, base)
-          : source === "property-based-testing"
-            ? await preparePbt(root, base)
-            : source === "microsoft-rust-guidelines"
-              ? await microsoftRustUpdate.prepare(root, base)
-              : source === "rust-risk-review"
-                ? await rustRiskUpdate.prepare(root, base)
-                : source === "web-quality-audit"
-                  ? await webAuditUpdate.prepare(root, base)
-                  : await googleCloudUpdate.prepare(root, base);
+      source === "rust-api-guidelines"
+        ? await prepareRust(root, base)
+        : await microsoftRustUpdate.prepare(root, base);
     preparedUpdate(root, source!, plan);
     writeFileSync(file, JSON.stringify(plan), { mode: 0o600, flag: "wx" });
     console.log(`Prepared verified source: ${source}`);

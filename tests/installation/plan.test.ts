@@ -21,6 +21,8 @@ import {
   readTargetState,
 } from "../../scripts/install-state.ts";
 import { canonicalDigest } from "../../scripts/source.ts";
+import { classifyTargets } from "../../scripts/install.ts";
+import type { Gap } from "../../scripts/install-state.ts";
 import {
   expectedTargets,
   installFixture,
@@ -68,7 +70,7 @@ test("the CLI requires an explicit nonempty unique product selection before crea
   assert.match(help.stderr, /explicit selection required/);
 });
 
-test("merged GitHub identity ships inside gh and leaves former packages unclaimed", (t) => {
+test("retired skills without an active receipt remain unclaimed and reported", (t) => {
   const f = installFixture(t);
   const products = ["codex", "dsh", "antigravity"] as const;
   const roots = {
@@ -76,36 +78,30 @@ test("merged GitHub identity ships inside gh and leaves former packages unclaime
     dsh: path.join(f.home, ".dsh"),
     antigravity: path.join(f.home, ".gemini/config"),
   };
-  const previous = products.map((product) =>
+  const previous = products.flatMap((product) => [
+    path.join(roots[product], "skills/gh"),
     path.join(roots[product], "skills/gh-identity"),
-  );
+  ]);
   for (const directory of previous) {
     mkdirSync(directory, { recursive: true });
     writeFileSync(
       path.join(directory, "SKILL.md"),
-      "previous identity package\n",
+      "previous retired package\n",
     );
   }
   const { plan } = f.planned(
     products.flatMap((product) => ["--product", product]),
   );
   for (const product of products) {
-    const gh = plan.targets.find((target) => target.key === `${product}:gh`);
-    assert.ok(gh);
-    assert.ok(
-      !plan.targets.some((target) => target.key === `${product}:gh-identity`),
+    const projectGuide = plan.targets.find(
+      (target) => target.key === `${product}:project-guide`,
     );
-    assert.equal(
-      readFileSync(
-        path.join(gh.source, "references/auth-readiness.md"),
-        "utf8",
-      ),
-      readFileSync(
-        path.join(
-          f.checkout,
-          "delivery/skills/gh/references/auth-readiness.md",
-        ),
-        "utf8",
+    assert.ok(projectGuide);
+    assert.ok(
+      !plan.targets.some(
+        (target) =>
+          target.key === `${product}:gh` ||
+          target.key === `${product}:gh-identity`,
       ),
     );
   }
@@ -113,13 +109,13 @@ test("merged GitHub identity ships inside gh and leaves former packages unclaime
     assert.ok(plan.reported.some((entry) => entry === directory));
     assert.equal(
       readFileSync(path.join(directory, "SKILL.md"), "utf8"),
-      "previous identity package\n",
+      "previous retired package\n",
     );
   }
-  assert.deepEqual(
-    f.gaps(f.plan(["--product", "codex", "--target", "codex:gh-identity"])),
-    [{ code: "invalid-target", key: "codex:gh-identity" }],
-  );
+  for (const key of ["codex:gh", "codex:gh-identity"])
+    assert.deepEqual(f.gaps(f.plan(["--product", "codex", "--target", key])), [
+      { code: "invalid-target", key },
+    ]);
 });
 
 test("new Codex plans report retired session files without claiming them", (t) => {
@@ -169,7 +165,7 @@ test("product roots record each explicit subset in canonical order and exclude e
     const canonical = (["codex", "dsh", "antigravity"] as const).filter(
       (product) => (selected as readonly string[]).includes(product),
     );
-    assert.equal(plan.version, 9);
+    assert.equal(plan.version, 10);
     assert.deepEqual(
       Object.keys(plan.roots).filter((key) =>
         ["codex", "dsh", "antigravity"].includes(key),
@@ -205,7 +201,7 @@ test("unselected product variables do not block planning or permit target or ado
   );
   assert.ok(
     f
-      .gaps(f.plan(["--adopt", "codex:gh"], environment))
+      .gaps(f.plan(["--adopt", "codex:project-guide"], environment))
       .some((gap) => gap.code === "adopt-unused"),
   );
 });
@@ -380,7 +376,7 @@ function installDistinctProducts(
 test("explicit Antigravity selection contains its platform-compatible skills and dependencies", (t) => {
   const f = installFixture(t);
   const initial = f.planned().plan;
-  assert.equal(initial.version, 9);
+  assert.equal(initial.version, 10);
   assert.equal(initial.roots.antigravity, undefined);
   const unsupportedUpgrade = { ...initial, version: 6 };
   const { sha256: initialDigest, ...upgradedBody } = unsupportedUpgrade;
@@ -397,7 +393,7 @@ test("explicit Antigravity selection contains its platform-compatible skills and
   );
   const { plan } = f.planned(["--product", "antigravity"]);
   const root = path.join(f.home, ".gemini");
-  assert.equal(plan.version, 9);
+  assert.equal(plan.version, 10);
   assert.equal(plan.roots.antigravity?.path, root);
   const { sha256: planDigest, ...v6Body } = plan;
   assert.equal(planDigest.length, 64);
@@ -427,11 +423,6 @@ test("explicit Antigravity selection contains its platform-compatible skills and
         ? ["antigravity:capability/sketch.mcp.json"]
         : []),
       "antigravity:capability/wx-docs.mcp.json",
-      "antigravity:alibabacloud-find-skills",
-      "antigravity:alibabacloud-sms-send-short-message",
-      "antigravity:gh",
-      "antigravity:google-cloud",
-      "antigravity:modern-web-guidance",
       "antigravity:policy/antigravity.md",
       "antigravity:policy/review.md",
       "antigravity:policy/common.md",
@@ -441,12 +432,7 @@ test("explicit Antigravity selection contains its platform-compatible skills and
       "antigravity:policy/tool-contracts.md",
       "antigravity:policy/writing.md",
       "antigravity:project-guide",
-      "antigravity:property-based-testing",
-      "antigravity:rust-risk-review",
-      "antigravity:web-quality-audit",
-      ...(process.platform === "darwin"
-        ? ["antigravity:sketch-native", "antigravity:wechatide"]
-        : []),
+      ...(process.platform === "darwin" ? ["antigravity:sketch-native"] : []),
       "antigravity:tools/check-ids.mjs",
       "antigravity:tools/check-prose.mjs",
       "antigravity:tools/task-temp.mjs",
@@ -463,19 +449,33 @@ test("explicit Antigravity selection contains its platform-compatible skills and
 test("Antigravity collisions and adoption gaps refuse the complete plan before target writes", (t) => {
   const f = installFixture(t);
   const root = path.join(f.home, ".gemini/config");
-  mkdirSync(path.join(root, "skills/gh"), { recursive: true });
-  writeFileSync(path.join(root, "skills/gh/SKILL.md"), "existing skill\n");
+  mkdirSync(path.join(root, "skills/project-guide"), { recursive: true });
+  writeFileSync(
+    path.join(root, "skills/project-guide/SKILL.md"),
+    "existing skill\n",
+  );
   const extra = ["--product", "codex", "--product", "antigravity"];
-  assert.ok(f.gaps(f.plan(extra)).some((gap) => gap.key === "antigravity:gh"));
-  const { plan } = f.planned([...extra, "--adopt", "antigravity:gh"]);
+  assert.ok(
+    f
+      .gaps(f.plan(extra))
+      .some((gap) => gap.key === "antigravity:project-guide"),
+  );
+  const { plan } = f.planned([
+    ...extra,
+    "--adopt",
+    "antigravity:project-guide",
+  ]);
   assert.equal(
-    plan.targets.find((target) => target.key === "antigravity:gh")?.adopted,
+    plan.targets.find((target) => target.key === "antigravity:project-guide")
+      ?.adopted,
     true,
   );
   assert.ok(
     f
       .gaps(
-        f.plan([...extra, "--adopt", "antigravity:gh"], { CODEX_HOME: root }),
+        f.plan([...extra, "--adopt", "antigravity:project-guide"], {
+          CODEX_HOME: root,
+        }),
       )
       .some((gap) => gap.code === "path-collision"),
   );
@@ -489,7 +489,7 @@ test("a plan binds both products to independent roots and shared source", (t) =>
   const f = installFixture(t);
   const { plan } = f.planned();
   const expected = expectedTargets(f.home, plan.run.source);
-  assert.equal(plan.version, 9);
+  assert.equal(plan.version, 10);
   assert.deepEqual(Object.keys(plan.roots).sort(), [
     "backup",
     "codex",
@@ -628,14 +628,14 @@ test("a stale source report cannot authorize a new plan", (t) => {
 
 test("an ignored member inside a delivered skill blocks planning", (t) => {
   const f = installFixture(t);
-  f.put("delivery/skills/gh/.DS_Store", "ignored member\n", 0o600);
+  f.put("delivery/skills/project-guide/.DS_Store", "ignored member\n", 0o600);
   assert.ok(
     f
       .gaps(f.plan())
       .some(
         (gap) =>
           gap.code === "source-coverage-missing" &&
-          gap.path?.endsWith("/skills/gh/.DS_Store"),
+          gap.path?.endsWith("/skills/project-guide/.DS_Store"),
       ),
   );
   assert.deepEqual(f.runs(), []);
@@ -753,24 +753,31 @@ test("the plan requires machine identity", (t) => {
 test("product-qualified adoption never claims the other product's same-named skill", (t) => {
   const f = installFixture(t);
   for (const product of ["codex", "dsh"]) {
-    const target = path.join(f.home, `.${product}/skills/gh`);
+    const target = path.join(f.home, `.${product}/skills/project-guide`);
     mkdirSync(target, { recursive: true });
     writeFileSync(path.join(target, "personal.txt"), product);
   }
-  assert.equal(f.plan(["--adopt", "gh"]).status, 2);
-  assert.equal(f.plan(["--adopt", "claude:gh"]).status, 2);
-  const gaps = f.gaps(f.plan(["--adopt", "codex:gh"]));
+  assert.equal(f.plan(["--adopt", "project-guide"]).status, 2);
+  assert.equal(f.plan(["--adopt", "claude:project-guide"]).status, 2);
+  const gaps = f.gaps(f.plan(["--adopt", "codex:project-guide"]));
   assert.ok(
-    gaps.some((gap) => gap.code === "adopt-required" && gap.key === "dsh:gh"),
+    gaps.some(
+      (gap) => gap.code === "adopt-required" && gap.key === "dsh:project-guide",
+    ),
   );
   assert.deepEqual(f.runs(), []);
-  const { plan } = f.planned(["--adopt", "codex:gh", "--adopt", "dsh:gh"]);
+  const { plan } = f.planned([
+    "--adopt",
+    "codex:project-guide",
+    "--adopt",
+    "dsh:project-guide",
+  ]);
   assert.deepEqual(
     plan.targets
       .filter((target) => target.adopted)
       .map((target) => target.key)
       .sort(),
-    ["codex:gh", "dsh:gh"],
+    ["codex:project-guide", "dsh:project-guide"],
   );
 });
 
@@ -805,10 +812,7 @@ test("target selection rejects unknown, repeated, unselected-product and nested 
     2,
   );
   assert.equal(f.plan(["--target", "AGENTS.md"]).status, 2);
-  assert.equal(
-    f.plan(["--target", "codex:gh/references/operations.md"]).status,
-    2,
-  );
+  assert.equal(f.plan(["--target", "codex:project-guide/SKILL.md"]).status, 2);
   for (const key of ["codex:missing", "antigravity:policy/review.md"]) {
     assert.ok(
       f
@@ -995,18 +999,18 @@ test("record validation binds product, path, source and backup even with a recom
   const { plan } = f.planned();
   for (const mutate of [
     (value: typeof plan) => {
-      value.targets.find((target) => target.key === "codex:gh")!.product =
-        "dsh";
+      value.targets.find(
+        (target) => target.key === "codex:project-guide",
+      )!.product = "dsh";
     },
     (value: typeof plan) => {
-      value.targets.find((target) => target.key === "dsh:gh")!.path = path.join(
-        f.home,
-        ".codex/skills/gh",
-      );
+      value.targets.find((target) => target.key === "dsh:project-guide")!.path =
+        path.join(f.home, ".codex/skills/project-guide");
     },
     (value: typeof plan) => {
-      value.targets.find((target) => target.key === "dsh:gh")!.source =
-        path.join(value.run.source, "delivery/AGENTS.md");
+      value.targets.find(
+        (target) => target.key === "dsh:project-guide",
+      )!.source = path.join(value.run.source, "delivery/AGENTS.md");
     },
     (value: typeof plan) => {
       value.targets.find(
@@ -1023,4 +1027,128 @@ test("record validation binds product, path, source and backup even with a recom
     changed.sha256 = canonicalDigest(body);
     assert.equal(InstallPlanSchema.safeParse(changed).success, false);
   }
+});
+
+test("V10 removal target schema rejects missing backup, non-null source, non-absent installed, or legacy versions", (t) => {
+  const f = installFixture(t, { products: ["codex"] });
+  const { plan } = f.planned();
+  const skillIndex = plan.targets.findIndex(
+    (target) => target.key === "codex:project-guide",
+  );
+  const original = plan.targets[skillIndex]!;
+  const removal = {
+    ...original,
+    key: "codex:gh",
+    path: path.join(f.home, ".codex/skills/gh"),
+    source: null,
+    installed: { type: "absent" as const },
+    before: {
+      type: "directory" as const,
+      mode: 0o700,
+      uid: process.getuid!(),
+      sha256: "0".repeat(64),
+    },
+    action: "remove" as const,
+    adopted: false,
+    backup: path.join(plan.roots.backup.path, plan.run.id, String(skillIndex)),
+  };
+  const validPlan = structuredClone(plan);
+  validPlan.targets[skillIndex] = removal;
+  const { sha256: _validDigest, ...validBody } = validPlan;
+  validPlan.sha256 = canonicalDigest(validBody);
+  assert.equal(InstallPlanSchema.safeParse(validPlan).success, true);
+
+  for (const mutate of [
+    (value: typeof validPlan) => {
+      value.version = 9;
+    },
+    (value: typeof validPlan) => {
+      value.targets[skillIndex]!.backup = null;
+    },
+    (value: typeof validPlan) => {
+      value.targets[skillIndex]!.source = original.source;
+    },
+    (value: typeof validPlan) => {
+      value.targets[skillIndex]!.installed = original.installed;
+    },
+    (value: typeof validPlan) => {
+      value.targets[skillIndex]!.before = { type: "absent" };
+    },
+    (value: typeof validPlan) => {
+      value.targets[skillIndex]!.adopted = true;
+    },
+    (value: typeof validPlan) => {
+      value.targets[skillIndex]!.path = path.join(f.home, ".dsh/skills/gh");
+    },
+  ]) {
+    const changed = structuredClone(validPlan);
+    mutate(changed);
+    const { sha256: _digest, ...body } = changed;
+    changed.sha256 = canonicalDigest(body);
+    assert.equal(InstallPlanSchema.safeParse(changed).success, false);
+  }
+});
+
+test("classifyTargets drops stale skill removal and keeps dense ordering if replaced before freeze", (t) => {
+  const f = installFixture(t, { products: ["codex"] });
+  const stalePath = path.join(f.home, ".codex/skills/gh");
+  mkdirSync(stalePath, { recursive: true });
+  writeFileSync(
+    path.join(stalePath, "SKILL.md"),
+    "---\nname: gh\ndescription: Historical repo-managed skill.\n---\n",
+  );
+  const expectedInstalled = readTargetState(stalePath);
+  assert.equal(expectedInstalled.type, "directory");
+
+  // Simulate a concurrent replacement after the initial receipt ownership check.
+  writeFileSync(
+    path.join(stalePath, "SKILL.md"),
+    "---\nname: gh\ndescription: Replaced by user during planning.\n---\n",
+  );
+  const untouchedPath = path.join(f.home, ".codex/skills/stale-unmodified");
+  mkdirSync(untouchedPath, { recursive: true });
+  writeFileSync(
+    path.join(untouchedPath, "SKILL.md"),
+    "---\nname: stale-unmodified\ndescription: Unmodified stale skill.\n---\n",
+  );
+  const untouchedInstalled = readTargetState(untouchedPath);
+  assert.equal(untouchedInstalled.type, "directory");
+
+  const gaps: Gap[] = [];
+  const missing = new Set<string>();
+  const targets = classifyTargets(
+    [
+      {
+        kind: "directory",
+        category: "skill",
+        product: "codex",
+        key: "codex:gh",
+        path: stalePath,
+        source: null,
+        relativeSource: null,
+        expectedInstalled,
+      },
+      {
+        kind: "directory",
+        category: "skill",
+        product: "codex",
+        key: "codex:stale-unmodified",
+        path: untouchedPath,
+        source: null,
+        relativeSource: null,
+        expectedInstalled: untouchedInstalled,
+      },
+    ],
+    [],
+    path.join(f.home, ".local/state/agents/backup/20260101T000000Z-aaaa1111"),
+    f.checkout,
+    process.getuid!(),
+    gaps,
+    missing,
+  );
+  assert.deepEqual(gaps, []);
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0]!.key, "codex:stale-unmodified");
+  assert.equal(targets[0]!.order, 0);
+  assert.ok(targets[0]!.backup?.endsWith("/0"));
 });

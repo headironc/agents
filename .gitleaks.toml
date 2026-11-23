@@ -1,23 +1,7 @@
 # Secret screening for this repository. `scripts/check-secrets.ts` scans Git source candidates
 # in a temporary copy during the repository gate.
 #
-# Every allowance below is narrow on purpose. A path-wide exemption would hide the next real secret
-# added to that same file, which is the failure this check exists to prevent.
+# Keep any future allowlist narrow by exact value rather than path-wide exemptions.
 
 [extend]
 useDefault = true
-
-[[allowlists]]
-# The literal alone, with no companion path entry. A `paths` entry here exempts the whole file
-# whatever else the block says: measured, by planting a real-shaped token in that same file and
-# watching it go unreported. This value is distinctive enough to stand on its own, and a credential
-# added beside it is still found.
-description = "One fixture string in the WechatIDE call test, allowed by its exact value."
-regexes = ['''mcp-fixture-secret-7f3a''']
-
-[[allowlists]]
-# This is a public WebCrypto algorithm identifier in the official guide, not a key.
-# Keep the exact secret match so credentials beside it remain subject to screening.
-description = "The MLKEM768-X25519 algorithm name in official WebCrypto guidance."
-regexTarget = "secret"
-regexes = ['''^MLKEM768-X25519$''']

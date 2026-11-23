@@ -20,16 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        source:
-          [
-            modern-web-guidance,
-            rust-api-guidelines,
-            property-based-testing,
-            microsoft-rust-guidelines,
-            rust-risk-review,
-            web-quality-audit,
-            google-cloud,
-          ]
+        source: [rust-api-guidelines, microsoft-rust-guidelines]
     permissions:
       contents: write
       pull-requests: write

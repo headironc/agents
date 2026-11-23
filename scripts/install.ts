@@ -24,20 +24,24 @@ import { CheckReportSchema } from "./check-report.ts";
 import type { CheckReportV1 } from "./check-report.ts";
 import {
   applyInstallPlan,
+  hostFacts,
   InstallRefused,
   loadPlanForApply,
   loadReceipt,
   RecordVersionError,
   rollbackInstallation,
   runtimeOf,
+  sameHost,
   verifyInstallation,
 } from "./install-apply.ts";
+import type { HostFacts } from "./install-apply.ts";
 import { readCurrentInstallation } from "./install-current.ts";
 import {
   activeAdoptKeyPattern,
   InstallPlanSchema,
   installationProducts,
   installPathCollisions,
+  runIdPattern,
   runtimeFiles,
 } from "./install-records.ts";
 import type {
@@ -47,6 +51,7 @@ import type {
   InstallTarget,
   RecordedProduct,
   RuntimeRecord,
+  TargetState,
 } from "./install-records.ts";
 import {
   attempt,
@@ -298,10 +303,104 @@ function verifyCheckout(
   return { directory, commit };
 }
 
-type TargetDraft = Omit<
+export type TargetDraft = Omit<
   InstallTarget,
   "order" | "before" | "action" | "adopted" | "backup" | "installed"
-> & { relativeSource: string };
+> & {
+  relativeSource: string | null;
+  expectedInstalled?: Extract<TargetState, { type: "directory" }>;
+};
+
+type ManagedSkill = {
+  product: Product;
+  key: string;
+  name: string;
+  path: string;
+  installed: Extract<TargetState, { type: "directory" }>;
+};
+
+/** Replay settled receipts for this host to find skills currently owned by this repository. */
+function readManagedSkills(
+  roots: InstallRoots,
+  currentHost: HostFacts,
+): ManagedSkill[] {
+  let names: string[];
+  try {
+    names = readdirSync(roots.deploy.path).sort(bytewise);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+  const activeDirectories = new Map<Product, string>();
+  for (const product of products) {
+    const root = roots[product];
+    if (!root) continue;
+    activeDirectories.set(
+      product,
+      path.join(
+        root.path,
+        product === "antigravity" ? "config/skills" : "skills",
+      ),
+    );
+  }
+  const runs: { receipt: InstallReceipt; plan: InstallPlan }[] = [];
+  for (const name of names) {
+    if (!runIdPattern.test(name)) continue;
+    const file = path.join(roots.deploy.path, name, "deployment-receipt.json");
+    let stat;
+    try {
+      stat = lstatIfExists(file);
+    } catch {
+      continue;
+    }
+    if (!stat || stat.isSymbolicLink() || !stat.isFile()) continue;
+    try {
+      const loaded = loadReceipt(file);
+      if (
+        loaded.receipt.status === "installed" &&
+        sameHost(loaded.plan.host, currentHost)
+      )
+        runs.push(loaded);
+    } catch {
+      continue;
+    }
+  }
+  runs.sort(
+    (left, right) =>
+      bytewise(left.receipt.startedAt, right.receipt.startedAt) ||
+      bytewise(left.receipt.run.id, right.receipt.run.id),
+  );
+  const managed = new Map<string, ManagedSkill>();
+  for (const { plan } of runs) {
+    for (const target of plan.targets) {
+      if (
+        target.category !== "skill" ||
+        !products.includes(target.product as Product)
+      )
+        continue;
+      const product = target.product as Product;
+      const expectedDirectory = activeDirectories.get(product);
+      if (!expectedDirectory || path.dirname(target.path) !== expectedDirectory)
+        continue;
+      if (target.action === "remove") {
+        managed.delete(target.path);
+      } else if (target.installed.type === "directory") {
+        managed.set(target.path, {
+          product,
+          key: target.key,
+          name: path.basename(target.path),
+          path: target.path,
+          installed: target.installed,
+        });
+      }
+    }
+  }
+  return [...managed.values()].sort(
+    (left, right) =>
+      products.indexOf(left.product) - products.indexOf(right.product) ||
+      bytewise(left.name, right.name),
+  );
+}
 
 /** Derive every target from fixed categories and the checked manifest; nested entries are not installed. */
 function deriveTargets(
@@ -368,10 +467,11 @@ function inspectDirectorySources(
     }
   };
   for (const draft of drafts)
-    if (draft.kind === "directory") visit(draft.relativeSource);
+    if (draft.kind === "directory" && draft.relativeSource)
+      visit(draft.relativeSource);
 }
 
-function classifyTargets(
+export function classifyTargets(
   drafts: TargetDraft[],
   adopt: string[],
   backupRun: string,
@@ -382,12 +482,46 @@ function classifyTargets(
 ): InstallTarget[] {
   const adoptable = new Set<string>();
   const unclassified = new Set<string>();
-  const targets = drafts.flatMap((draft, order): InstallTarget[] => {
+  const targets: InstallTarget[] = [];
+  for (const draft of drafts) {
     inspectParents(draft.path, uid, gaps, missing);
     const before = inspectTarget(draft.path, gaps);
     if (!before) {
       unclassified.add(draft.key);
-      return [];
+      continue;
+    }
+    if (draft.expectedInstalled) {
+      // Re-verify receipt ownership at the exact moment `before` is frozen so a concurrent
+      // local replacement cannot be bound as a removable target and skipped past drift checks.
+      if (
+        before.type !== "directory" ||
+        !sameState(before, draft.expectedInstalled)
+      ) {
+        continue;
+      }
+      const foreign = attempt(
+        gaps,
+        { code: "unreadable-target", path: draft.path },
+        () => foreignOwnedMember(draft.path, uid),
+      );
+      if (foreign)
+        gaps.push({ code: "backup-owner-unrestorable", path: foreign });
+      const order = targets.length;
+      targets.push({
+        order,
+        kind: "directory",
+        category: "skill",
+        product: draft.product,
+        key: draft.key,
+        path: draft.path,
+        source: null,
+        installed: { type: "absent" },
+        before,
+        action: "remove",
+        adopted: false,
+        backup: path.join(backupRun, String(order)),
+      });
+      continue;
     }
     if (before.type === "file" || before.type === "directory") {
       const foreign = attempt(
@@ -398,7 +532,7 @@ function classifyTargets(
       if (foreign)
         gaps.push({ code: "backup-owner-unrestorable", path: foreign });
     }
-    const source = path.join(checkout, draft.relativeSource);
+    const source = path.join(checkout, draft.relativeSource!);
     const installed = attempt(
       gaps,
       { code: "source-unreadable", path: source },
@@ -406,13 +540,14 @@ function classifyTargets(
     );
     if (!installed) {
       unclassified.add(draft.key);
-      return [];
+      continue;
     }
     if (installed.type !== draft.kind) {
       gaps.push({ code: "source-invalid-target", path: source });
       unclassified.add(draft.key);
-      return [];
+      continue;
     }
+    const order = targets.length;
     const backup =
       before.type === "file" || before.type === "directory"
         ? path.join(backupRun, String(order))
@@ -427,23 +562,21 @@ function classifyTargets(
       if (!adopt.includes(draft.key))
         gaps.push({ code: "adopt-required", path: draft.path, key: draft.key });
     }
-    return [
-      {
-        order,
-        kind: draft.kind,
-        category: draft.category,
-        product: draft.product,
-        key: draft.key,
-        path: draft.path,
-        source: draft.source,
-        installed,
-        before,
-        action,
-        adopted: needsAdoption && adopt.includes(draft.key),
-        backup,
-      },
-    ];
-  });
+    targets.push({
+      order,
+      kind: draft.kind,
+      category: draft.category,
+      product: draft.product,
+      key: draft.key,
+      path: draft.path,
+      source: draft.source,
+      installed,
+      before,
+      action,
+      adopted: needsAdoption && adopt.includes(draft.key),
+      backup,
+    });
+  }
   for (const key of adopt)
     if (!adoptable.has(key) && !unclassified.has(key))
       gaps.push({ code: "adopt-unused", key });
@@ -455,6 +588,7 @@ function inspectUnlisted(
   roots: InstallRoots,
   entries: SkillEntry[],
   gaps: Gap[],
+  plannedRemovals: Set<string>,
 ): string[] {
   const reported: string[] = [];
   const report = (file: string) => reported.push(file);
@@ -475,8 +609,10 @@ function inspectUnlisted(
     );
     const prefix = product === "antigravity" ? "config/" : "";
     const skillDirectory = path.join(root.path, prefix, "skills");
-    for (const name of list(skillDirectory))
-      if (!members.has(name)) report(path.join(skillDirectory, name));
+    for (const name of list(skillDirectory)) {
+      const target = path.join(skillDirectory, name);
+      if (!members.has(name) && !plannedRemovals.has(target)) report(target);
+    }
     // A published name may carry a directory, and a directory on the way to one is walked rather
     // than reported. Every fixed list is flat today, so this path is unexercised; it stays because
     // the alternative is a category that silently reports its own subdirectory as an unlisted name.
@@ -694,9 +830,39 @@ export function planInstallation(
   block();
   const drafts = args.targets.length
     ? available.filter((target) => args.targets.includes(target.key))
-    : available;
+    : [...available];
+  if (args.targets.length === 0) {
+    const declaredPaths = new Set(available.map((draft) => draft.path));
+    for (const entry of readManagedSkills(roots, hostFacts())) {
+      if (declaredPaths.has(entry.path)) continue;
+      let current: TargetState | undefined;
+      try {
+        current = readTargetState(entry.path);
+      } catch {
+        current = undefined;
+      }
+      if (
+        current?.type === "directory" &&
+        sameState(current, entry.installed)
+      ) {
+        drafts.push({
+          kind: "directory",
+          category: "skill",
+          product: entry.product,
+          key: entry.key,
+          path: entry.path,
+          source: null,
+          relativeSource: null,
+          expectedInstalled: entry.installed,
+        });
+      }
+    }
+  }
   for (const draft of drafts) {
-    if (!candidate.some((entry) => inside(draft.relativeSource, entry.path)))
+    if (
+      draft.relativeSource &&
+      !candidate.some((entry) => inside(draft.relativeSource!, entry.path))
+    )
       gaps.push({
         code: "candidate-source-missing",
         path: draft.relativeSource,
@@ -713,7 +879,12 @@ export function planInstallation(
     gaps,
     newDirectories,
   );
-  const reported = inspectUnlisted(roots, entries, gaps);
+  const plannedRemovals = new Set(
+    targets
+      .filter((target) => target.action === "remove")
+      .map((target) => target.path),
+  );
+  const reported = inspectUnlisted(roots, entries, gaps, plannedRemovals);
 
   const outputDirectories = new Set<string>();
   inspectParents(run.directory, uid, gaps, outputDirectories);
@@ -864,7 +1035,10 @@ export function planInstallation(
     )
       throw new Error("Candidate snapshot differs from the checked source");
     for (const target of targets)
-      if (!sameState(target.installed, readTargetState(target.source)))
+      if (
+        target.source &&
+        !sameState(target.installed, readTargetState(target.source))
+      )
         throw new Error(`Candidate target differs: ${target.key}`);
     const runtime = prepareRuntime(
       checkout.directory,
@@ -873,7 +1047,7 @@ export function planInstallation(
       report.report.platform,
     );
     const body = {
-      version: 9,
+      version: 10,
       createdAt,
       run,
       review: args.output,
@@ -932,6 +1106,7 @@ export function planInstallation(
       targets: {
         create: count("create"),
         replace: count("replace"),
+        remove: count("remove"),
         unchanged: count("unchanged"),
       },
       adopted: args.adopt,

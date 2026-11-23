@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -11,22 +12,30 @@ import path from "node:path";
 import test from "node:test";
 import { load } from "js-yaml";
 import { updateServer } from "./upstream-fixtures.ts";
-import { modernWebUpdate } from "../../scripts/upstream-modern-web.ts";
-import { changes, publish, repositoryId } from "../../scripts/upstream-pr.ts";
-import type { Api, UpdatePlan } from "../../scripts/upstream-pr.ts";
 import {
-  modernWebLock,
-  modernWebSourceSchema,
-  sha256,
-} from "../../scripts/modern-web-source.ts";
+  preparedUpdate,
+  publishPrepared,
+  repositoryId,
+  sources,
+} from "../../scripts/upstream-pr.ts";
+import type { Api } from "../../scripts/upstream-pr.ts";
+import {
+  digest,
+  gitBlob,
+  rustLock,
+  rustPolicy,
+  rustRoot,
+  rustSourceSchema,
+} from "../../scripts/rust-api-source.ts";
+import type { RustPlan } from "../../scripts/upstream-rust-api.ts";
+import { rustUpdate } from "../../scripts/upstream-rust-api.ts";
 import { repositoryRoot } from "./fixtures.ts";
-import { applyModernWebImport } from "../../scripts/update-modern-web-guidance.ts";
 
 const base = "a".repeat(40);
-const source = modernWebSourceSchema.parse(
-  JSON.parse(readFileSync(path.join(repositoryRoot, modernWebLock), "utf8")),
+const source = rustSourceSchema.parse(
+  JSON.parse(readFileSync(path.join(repositoryRoot, rustLock), "utf8")),
 );
-const original: UpdatePlan = {
+const original: RustPlan = {
   base,
   source,
   files: source.files.map((f) => ({
@@ -36,49 +45,52 @@ const original: UpdatePlan = {
     ),
   })),
 };
-function next(previous = original): UpdatePlan {
+
+function next(previous = original, revision = "c".repeat(40)): RustPlan {
   const plan = structuredClone(previous);
-  const parts = previous.source.version.split(".");
-  parts[2] = String(BigInt(parts[2]!) + 1n);
-  plan.source.version = parts.join(".");
-  plan.source.tarball = `https://registry.npmjs.org/modern-web-guidance/-/modern-web-guidance-${plan.source.version}.tgz`;
+  plan.source.revision = revision;
   const file = plan.source.files[0]!;
   const bytes = Buffer.from(
-    `Synthetic source ${plan.source.version} for API simulation only.\n`,
+    `Synthetic Rust guideline ${plan.source.revision} for API simulation only.\n`,
   );
   file.bytes = bytes.length;
-  file.sha256 = sha256(bytes);
+  file.sha256 = digest(bytes);
+  file.blob = gitBlob(bytes);
   plan.files.find((f) => f.path === file.target)!.content =
     bytes.toString("base64");
   return plan;
 }
-function server(plan: UpdatePlan, fault = "", root = repositoryRoot) {
-  return updateServer(modernWebUpdate(root, plan), fault);
+
+function server(plan: RustPlan, fault = "", root = repositoryRoot) {
+  return updateServer(rustUpdate(root, plan), fault);
 }
 
 test("no update performs no API calls; drift and malformed plans fail before writing", async () => {
   assert.deepEqual(
-    await publish(repositoryRoot, original, async () => {
-      throw new Error("unexpected API");
-    }),
-    { status: "unchanged", version: source.version },
+    await publishPrepared(
+      preparedUpdate(repositoryRoot, "rust-api-guidelines", original),
+      async () => {
+        throw new Error("unexpected API");
+      },
+    ),
+    { status: "unchanged", version: source.revision },
   );
   const drift = structuredClone(original);
-  drift.source.gitHead = base;
-  assert.throws(() => changes(repositoryRoot, drift), /Same-version/);
+  drift.source.files[0]!.sha256 = "0".repeat(64);
+  assert.throws(() => rustUpdate(repositoryRoot, drift), /bytes/);
   const extra = next();
-  extra.files.push({ path: "../escape", content: "eA==" });
-  assert.throws(() => changes(repositoryRoot, extra), /membership/);
+  extra.files[1]!.path = extra.files[0]!.path;
+  assert.throws(() => rustUpdate(repositoryRoot, extra), /membership/);
   const missing = next();
   missing.files[0]!.content = "eA==";
-  assert.throws(() => changes(repositoryRoot, missing), /bytes/);
+  assert.throws(() => rustUpdate(repositoryRoot, missing), /bytes/);
 });
 
-test("a new release creates exactly one branch, signed commit and ready PR with byte readback", async () => {
+test("a new release creates exactly one branch, signed commit and draft PR with byte readback", async () => {
   const plan = next(),
     fake = server(plan);
   assert.equal(
-    (await publish(repositoryRoot, plan, fake.api)).status,
+    (await publishPrepared(rustUpdate(repositoryRoot, plan), fake.api)).status,
     "created",
   );
   assert.deepEqual(fake.writes, [
@@ -96,7 +108,8 @@ test("historical proposals and pending review never receive updates or duplicate
     const plan = next(),
       fake = server(plan, fault);
     assert.equal(
-      (await publish(repositoryRoot, plan, fake.api)).status,
+      (await publishPrepared(rustUpdate(repositoryRoot, plan), fake.api))
+        .status,
       status,
     );
     assert.deepEqual(fake.writes, []);
@@ -116,7 +129,9 @@ test("uncertain writes and incomplete or changed targets stop without retries", 
   ]) {
     const plan = next(),
       fake = server(plan, fault);
-    await assert.rejects(publish(repositoryRoot, plan, fake.api));
+    await assert.rejects(
+      publishPrepared(rustUpdate(repositoryRoot, plan), fake.api),
+    );
     assert.equal(new Set(fake.writes).size, fake.writes.length);
     assert.ok(!fake.writes.some((p) => p.endsWith("/pulls")));
     if (fault === "lost-write")
@@ -137,7 +152,7 @@ test("later pages remain authoritative and later write failures are read back on
             {
               head: {
                 repo: { id: repositoryId },
-                ref: "codex/update-modern-web-guidance-0.0.0",
+                ref: "codex/update-rust-api-guidelines-0000",
               },
             },
           ];
@@ -145,7 +160,7 @@ test("later pages remain authoritative and later write failures are read back on
     return fake.api(method, endpoint, body);
   };
   assert.equal(
-    (await publish(repositoryRoot, plan, api)).status,
+    (await publishPrepared(rustUpdate(repositoryRoot, plan), api)).status,
     "pending-review",
   );
   assert.equal(pages.length, 2);
@@ -153,7 +168,7 @@ test("later pages remain authoritative and later write failures are read back on
   for (const fault of ["lost-commit", "lost-pr"]) {
     const failed = server(plan, fault);
     await assert.rejects(
-      publish(repositoryRoot, plan, failed.api),
+      publishPrepared(rustUpdate(repositoryRoot, plan), failed.api),
       /target read back/,
     );
     assert.equal(new Set(failed.writes).size, failed.writes.length);
@@ -167,34 +182,49 @@ test("later pages remain authoritative and later write failures are read back on
 test("publisher coverage survives successive updates of the baseline source lock", async (t) => {
   const root = mkdtempSync(path.join(os.tmpdir(), "upstream-pr-baseline-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const file of original.files) {
-    const destination = path.join(root, file.path);
-    mkdirSync(path.dirname(destination), { recursive: true });
-    writeFileSync(destination, Buffer.from(file.content, "base64"));
+  for (const relative of [rustLock, rustPolicy, rustRoot]) {
+    mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
+    cpSync(path.join(repositoryRoot, relative), path.join(root, relative), {
+      recursive: true,
+    });
   }
-  mkdirSync(path.join(root, "config"));
-  writeFileSync(path.join(root, modernWebLock), JSON.stringify(source));
   let current = original;
   for (let generation = 0; generation < 2; generation++) {
-    const candidate = next(current);
+    const candidate = next(current, (generation === 0 ? "c" : "d").repeat(40));
     const fake = server(candidate, "", root);
-    assert.equal((await publish(root, candidate, fake.api)).status, "created");
-    applyModernWebImport(root, {
-      source: candidate.source,
-      files: new Map(
-        candidate.files.map((f) => [f.path, Buffer.from(f.content, "base64")]),
-      ),
-    });
+    assert.equal(
+      (await publishPrepared(rustUpdate(root, candidate), fake.api)).status,
+      "created",
+    );
+    const landed = structuredClone(candidate);
+    for (const file of landed.files) {
+      mkdirSync(path.dirname(path.join(root, file.path)), { recursive: true });
+      writeFileSync(
+        path.join(root, file.path),
+        Buffer.from(file.content, "base64"),
+      );
+    }
+    const updatedPolicy = readFileSync(
+      path.join(root, rustPolicy),
+      "utf8",
+    ).replace(current.source.revision, landed.source.revision);
+    writeFileSync(path.join(root, rustPolicy), updatedPolicy);
+    landed.source.assessment!.revision = landed.source.revision;
+    landed.source.assessment!.policySha256 = digest(updatedPolicy);
+    writeFileSync(
+      path.join(root, rustLock),
+      JSON.stringify(landed.source, null, 2) + "\n",
+    );
     assert.deepEqual(
-      await publish(root, candidate, async () => {
+      await publishPrepared(rustUpdate(root, landed), async () => {
         throw new Error("unexpected API");
       }),
       {
         status: "unchanged",
-        version: candidate.source.version,
+        version: landed.source.revision,
       },
     );
-    current = candidate;
+    current = landed;
   }
 });
 
@@ -214,15 +244,7 @@ test("the scheduled workflow runs only on main with bounded publishing permissio
   assert.deepEqual(job.strategy, {
     "fail-fast": false,
     matrix: {
-      source: [
-        "modern-web-guidance",
-        "rust-api-guidelines",
-        "property-based-testing",
-        "microsoft-rust-guidelines",
-        "rust-risk-review",
-        "web-quality-audit",
-        "google-cloud",
-      ],
+      source: [...sources],
     },
   });
   assert.equal(

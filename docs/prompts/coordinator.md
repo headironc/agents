@@ -78,14 +78,14 @@
 
 ## 维护入口与验证边界
 
-| 内容 | 权威入口 |
-| --- | --- |
-| 实施范围与操作边界 | [Codex 规则](../../delivery/AGENTS.md)及目标项目采用规则 |
-| 模型、工作区、委派、接纳、接任与归档 | [模型协作政策](../../delivery/policy/models.md) |
-| 检查、审查与合并准入 | [审查政策](../../delivery/policy/review.md)及目标项目门禁 |
-| 工具调用与发布授权 | [工具契约](../../delivery/policy/tool-contracts.md)、[gh 授权合同](../../delivery/skills/gh/references/workflow-authorization.md) |
-| 设计委派 | [设计路线](../../delivery/policy/models.md#task-start-and-execution-routing)、[Sketch 技能](../../delivery/skills/sketch-native/SKILL.md) |
-| 协作提醒与能力限制 | [使用指南](../usage.md#本机协作提醒)、[验证边界](../usage.md#验证能说明什么) |
-| 行为预期 | [模型协作场景](../../tests/scenarios/rules.md#模型选择与接续) |
+| 内容                                 | 权威入口                                                                                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 实施范围与操作边界                   | [Codex 规则](../../delivery/AGENTS.md)及目标项目采用规则                                                                                  |
+| 模型、工作区、委派、接纳、接任与归档 | [模型协作政策](../../delivery/policy/models.md)                                                                                           |
+| 检查、审查与合并准入                 | [审查政策](../../delivery/policy/review.md)及目标项目门禁                                                                                 |
+| 工具调用与发布授权                   | [工具契约](../../delivery/policy/tool-contracts.md)、[PR 工作流授权](../../delivery/policy/review.md#targets-and-authorized-effects)      |
+| 设计委派                             | [设计路线](../../delivery/policy/models.md#task-start-and-execution-routing)、[Sketch 技能](../../delivery/skills/sketch-native/SKILL.md) |
+| 协作提醒与能力限制                   | [使用指南](../usage.md#本机协作提醒)、[验证边界](../usage.md#验证能说明什么)                                                              |
+| 行为预期                             | [模型协作场景](../../tests/scenarios/rules.md#模型选择与接续)                                                                             |
 
 文档检查只证明静态链接与格式。真实模型演练另行绑定模型、材料与操作范围，不为验证模板调用真实业务服务。

@@ -18,16 +18,11 @@ const root = path.resolve(import.meta.dirname, "../..");
 const scanner = path.join(root, ".cache/agents-tools/bin/gitleaks");
 const entry = path.join(root, "scripts/check-secrets.ts");
 
-test("the official algorithm name is allowed while a credential in the same guide is detected", (t) => {
+test("clean Markdown passes screening while an injected credential is detected and redacted", (t) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "agents-secret-guide-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const guide = readFileSync(
-    path.join(
-      root,
-      "delivery/skills/modern-web-guidance/upstream/guides/security/client-side-encryption.md",
-    ),
-    "utf8",
-  );
+  const guide =
+    "# Local guidance\n\nOrdinary documentation without credentials.\n";
   const candidate = path.join(directory, "guide.md");
   writeFileSync(candidate, guide);
   const scan = () =>

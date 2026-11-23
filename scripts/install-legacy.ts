@@ -202,7 +202,7 @@ export function validLegacyProductRoots(
 }
 
 export function privateRunDirectory(
-  version: 5 | 6 | 7 | 8 | 9,
+  version: 5 | 6 | 7 | 8 | 9 | 10,
   roots: { state: { path: string }; codex?: { path: string } | undefined },
   id: string,
 ): string {

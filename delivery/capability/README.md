@@ -4,19 +4,19 @@
 
 ## 安装
 
-| 片段 | 合并位置或使用方式 |
-| --- | --- |
-| `codex.toml` | `${CODEX_HOME:-$HOME/.codex}/config.toml` |
-| `dsh-headless.patch.yml` | `${DSH_HOME:-$HOME/.dsh}/profiles/headless/cordis.patch.yml`，或调用时通过 `--patch` 传入 |
-| `gcloud-mcp-denylist.json` | `@google-cloud/gcloud-mcp` 的前缀黑名单模板；个人启用时将 `-c` 与此文件物理绝对路径传给 `gcloud` MCP 参数 |
-| `gcloud.mcp.json` | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置；Codex 合并 `codex.toml` 中的 `mcp_servers.gcloud` 段落 |
-| `google-developer-knowledge.mcp.json` | `$HOME/.gemini/config/mcp_config.json`（通过 `authProviderType: "google_credentials"` 鉴权）；Codex 合并 `codex.toml` 中的 `mcp_servers.developer-knowledge`（通过 `env_http_headers` 读取 `DEVELOPERKNOWLEDGE_API_KEY`） |
-| `google-observability.mcp.json` | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置（12 项只读工具）；Codex 合并 `codex.toml` 中的 `mcp_servers.google-observability` 段落 |
-| `google-storage.mcp.json` | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置（默认安全模式）；Codex 合并 `codex.toml` 中的 `mcp_servers.google-storage` 段落 |
-| `rust-lints.toml` | 明确采用 `policy/rust.md` 的项目的 `Cargo.toml` |
-| `chrome-devtools.mcp.json` | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置（跨平台；若 macOS Antigravity 已启用 `chrome-devtools-plugin` 则不重复合并此 JSON）；Codex 合并 `codex.toml` 中的 `mcp_servers.chrome-devtools` 段落 |
-| `sketch.mcp.json` | 仅 macOS：`$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置（配套 `sketch-native`）；Codex 合并 `codex.toml` 中的 `mcp_servers.sketch` 段落 |
-| `wx-docs.mcp.json` | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置；Codex 也可合并 `codex.toml` 中的 `mcp_servers.wx-docs` 段落 |
+| 片段                                  | 合并位置或使用方式                                                                                                                                                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `codex.toml`                          | `${CODEX_HOME:-$HOME/.codex}/config.toml`                                                                                                                                                                                             |
+| `dsh-headless.patch.yml`              | `${DSH_HOME:-$HOME/.dsh}/profiles/headless/cordis.patch.yml`，或调用时通过 `--patch` 传入                                                                                                                                             |
+| `gcloud-mcp-denylist.json`            | `@google-cloud/gcloud-mcp` 的前缀黑名单模板；个人启用时将 `-c` 与此文件物理绝对路径传给 `gcloud` MCP 参数                                                                                                                             |
+| `gcloud.mcp.json`                     | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置；Codex 合并 `codex.toml` 中的 `mcp_servers.gcloud` 段落                                                                                              |
+| `google-developer-knowledge.mcp.json` | `$HOME/.gemini/config/mcp_config.json`（通过 `authProviderType: "google_credentials"` 鉴权）；Codex 合并 `codex.toml` 中的 `mcp_servers.developer-knowledge`（通过 `env_http_headers` 读取 `DEVELOPERKNOWLEDGE_API_KEY`）             |
+| `google-observability.mcp.json`       | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置（12 项只读工具）；Codex 合并 `codex.toml` 中的 `mcp_servers.google-observability` 段落                                                               |
+| `google-storage.mcp.json`             | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置（默认安全模式）；Codex 合并 `codex.toml` 中的 `mcp_servers.google-storage` 段落                                                                      |
+| `rust-lints.toml`                     | 明确采用 `policy/rust.md` 的项目的 `Cargo.toml`                                                                                                                                                                                       |
+| `chrome-devtools.mcp.json`            | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置（跨平台；若 macOS Antigravity 已启用 `chrome-devtools-plugin` 则不重复合并此 JSON）；Codex 合并 `codex.toml` 中的 `mcp_servers.chrome-devtools` 段落 |
+| `sketch.mcp.json`                     | 仅 macOS：`$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置（配套 `sketch-native`）；Codex 合并 `codex.toml` 中的 `mcp_servers.sketch` 段落                                                            |
+| `wx-docs.mcp.json`                    | `$HOME/.gemini/config/mcp_config.json` 或其他支持 `mcpServers` JSON 的客户端配置；Codex 也可合并 `codex.toml` 中的 `mcp_servers.wx-docs` 段落                                                                                         |
 
 ## 推荐值
 
@@ -26,7 +26,7 @@
 
 `sketch.mcp.json` 指向 Sketch 2026.4+ 本机回环 MCP 端点（`http://localhost:31126/mcp`，不支持 Mac App Store 版），仅在 macOS 安装交付。`codex.toml` 将 `run_code`、`save_comment` 与 `delete_comment` 均注释推荐为 `approval_mode = "prompt"`（按 Codex `AppToolApproval` 语义，`prompt` 为每次询问，`approve` 为直接自动放行；个人在受信任设计稿上可自行放宽 `run_code`，Workspace 评论写操作仍保持询问）。
 
-`chrome-devtools.mcp.json` 以无硬编码路径的 `npx` 启动固定版本 `chrome-devtools-mcp@1.13.0`，默认附带 `--no-usage-statistics` 与 `--no-performance-crux`，避免默认外发遥测或将私密页面 URL 送往 CrUX API；在 macOS GUI 客户端 `PATH` 不含 `nvm` 目录时，请通过稳定用户入口（如 `/opt/homebrew/bin` 或 `~/.local/bin` 软链到兼容 Node）或个人合并 `env.PATH` 提供 `npx`，不在仓库写死版本路径。按方案 2 分工：若在 macOS Antigravity 保留官方 `chrome-devtools-plugin` 以使用其专项排障技能，切勿同时把 `chrome-devtools.mcp.json` 合入全局 `mcp_config.json`，以免重复拉起双份实例；`modern-web-guidance` 与 `web-quality-audit` 继续承担 Web 标准指引与页面质量证据边界。
+`chrome-devtools.mcp.json` 以无硬编码路径的 `npx` 启动固定版本 `chrome-devtools-mcp@1.13.0`，默认附带 `--no-usage-statistics` 与 `--no-performance-crux`，避免默认外发遥测或将私密页面 URL 送往 CrUX API；在 macOS GUI 客户端 `PATH` 不含 `nvm` 目录时，请通过稳定用户入口（如 `/opt/homebrew/bin` 或 `~/.local/bin` 软链到兼容 Node）或个人合并 `env.PATH` 提供 `npx`，不在仓库写死版本路径。按方案 2 分工：若在 macOS Antigravity 保留官方 `chrome-devtools-plugin` 以使用其专项排障技能，切勿同时把 `chrome-devtools.mcp.json` 合入全局 `mcp_config.json`，以免重复拉起双份实例。
 
 `wx-docs.mcp.json` 登记微信开放文档官方只读 Streamable HTTP MCP 服务（`https://developers.weixin.qq.com/doc/mcp`），无鉴权。客户端未挂载该服务时，由使用者自行将片段合并到对应 MCP 配置。
 

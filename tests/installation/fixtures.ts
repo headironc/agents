@@ -36,43 +36,16 @@ import { fixtureEnvironment, repositoryRoot } from "../validation/fixtures.ts";
 // Expected targets follow the installation target table in docs/usage.md, not planner output.
 export const skills = {
   codex: [
-    "alibabacloud-find-skills",
-    "alibabacloud-sms-send-short-message",
-    "gh",
-    "google-cloud",
-    "modern-web-guidance",
     "project-guide",
-    "property-based-testing",
-    "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
-    "web-quality-audit",
-    ...(process.platform === "darwin" ? ["wechatide"] : []),
   ],
   dsh: [
-    "alibabacloud-find-skills",
-    "alibabacloud-sms-send-short-message",
-    "gh",
-    "google-cloud",
-    "modern-web-guidance",
     "project-guide",
-    "property-based-testing",
-    "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
-    "web-quality-audit",
-    ...(process.platform === "darwin" ? ["wechatide"] : []),
   ],
   antigravity: [
-    "alibabacloud-find-skills",
-    "alibabacloud-sms-send-short-message",
-    "gh",
-    "google-cloud",
-    "modern-web-guidance",
     "project-guide",
-    "property-based-testing",
-    "rust-risk-review",
     ...(process.platform === "darwin" ? ["sketch-native"] : []),
-    "web-quality-audit",
-    ...(process.platform === "darwin" ? ["wechatide"] : []),
   ],
 };
 export const policies = [
@@ -111,16 +84,10 @@ export const tools = ["check-ids.mjs", "check-prose.mjs", "task-temp.mjs"];
 // The capability category, written out here the way the installation target table names it.
 export const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
-  [
-    "chrome-devtools.mcp.json",
-    "delivery/capability/chrome-devtools.mcp.json",
-  ],
+  ["chrome-devtools.mcp.json", "delivery/capability/chrome-devtools.mcp.json"],
   ["codex.toml", "delivery/capability/codex.toml"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
-  [
-    "gcloud-mcp-denylist.json",
-    "delivery/capability/gcloud-mcp-denylist.json",
-  ],
+  ["gcloud-mcp-denylist.json", "delivery/capability/gcloud-mcp-denylist.json"],
   ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
   [
     "google-developer-knowledge.mcp.json",
@@ -142,15 +109,9 @@ export const capability: [string, string][] = [
 ];
 export const dshCapability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
-  [
-    "chrome-devtools.mcp.json",
-    "delivery/capability/chrome-devtools.mcp.json",
-  ],
+  ["chrome-devtools.mcp.json", "delivery/capability/chrome-devtools.mcp.json"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
-  [
-    "gcloud-mcp-denylist.json",
-    "delivery/capability/gcloud-mcp-denylist.json",
-  ],
+  ["gcloud-mcp-denylist.json", "delivery/capability/gcloud-mcp-denylist.json"],
   ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
   [
     "google-developer-knowledge.mcp.json",
@@ -171,14 +132,8 @@ export const dshCapability: [string, string][] = [
   ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 export const antigravityCapability: [string, string][] = [
-  [
-    "chrome-devtools.mcp.json",
-    "delivery/capability/chrome-devtools.mcp.json",
-  ],
-  [
-    "gcloud-mcp-denylist.json",
-    "delivery/capability/gcloud-mcp-denylist.json",
-  ],
+  ["chrome-devtools.mcp.json", "delivery/capability/chrome-devtools.mcp.json"],
+  ["gcloud-mcp-denylist.json", "delivery/capability/gcloud-mcp-denylist.json"],
   ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
   [
     "google-developer-knowledge.mcp.json",
@@ -784,10 +739,11 @@ export function legacyPlan(
   for (const file of plan.runtime.files)
     file.path = path.join(plan.run.runtime, path.basename(file.path));
   for (const target of plan.targets)
-    target.source = path.join(
-      privateRun,
-      path.relative(previous, target.source),
-    );
+    if (target.source)
+      target.source = path.join(
+        privateRun,
+        path.relative(previous, target.source),
+      );
   const removedSources = new Set(
     postLegacyCapabilityFiles.map((name) => `delivery/capability/${name}`),
   );

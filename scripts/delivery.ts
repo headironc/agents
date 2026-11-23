@@ -12,7 +12,7 @@ export const memberCategories = [
 
 export const products = ["codex", "dsh", "antigravity"] as const;
 export type Product = (typeof products)[number];
-export const darwinOnlySkills = new Set(["sketch-native", "wechatide"]);
+export const darwinOnlySkills = new Set(["sketch-native"]);
 export const darwinOnlyCapabilities = new Set(["sketch.mcp.json"]);
 const sharedPolicies = [
   "writing",
@@ -35,16 +35,10 @@ const tools: [string, string][] = [
 // configuration that belongs to the person or the project, and nothing here writes those files.
 const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
-  [
-    "chrome-devtools.mcp.json",
-    "delivery/capability/chrome-devtools.mcp.json",
-  ],
+  ["chrome-devtools.mcp.json", "delivery/capability/chrome-devtools.mcp.json"],
   ["codex.toml", "delivery/capability/codex.toml"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
-  [
-    "gcloud-mcp-denylist.json",
-    "delivery/capability/gcloud-mcp-denylist.json",
-  ],
+  ["gcloud-mcp-denylist.json", "delivery/capability/gcloud-mcp-denylist.json"],
   ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
   [
     "google-developer-knowledge.mcp.json",
@@ -61,15 +55,9 @@ const capability: [string, string][] = [
 ];
 const dshCapability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
-  [
-    "chrome-devtools.mcp.json",
-    "delivery/capability/chrome-devtools.mcp.json",
-  ],
+  ["chrome-devtools.mcp.json", "delivery/capability/chrome-devtools.mcp.json"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
-  [
-    "gcloud-mcp-denylist.json",
-    "delivery/capability/gcloud-mcp-denylist.json",
-  ],
+  ["gcloud-mcp-denylist.json", "delivery/capability/gcloud-mcp-denylist.json"],
   ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
   [
     "google-developer-knowledge.mcp.json",
@@ -85,14 +73,8 @@ const dshCapability: [string, string][] = [
   ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 const antigravityCapability: [string, string][] = [
-  [
-    "chrome-devtools.mcp.json",
-    "delivery/capability/chrome-devtools.mcp.json",
-  ],
-  [
-    "gcloud-mcp-denylist.json",
-    "delivery/capability/gcloud-mcp-denylist.json",
-  ],
+  ["chrome-devtools.mcp.json", "delivery/capability/chrome-devtools.mcp.json"],
+  ["gcloud-mcp-denylist.json", "delivery/capability/gcloud-mcp-denylist.json"],
   ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
   [
     "google-developer-knowledge.mcp.json",

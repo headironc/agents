@@ -124,10 +124,10 @@ export const InstallTargetSchema = z.strictObject({
   product: z.enum(recordedProducts),
   key: adoptKey,
   path: absolutePath,
-  source: absolutePath,
+  source: absolutePath.nullable(),
   installed: TargetStateSchema,
   before: TargetStateSchema,
-  action: z.enum(["create", "replace", "unchanged"]),
+  action: z.enum(["create", "replace", "remove", "unchanged"]),
   adopted: z.boolean(),
   backup: absolutePath.nullable(),
 });
@@ -162,6 +162,7 @@ export const InstallPlanSchema = z
       z.literal(7),
       z.literal(8),
       z.literal(9),
+      z.literal(10),
     ]),
     createdAt: z.iso.datetime({ precision: 3 }),
     run: z.strictObject({
@@ -272,7 +273,9 @@ export const InstallPlanSchema = z
       relative: string;
       source: string;
     }[] =
-      plan.version === 9 ? publicMembers([]) : legacyFileMembers(plan.version);
+      plan.version === 9 || plan.version === 10
+        ? publicMembers([])
+        : legacyFileMembers(plan.version);
     plan.targets.forEach((target, index) => {
       const inside = (root: string, file: string) => {
         const relative = path.relative(root, file);
@@ -292,6 +295,28 @@ export const InstallPlanSchema = z
             : "config/";
       const relative =
         target.category === "skill" ? `${prefix}skills/${name}` : name;
+      if (target.action === "remove") {
+        if (
+          plan.version < 10 ||
+          target.order !== index ||
+          !target.key.startsWith(`${target.product}:`) ||
+          target.category !== "skill" ||
+          target.kind !== "directory" ||
+          !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) ||
+          !plan.roots[target.product] ||
+          target.path !==
+            path.join(plan.roots[target.product]!.path, relative) ||
+          !inside(plan.roots[target.product]!.path, target.path) ||
+          target.source !== null ||
+          target.installed.type !== "absent" ||
+          target.before.type !== "directory" ||
+          target.adopted ||
+          target.backup !==
+            path.join(plan.roots.backup.path, run.id, String(index))
+        )
+          issue(`Invalid removal target ${index}`);
+        return;
+      }
       const member =
         target.category === "skill"
           ? /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
@@ -446,6 +471,7 @@ export const InstallReceiptSchema = z
       z.literal(7),
       z.literal(8),
       z.literal(9),
+      z.literal(10),
     ]),
     plan: z.strictObject({ path: absolutePath, sha256: digest }),
     run: z.strictObject({ id: runId, directory: absolutePath }),

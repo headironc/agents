@@ -42,9 +42,17 @@ Read back the cleanup results and check preservation of any installation or reco
 
 ## Task completion and chat archival
 
-Before completion, handoff, or archival, reconcile task-owned scratch under the [temporary-directory lifecycle](#task-temporary-directories), finish outstanding [exercise cleanup](#test-and-exercise-cleanup), and retire unneeded task-owned worktrees. Confirmed merge readback in an authorized PR workflow triggers [worktree and branch cleanup](../skills/gh/references/operations.md#post-merge-cleanup).
+Before completion, handoff, or archival, reconcile task-owned scratch under the [temporary-directory lifecycle](#task-temporary-directories), finish outstanding [exercise cleanup](#test-and-exercise-cleanup), and retire unneeded task-owned worktrees. Confirmed merge readback in an authorized PR workflow triggers [worktree and branch cleanup](#post-merge-cleanup).
 
 Before archiving, confirm no work is running and no participant depends on the chat. Never force-remove primary, pinned, or shared checkouts. At closeout, apply [requirement assessment and ownership](common.md#working-together) to reusable rule gaps at their authoritative source without adding a ledger. Use only the actual client's supported archival operation and effective authorization.
+
+## Post-merge cleanup
+
+Confirmed merge readback in an authorized PR workflow immediately triggers cleanup under the existing [merge authorization](review.md#targets-and-authorized-effects) and [closeout rules](#task-completion-and-chat-archival):
+
+- **Primary checkout on a feature branch (solo default)**: When the clean primary checkout is owned by this task and bound to the merged feature branch, switch back to a verified safe branch (such as `main`) without touching unrelated worktrees.
+- **Dedicated task worktree**: If an isolated worktree was allocated for this PR and its HEAD matches the merged PR head with no remaining consumers or uncommitted changes, preserve any needed ignored evidence outside it and retire the worktree through the client's archival tool or `git worktree remove`. When a coordinator merges a delegated worker slice (or retires a superseded helper worker) with no remaining responsibility or in-flight operation on that worker chat, atomically retire the worker's worktree, archive the completed worker chat through the current client's supported and authorized mechanism, and remove the entry from the active `progress.md` table before advancing the slot. Report an unavailable archival capability without claiming it completed. Never force-remove primary, pinned, or shared checkouts.
+- **Branch removal and readback**: Once no worktree uses the local branch and its tip equals the merged PR head, delete the local branch and delete the remote head ref while it still points to that head. Read back worktree and ref states and report the merged PR and cleanup results separately.
 
 ## Continuity and evidence
 
