@@ -104,7 +104,8 @@ function readRecord(
     value.version !== 6 &&
     value.version !== 7 &&
     value.version !== 8 &&
-    value.version !== 9
+    value.version !== 9 &&
+    value.version !== 10
   ) {
     throw new RecordVersionError(`Unsupported ${code} version: ${physical}`);
   }
@@ -340,14 +341,15 @@ function checkRunContents(
     if (entries && canonicalDigest(entries) !== plan.candidate.sha256)
       problems.push({ code: "candidate-changed", path: plan.run.source });
     for (const target of plan.targets) {
-      if (target.kind !== "directory") continue;
+      const sourcePath = target.source;
+      if (target.kind !== "directory" || sourcePath === null) continue;
       const current = attempt(
         problems,
-        { code: "candidate-changed", path: target.source },
-        () => readTargetState(target.source),
+        { code: "candidate-changed", path: sourcePath },
+        () => readTargetState(sourcePath),
       );
       if (current && !sameState(current, target.installed))
-        problems.push({ code: "candidate-changed", path: target.source });
+        problems.push({ code: "candidate-changed", path: sourcePath });
     }
   }
   for (const file of plan.runtime.files) {
@@ -559,6 +561,12 @@ function placeTarget(target: InstallTarget, runId: string): void {
   const prior = priorFor(target, runId);
   if (lstatIfExists(temporary) || lstatIfExists(prior))
     throw new Error(`Installation temporary already exists: ${target.path}`);
+  if (target.action === "remove") {
+    renameSync(target.path, prior);
+    return;
+  }
+  if (!target.source)
+    throw new Error(`Missing installation source: ${target.path}`);
   if (target.kind === "directory") copyDirectory(target.source, temporary);
   else {
     const bytes = readRegularFile(target.source);

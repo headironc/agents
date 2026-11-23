@@ -16,20 +16,11 @@ test("core inventory has the independently expected delivered subjects and valid
     "id-check",
     "ref-check",
     "task-temp",
-    "aliyun-sms",
-    "gcloud",
-    "modern-web-guidance",
     "upstream-pr",
-    "wechatide",
-    "wechatide-call",
-    "wechatide-install-check",
     "rg",
     "jq",
     "curl",
     "git",
-    "gh",
-    "github-api",
-    "gh-stack",
     "openssh",
     "node",
     "bun",
@@ -69,9 +60,6 @@ test("every delivered consumer has its independently expected binding and declar
       "python",
     ],
     "delivery/skills/project-guide/SKILL.md": ["git", "rg"],
-    "delivery/skills/modern-web-guidance/SKILL.md": ["modern-web-guidance"],
-    "delivery/skills/modern-web-guidance/references/cli.md": ["task-temp"],
-    "delivery/skills/gh/references/auth-readiness.md": ["gh"],
     "scripts/install.ts": ["agents-installer", "git", "node"],
     "scripts/check-prose.mjs": ["prose-check"],
     "scripts/check-ids.mjs": ["id-check"],
@@ -82,72 +70,10 @@ test("every delivered consumer has its independently expected binding and declar
     "scripts/build-install.ts": ["bun"],
     "scripts/bundle-tools.ts": ["bun"],
     "scripts/check-install-build.ts": ["bun", "node"],
-    "delivery/skills/alibabacloud-sms-send-short-message/SKILL.md": [
-      "aliyun-sms",
-    ],
-    "delivery/skills/alibabacloud-sms-send-short-message/scripts/send_sms.sh": [
-      "aliyun-sms",
-      "jq",
-    ],
-    "delivery/skills/alibabacloud-sms-send-short-message/references/sms-qualification.md":
-      ["aliyun-sms"],
-    "delivery/skills/wechatide/scripts/call.sh": [
-      "wechatide-call",
-      "wechatide",
-    ],
-    "delivery/skills/wechatide/references/cli.md": ["wechatide-call"],
-    "delivery/skills/wechatide/references/tasks.md": ["wechatide-call"],
-    "delivery/skills/wechatide/skills/automator/SKILL.md": ["wechatide-call"],
-    "delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md": [
-      "wechatide-call",
-    ],
-    "delivery/skills/wechatide/skills/compiler/SKILL.md": ["wechatide-call"],
-    "delivery/skills/wechatide/skills/debugger/SKILL.md": ["wechatide-call"],
-    "delivery/skills/wechatide/skills/initializer/SKILL.md": ["wechatide-call"],
-    "delivery/skills/wechatide/skills/installer/SKILL.md": [
-      "wechatide-install-check",
-    ],
-    "delivery/skills/wechatide/skills/installer/scripts/check-install.mjs": [
-      "wechatide-install-check",
-    ],
-    "delivery/skills/wechatide/skills/previewer/SKILL.md": ["wechatide-call"],
-    "delivery/skills/wechatide/skills/project-manager/SKILL.md": [
-      "wechatide-call",
-    ],
-    "delivery/skills/wechatide/skills/simulator/SKILL.md": ["wechatide-call"],
     "delivery/policy/tool-contracts.md": ["rg", "jq", "curl", "git", "openssh"],
     "delivery/policy/deepseek-harness.md": ["dsh"],
     "delivery/policy/models.md": ["dsh"],
     "delivery/policy/execution.md": ["task-temp"],
-    "delivery/skills/alibabacloud-find-skills/references/agentexplorer-api.md":
-      ["curl"],
-    "delivery/skills/alibabacloud-find-skills/references/verification-method.md":
-      ["jq"],
-    "delivery/skills/google-cloud/skills/finding-google-skills/SKILL.md": [
-      "curl",
-      "jq",
-      "task-temp",
-    ],
-    "delivery/skills/google-cloud/skills/cloud-sql-postgresql/SKILL.md": [
-      "gcloud",
-    ],
-    "delivery/skills/google-cloud/skills/gcloud/references/cli-usage.md": [
-      "gcloud",
-    ],
-    "delivery/skills/google-cloud/skills/google-cloud-auth/SKILL.md": ["gcloud"],
-    "delivery/skills/google-cloud/skills/google-cloud-onboarding/SKILL.md": [
-      "gcloud",
-    ],
-    "delivery/skills/google-cloud/skills/google-cloud-storage/SKILL.md": [
-      "gcloud",
-    ],
-    "delivery/skills/google-cloud/skills/retrieving-developer-knowledge/SKILL.md":
-      ["curl"],
-    "delivery/skills/google-cloud/skills/retrieving-developer-knowledge/references/api-fallback.md":
-      ["curl"],
-    "delivery/skills/gh/SKILL.md": ["gh", "github-api", "gh-stack"],
-    "delivery/skills/gh/references/extended-commands.md": ["gh"],
-    "delivery/skills/gh/references/operations.md": ["gh", "git"],
     "scripts/check.ts": [
       "node",
       "bun",
@@ -159,7 +85,6 @@ test("every delivered consumer has its independently expected binding and declar
       "typescript",
       "git",
       "jq",
-      "gh",
       "python",
       "skill-validation",
       "codex-cli-loader",
@@ -218,77 +143,6 @@ test("every delivered consumer has its independently expected binding and declar
     "utf8",
   );
   for (const [consumer, kind, subject] of [
-    [
-      "delivery/skills/alibabacloud-sms-send-short-message/scripts/send_sms.sh",
-      "script",
-      "aliyun-sms",
-    ],
-    [
-      "delivery/skills/alibabacloud-sms-send-short-message/scripts/send_sms.sh",
-      "script",
-      "jq",
-    ],
-    [
-      "delivery/skills/alibabacloud-sms-send-short-message/references/sms-qualification.md",
-      "skill",
-      "aliyun-sms",
-    ],
-    [
-      "delivery/skills/wechatide/references/tasks.md",
-      "skill",
-      "wechatide-call",
-    ],
-    [
-      "delivery/skills/wechatide/skills/initializer/SKILL.md",
-      "skill",
-      "wechatide-call",
-    ],
-    [
-      "delivery/skills/wechatide/skills/debugger/SKILL.md",
-      "skill",
-      "wechatide-call",
-    ],
-    [
-      "delivery/skills/wechatide/skills/previewer/SKILL.md",
-      "skill",
-      "wechatide-call",
-    ],
-    [
-      "delivery/skills/wechatide/skills/project-manager/SKILL.md",
-      "skill",
-      "wechatide-call",
-    ],
-    [
-      "delivery/skills/wechatide/skills/simulator/SKILL.md",
-      "skill",
-      "wechatide-call",
-    ],
-    [
-      "delivery/skills/wechatide/skills/automator/SKILL.md",
-      "skill",
-      "wechatide-call",
-    ],
-    [
-      "delivery/skills/wechatide/skills/cloudbase-operator/SKILL.md",
-      "skill",
-      "wechatide-call",
-    ],
-    [
-      "delivery/skills/wechatide/skills/installer/SKILL.md",
-      "skill",
-      "wechatide-install-check",
-    ],
-    ["delivery/skills/gh/references/operations.md", "skill", "git"],
-    [
-      "delivery/skills/google-cloud/skills/gcloud/references/cli-usage.md",
-      "skill",
-      "gcloud",
-    ],
-    [
-      "delivery/skills/google-cloud/skills/finding-google-skills/SKILL.md",
-      "skill",
-      "curl",
-    ],
     ["delivery/skills/project-guide/SKILL.md", "skill", "git"],
     ["delivery/skills/project-guide/SKILL.md", "skill", "rg"],
     ["scripts/check-docs.ts", "script", "node"],
@@ -317,7 +171,7 @@ test("every delivered consumer has its independently expected binding and declar
 test("unregistered skill executors are discovered independently of consumer bindings", (t) => {
   const f = fixtureRepository(t);
   f.put(
-    "delivery/skills/gh/tests/scripts/fake.mjs",
+    "delivery/skills/project-guide/tests/scripts/fake.mjs",
     "// Read [fixture](unused.md). Use tool `git`.\n",
   );
   checkToolContracts(f.directory);
@@ -329,7 +183,7 @@ test("unregistered skill executors are discovered independently of consumer bind
     ["unregistered.sh.in", "#"],
     ["resolve-latest-model-info", "#"],
   ]) {
-    const file = `delivery/skills/gh/scripts/${name}`;
+    const file = `delivery/skills/project-guide/scripts/${name}`;
     f.put(
       file,
       `${marker} Read [Git transport](../../../delivery/policy/tool-contracts.md). Use tool \`git\`.\n`,
@@ -494,10 +348,10 @@ for (const [file, marker, owner, subject] of [
 
 test("a skill Markdown consumer cannot separate either owner route from first use", (t) => {
   const f = fixtureRepository(t);
-  const file = "delivery/skills/gh/references/operations.md";
+  const file = "delivery/skills/project-guide/SKILL.md";
   const original = readFileSync(path.join(f.directory, file), "utf8");
   checkToolContracts(f.directory);
-  for (const subject of ["gh", "git"]) {
+  for (const subject of ["git", "rg"]) {
     const use = `Use tool \`${subject}\``;
     assert.ok(original.includes(use));
     f.put(file, original.replace(use, `\n\n${use}`));

@@ -84,20 +84,27 @@ for (const product of ["codex", "dsh", "antigravity"] as const) {
     try {
       for (const name of unselected) {
         const root = roots[name];
-        mkdirSync(path.join(root, "skills/gh"), {
+        mkdirSync(path.join(root, "skills/project-guide"), {
           recursive: true,
           mode: 0o700,
         });
-        writeFileSync(path.join(root, "skills/gh/personal.txt"), name);
+        writeFileSync(
+          path.join(root, "skills/project-guide/personal.txt"),
+          name,
+        );
         chmodSync(root, 0o500);
         before.set(name, readTargetState(root));
       }
-      mkdirSync(path.join(selected, "skills/gh"), { recursive: true });
+      mkdirSync(path.join(selected, "skills/project-guide"), {
+        recursive: true,
+      });
       writeFileSync(
-        path.join(selected, "skills/gh/original.txt"),
+        path.join(selected, "skills/project-guide/original.txt"),
         "restore this tree\n",
       );
-      const original = readTargetState(path.join(selected, "skills/gh"));
+      const original = readTargetState(
+        path.join(selected, "skills/project-guide"),
+      );
       const environment =
         product === "codex"
           ? { DSH_HOME: "invalid-unselected-dsh" }
@@ -107,7 +114,7 @@ for (const product of ["codex", "dsh", "antigravity"] as const) {
           assert.deepEqual(readTargetState(roots[name]), before.get(name));
       };
       const { review, plan } = f.planned(
-        ["--adopt", `${product}:gh`],
+        ["--adopt", `${product}:project-guide`],
         environment,
       );
       const expected = expectedTargets(
@@ -155,7 +162,7 @@ for (const product of ["codex", "dsh", "antigravity"] as const) {
       );
       assert.equal(outcome(rolledBack).status, "rolled-back");
       assert.deepEqual(
-        readTargetState(path.join(selected, "skills/gh")),
+        readTargetState(path.join(selected, "skills/project-guide")),
         original,
       );
       assert.equal(
@@ -379,7 +386,7 @@ test("V8 remains verifiable and recoverable across a V9 shared-asset installatio
     "--adopt",
     "antigravity:AGENTS.md",
   ]);
-  assert.equal(current.plan.version, 9);
+  assert.equal(current.plan.version, 10);
   const changedEntry = current.plan.targets.find(
     (target) => target.key === "antigravity:AGENTS.md",
   )!;
@@ -457,7 +464,7 @@ test("retired Codex targets remain recoverable from a V7 record", (t) => {
     "--target",
     "codex:capability/codex.toml",
   ]);
-  assert.equal(plan.version, 9);
+  assert.equal(plan.version, 10);
   plan.version = 7;
   plan.targets = members.map(([category, relative], order) => {
     const source = path.join(plan.run.source, "delivery", relative);
@@ -547,8 +554,8 @@ test("five selected files install and roll back from a Codex worktree without ch
     originals.set(target, readTargetState(target));
   }
   const unselected = [
-    path.join(codex, "skills/wechatide"),
-    path.join(f.home, ".dsh/skills/wechatide"),
+    path.join(codex, "skills/third-party"),
+    path.join(f.home, ".dsh/skills/third-party"),
   ];
   for (const directory of unselected) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -573,7 +580,7 @@ test("five selected files install and roll back from a Codex worktree without ch
   for (const target of plan.targets)
     assert.deepEqual(
       readTargetState(target.path),
-      readTargetState(target.source),
+      readTargetState(target.source!),
     );
   assert.equal(
     outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
@@ -602,29 +609,33 @@ test("five selected files install and roll back from a Codex worktree without ch
 test("selected review files and complete skills preserve other targets through refusal, apply and rollback", (t) => {
   const f = installFixture(t);
   const keys = [
-    "codex:gh",
+    "codex:project-guide",
     "codex:policy/review.md",
-    "dsh:gh",
+    "dsh:project-guide",
     "dsh:policy/review.md",
   ];
   const originals = new Map<string, ReturnType<typeof readTargetState>>();
   const untouched: string[] = [];
   for (const product of ["codex", "dsh"]) {
     const root = path.join(f.home, `.${product}`);
-    const gh = path.join(root, "skills/gh");
-    cpSync(path.join(f.checkout, "delivery/skills/gh"), gh, {
-      recursive: true,
-    });
-    writeFileSync(
-      path.join(gh, "references/operations.md"),
-      "previous operations\n",
+    const projectGuide = path.join(root, "skills/project-guide");
+    cpSync(
+      path.join(f.checkout, "delivery/skills/project-guide"),
+      projectGuide,
+      {
+        recursive: true,
+      },
     );
-    originals.set(gh, readTargetState(gh));
+    writeFileSync(
+      path.join(projectGuide, "SKILL.md"),
+      "previous project-guide\n",
+    );
+    originals.set(projectGuide, readTargetState(projectGuide));
     const review = path.join(root, "policy/review.md");
     mkdirSync(path.dirname(review), { recursive: true });
     writeFileSync(review, "previous review\n", { mode: 0o600 });
     originals.set(review, readTargetState(review));
-    const other = path.join(root, "skills/wechatide");
+    const other = path.join(root, "skills/third-party");
     mkdirSync(other, { recursive: true, mode: 0o700 });
     writeFileSync(
       path.join(other, "SKILL.md"),
@@ -643,7 +654,7 @@ test("selected review files and complete skills preserve other targets through r
     plan.targets.filter((target) => target.kind === "directory").length,
     2,
   );
-  const drift = path.join(f.home, ".dsh/skills/gh/new-owner.txt");
+  const drift = path.join(f.home, ".dsh/skills/project-guide/new-owner.txt");
   writeFileSync(drift, "third party\n");
   assert.equal(f.cli(["apply", "--plan", review]).status, 1);
   assert.equal(existsSync(plan.run.receipt), false);
@@ -654,7 +665,7 @@ test("selected review files and complete skills preserve other targets through r
   for (const target of plan.targets)
     assert.deepEqual(
       readTargetState(target.path),
-      readTargetState(target.source),
+      readTargetState(target.source!),
     );
   assert.equal(
     outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
@@ -677,7 +688,7 @@ test("selected review files and complete skills preserve other targets through r
 test("explicit products apply, read back and restore Antigravity without touching App settings or unlisted skills", (t) => {
   const f = installFixture(t);
   const root = path.join(f.home, ".gemini/config");
-  const existing = path.join(root, "skills/gh");
+  const existing = path.join(root, "skills/project-guide");
   mkdirSync(existing, { recursive: true });
   writeFileSync(path.join(existing, "SKILL.md"), "original\n");
   writeFileSync(path.join(root, "skills/unmanaged"), "retained\n");
@@ -703,16 +714,16 @@ test("explicit products apply, read back and restore Antigravity without touchin
     "--product",
     "antigravity",
     "--adopt",
-    "antigravity:gh",
+    "antigravity:project-guide",
     "--adopt",
     "antigravity:AGENTS.md",
   ]);
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
-  assert.equal(readReceipt(plan.run.receipt).version, 9);
+  assert.equal(readReceipt(plan.run.receipt).version, 10);
   for (const target of plan.targets)
     assert.deepEqual(
       readTargetState(target.path),
-      readTargetState(target.source),
+      readTargetState(target.source!),
     );
   assert.equal(
     outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
@@ -848,7 +859,10 @@ test("rollback retains third-party Antigravity changes and restores other select
     "antigravity",
   ]);
   outcome(f.cli(["apply", "--plan", review]));
-  const target = path.join(f.home, ".gemini/config/skills/gh/SKILL.md");
+  const target = path.join(
+    f.home,
+    ".gemini/config/skills/project-guide/SKILL.md",
+  );
   writeFileSync(target, "third-party change\n");
   const result = rollbackInstallation(plan.run.receipt, { HOME: f.home });
   assert.equal(result.status, "rollback-incomplete");
@@ -936,16 +950,17 @@ test("a real runtime installs files and directories directly, then rolls back", 
 
 test("skill directories retain source modes under a restrictive umask", (t) => {
   const f = installFixture(t);
-  const relative = "delivery/skills/alibabacloud-find-skills";
+  const relative = "delivery/skills/project-guide";
   chmodSync(path.join(f.checkout, relative), 0o755);
-  chmodSync(path.join(f.checkout, relative, "references"), 0o755);
+  chmodSync(path.join(f.checkout, relative, "SKILL.md"), 0o644);
+  f.writeReport();
   const { review, plan } = f.planned();
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
-  const installed = path.join(f.home, ".codex/skills/alibabacloud-find-skills");
+  const installed = path.join(f.home, ".codex/skills/project-guide");
   assert.equal(lstatSync(installed).mode & 0o7777, 0o755);
   assert.equal(
-    lstatSync(path.join(installed, "references")).mode & 0o7777,
-    0o755,
+    lstatSync(path.join(installed, "SKILL.md")).mode & 0o7777,
+    0o644,
   );
   assert.equal(
     outcome(f.cli(["verify", "--receipt", plan.run.receipt])).verified,
@@ -982,13 +997,17 @@ test("a target changed after planning stops apply without overwriting it", (t) =
 test("an added member in a frozen skill blocks apply before any target changes", (t) => {
   const f = installFixture(t);
   const { review, plan } = f.planned();
-  const extra = path.join(plan.run.source, "delivery/skills/gh/extra.txt");
+  const extra = path.join(
+    plan.run.source,
+    "delivery/skills/project-guide/extra.txt",
+  );
   writeFileSync(extra, "added after planning\n");
   assert.ok(
     refusal(() => applyInstallPlan(review, { HOME: f.home })).some(
       (problem) =>
         problem.code === "candidate-changed" &&
-        problem.path === path.join(plan.run.source, "delivery/skills/gh"),
+        problem.path ===
+          path.join(plan.run.source, "delivery/skills/project-guide"),
     ),
   );
   assert.equal(existsSync(plan.run.receipt), false);
@@ -1188,13 +1207,13 @@ test("interrupted recovery retains a matching temporary until ownership is resol
     path.dirname(target.path),
     `.agents-install-${plan.run.id}-${step.order}`,
   );
-  writeFileSync(temporary, readFileSync(target.source));
-  chmodSync(temporary, lstatSync(target.source).mode & 0o7777);
+  writeFileSync(temporary, readFileSync(target.source!));
+  chmodSync(temporary, lstatSync(target.source!).mode & 0o7777);
   assert.equal(
     rollbackInstallation(plan.run.receipt, { HOME: f.home }).status,
     "rollback-incomplete",
   );
-  assert.deepEqual(readFileSync(temporary), readFileSync(target.source));
+  assert.deepEqual(readFileSync(temporary), readFileSync(target.source!));
   unlinkSync(temporary);
   assert.equal(
     rollbackInstallation(plan.run.receipt, { HOME: f.home }).status,
@@ -1207,7 +1226,7 @@ test("interrupted replacement restores the prior file or skill while retaining t
     const f = installFixture(t);
     const target = path.join(
       f.home,
-      kind === "file" ? ".codex/AGENTS.md" : ".codex/skills/gh",
+      kind === "file" ? ".codex/AGENTS.md" : ".codex/skills/project-guide",
     );
     mkdirSync(kind === "file" ? path.dirname(target) : target, {
       recursive: true,
@@ -1219,7 +1238,7 @@ test("interrupted replacement restores the prior file or skill while retaining t
     }
     const { review, plan } = f.planned([
       "--adopt",
-      kind === "file" ? "codex:AGENTS.md" : "codex:gh",
+      kind === "file" ? "codex:AGENTS.md" : "codex:project-guide",
     ]);
     assert.equal(
       applyInstallPlan(review, { HOME: f.home }).status,
@@ -1351,9 +1370,9 @@ test("the frozen runtime applies and recovers after its source checkout is remov
   rmSync(plan.run.source, { recursive: true, force: true });
   for (const product of ["codex", "dsh"]) {
     for (const relative of [
-      "skills/gh/SKILL.md",
+      "skills/project-guide/SKILL.md",
       ...(process.platform === "darwin"
-        ? ["skills/wechatide/skills/project-config/SKILL.md"]
+        ? ["skills/sketch-native/SKILL.md"]
         : []),
       "policy/review.md",
     ])
@@ -1432,7 +1451,7 @@ test("an old snapshot link requires adoption and becomes independent of its sour
     true,
   );
   const expected = readFileSync(
-    plan.targets.find((item) => item.path === target)!.source,
+    plan.targets.find((item) => item.path === target)!.source!,
   );
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
   const parkedPrevious = path.join(f.base, "parked-previous");
@@ -1463,13 +1482,13 @@ test("an old snapshot link requires adoption and becomes independent of its sour
 test("an adopted skill directory restores its full tree and keeps unlisted siblings", (t) => {
   const f = installFixture(t);
   const skillsRoot = path.join(f.home, ".codex/skills");
-  const target = path.join(skillsRoot, "gh");
+  const target = path.join(skillsRoot, "project-guide");
   mkdirSync(path.join(target, "references"), { recursive: true });
   writeFileSync(path.join(target, "SKILL.md"), "personal skill\n");
   writeFileSync(path.join(target, "references/note.txt"), "private note\n");
   symlinkSync("references/note.txt", path.join(target, "note-link"));
   writeFileSync(path.join(skillsRoot, "unlisted.txt"), "keep\n");
-  const { review, plan } = f.planned(["--adopt", "codex:gh"]);
+  const { review, plan } = f.planned(["--adopt", "codex:project-guide"]);
   assert.equal(outcome(f.cli(["apply", "--plan", review])).status, "installed");
   assert.equal(lstatSync(target).isDirectory(), true);
   assert.equal(
@@ -1636,7 +1655,7 @@ test("DeepSeek Harness root or target drift refuses apply before changing either
       (problem) => problem.code === "roots-changed" && problem.root === "dsh",
     ),
   );
-  const target = path.join(f.home, ".dsh/skills/gh");
+  const target = path.join(f.home, ".dsh/skills/project-guide");
   mkdirSync(target, { recursive: true });
   writeFileSync(path.join(target, "new-owner.txt"), "retain\n");
   assert.ok(
@@ -1650,4 +1669,223 @@ test("DeepSeek Harness root or target drift refuses apply before changing either
     readFileSync(path.join(target, "new-owner.txt"), "utf8"),
     "retain\n",
   );
+});
+
+test("V10 removes only unmodified prior repo-managed skills while preserving third-party and locally replaced skills", (t) => {
+  const f = installFixture(t);
+  const products = ["codex", "dsh", "antigravity"] as const;
+  const legacySkillBody = (name: string) =>
+    `---\nname: ${name}\ndescription: Legacy managed fixture skill.\n---\n\n# ${name}\n`;
+  // Simulate a prior checkout that also delivered gh, google-cloud, and wechatide.
+  for (const name of ["gh", "google-cloud", "wechatide"]) {
+    f.put(`delivery/skills/${name}/SKILL.md`, legacySkillBody(name), 0o600);
+  }
+  f.put(
+    "config/personal-skills.txt",
+    [
+      "project-guide\tcodex,dsh,antigravity",
+      "sketch-native\tcodex,dsh,antigravity",
+      "gh\tcodex,dsh,antigravity",
+      "google-cloud\tcodex,dsh,antigravity",
+      "wechatide\tcodex,dsh,antigravity",
+      "",
+    ].join("\n"),
+    0o600,
+  );
+  f.writeReport();
+  const initial = f.planned(
+    products.flatMap((product) => ["--product", product]),
+  );
+  // Verify V9 prior receipts also feed V10 ownership replay cleanly.
+  initial.plan.version = 9;
+  const { sha256: _initialDigest, ...initialBody } = initial.plan;
+  initial.plan.sha256 = canonicalDigest(initialBody);
+  const initialBytes = JSON.stringify(initial.plan);
+  chmodSync(initial.plan.run.plan, 0o600);
+  writeFileSync(initial.plan.run.plan, initialBytes);
+  chmodSync(initial.plan.run.plan, 0o400);
+  writeFileSync(initial.review, initialBytes);
+  assert.equal(
+    outcome(f.cli(["apply", "--plan", initial.review])).status,
+    "installed",
+  );
+
+  // Add third-party skills and replace wechatide with an official third-party installation.
+  const skillRoots = {
+    codex: path.join(f.home, ".codex/skills"),
+    dsh: path.join(f.home, ".dsh/skills"),
+    antigravity: path.join(f.home, ".gemini/config/skills"),
+  };
+  const thirdPartySnapshots = new Map<
+    string,
+    ReturnType<typeof readTargetState>
+  >();
+  for (const product of products) {
+    const root = skillRoots[product];
+    for (const thirdParty of ["cloudflare", "cf-cli", "turnstile-spin"]) {
+      const dir = path.join(root, thirdParty);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        path.join(dir, "SKILL.md"),
+        `---\nname: ${thirdParty}\ndescription: Third-party skill.\n---\n`,
+      );
+      thirdPartySnapshots.set(dir, readTargetState(dir));
+    }
+    const officialWechatide = path.join(root, "wechatide");
+    writeFileSync(
+      path.join(officialWechatide, "SKILL.md"),
+      "---\nname: wechatide\ndescription: Official third-party WeChat DevTools skill.\n---\n",
+    );
+    thirdPartySnapshots.set(
+      officialWechatide,
+      readTargetState(officialWechatide),
+    );
+  }
+
+  // Slim the repo back to project-guide (+ sketch-native on darwin) and remove the legacy skills.
+  for (const name of ["gh", "google-cloud", "wechatide"]) {
+    rmSync(path.join(f.checkout, "delivery/skills", name), {
+      recursive: true,
+      force: true,
+    });
+  }
+  f.put(
+    "config/personal-skills.txt",
+    "project-guide\tcodex,dsh,antigravity\nsketch-native\tcodex,dsh,antigravity\n",
+    0o600,
+  );
+  f.writeReport();
+
+  // Partial --target updates must NOT remove stale repo-managed skills.
+  const partial = f.planned([
+    "--product",
+    "antigravity",
+    "--target",
+    "antigravity:AGENTS.md",
+  ]);
+  assert.ok(!partial.plan.targets.some((target) => target.action === "remove"));
+
+  // Full incremental plan removes only unmodified stale repo skills (gh, google-cloud).
+  const next = f.planned(products.flatMap((product) => ["--product", product]));
+  assert.equal(next.plan.version, 10);
+  const removedTargets = next.plan.targets.filter(
+    (target) => target.action === "remove",
+  );
+  assert.deepEqual(
+    removedTargets.map((target) => target.key).sort(),
+    products
+      .flatMap((product) => [`${product}:gh`, `${product}:google-cloud`])
+      .sort(),
+  );
+  const reported = next.plan.reported.map((entry) =>
+    typeof entry === "string" ? entry : entry.path,
+  );
+  for (const [dir] of thirdPartySnapshots) {
+    assert.ok(reported.includes(dir), `Expected ${dir} in reported`);
+  }
+  for (const target of removedTargets) {
+    assert.ok(
+      !reported.includes(target.path),
+      `Planned removal ${target.path} must not be duplicated in reported`,
+    );
+  }
+
+  assert.equal(
+    outcome(f.cli(["apply", "--plan", next.review])).status,
+    "installed",
+  );
+  assert.equal(
+    outcome(f.cli(["verify", "--receipt", next.plan.run.receipt])).verified,
+    true,
+  );
+  for (const target of removedTargets) {
+    assert.equal(existsSync(target.path), false, target.path);
+  }
+  for (const [dir, snapshot] of thirdPartySnapshots) {
+    assert.deepEqual(readTargetState(dir), snapshot);
+  }
+
+  // If a user later installs a third-party skill at a previously removed path, subsequent plans leave it alone.
+  const recreated = path.join(skillRoots.antigravity, "gh");
+  mkdirSync(recreated, { recursive: true });
+  writeFileSync(
+    path.join(recreated, "SKILL.md"),
+    "---\nname: gh\ndescription: User-installed gh skill.\n---\n",
+  );
+  const recreatedState = readTargetState(recreated);
+  const after = f.planned(
+    products.flatMap((product) => ["--product", product]),
+  );
+  assert.ok(!after.plan.targets.some((target) => target.action === "remove"));
+  assert.ok(
+    after.plan.reported.some(
+      (entry) => (typeof entry === "string" ? entry : entry.path) === recreated,
+    ),
+  );
+  assert.deepEqual(readTargetState(recreated), recreatedState);
+
+  // Rolling back the V10 removal preserves any newly created third-party gh while restoring the others.
+  const rb = f.cli(["rollback", "--receipt", next.plan.run.receipt]);
+  assert.equal(rb.status, 1);
+  assert.equal(
+    (JSON.parse(rb.stdout) as { status: string }).status,
+    "rollback-incomplete",
+  );
+  assert.deepEqual(readTargetState(recreated), recreatedState);
+  for (const target of removedTargets) {
+    if (target.path !== recreated)
+      assert.deepEqual(readTargetState(target.path), target.before);
+  }
+  for (const [dir, snapshot] of thirdPartySnapshots) {
+    assert.deepEqual(readTargetState(dir), snapshot);
+  }
+});
+
+test("rolled-back prior runs do not grant ownership to remove skills on subsequent plans", (t) => {
+  const f = installFixture(t, { products: ["codex"] });
+  f.put(
+    "delivery/skills/legacy-one/SKILL.md",
+    "---\nname: legacy-one\ndescription: Legacy fixture.\n---\n",
+    0o600,
+  );
+  f.put(
+    "config/personal-skills.txt",
+    "project-guide\tcodex,dsh,antigravity\nsketch-native\tcodex,dsh,antigravity\nlegacy-one\tcodex,dsh,antigravity\n",
+    0o600,
+  );
+  f.writeReport();
+  const initial = f.planned();
+  assert.equal(
+    outcome(f.cli(["apply", "--plan", initial.review])).status,
+    "installed",
+  );
+  assert.equal(
+    outcome(f.cli(["rollback", "--receipt", initial.plan.run.receipt])).status,
+    "rolled-back",
+  );
+  const manual = path.join(f.home, ".codex/skills/legacy-one");
+  mkdirSync(manual, { recursive: true });
+  writeFileSync(
+    path.join(manual, "SKILL.md"),
+    "---\nname: legacy-one\ndescription: Legacy fixture.\n---\n",
+  );
+  const manualState = readTargetState(manual);
+  rmSync(path.join(f.checkout, "delivery/skills/legacy-one"), {
+    recursive: true,
+    force: true,
+  });
+  f.put(
+    "config/personal-skills.txt",
+    "project-guide\tcodex,dsh,antigravity\nsketch-native\tcodex,dsh,antigravity\n",
+    0o600,
+  );
+  f.writeReport();
+  const next = f.planned();
+  assert.ok(!next.plan.targets.some((target) => target.action === "remove"));
+  assert.ok(
+    next.plan.reported.some(
+      (entry) => (typeof entry === "string" ? entry : entry.path) === manual,
+    ),
+  );
+  assert.deepEqual(readTargetState(manual), manualState);
 });

@@ -108,7 +108,7 @@ test("unsupported source links reject the build before any generated entry chang
 
 test("declared source links resolve from each native entry and retain fragments", () => {
   const source =
-    "# Shared instructions\n[Policy](execution.md#workspaces) [Tool](../tools/check-prose.mjs) [Skill](../skills/gh/SKILL.md) [Here](#local) [Web](https://example.com/)\n";
+    "# Shared instructions\n[Policy](execution.md#workspaces) [Tool](../tools/check-prose.mjs) [Skill](../skills/project-guide/SKILL.md) [Here](#local) [Web](https://example.com/)\n";
   const adapter =
     "[Route](../policy/models.md#goals) [Runtime](../policy/antigravity.md#会话空间与只读边界)\n";
   for (const product of ["codex", "dsh", "antigravity"] as const) {
@@ -117,7 +117,7 @@ test("declared source links resolve from each native entry and retain fragments"
     for (const target of [
       "policy/execution.md#workspaces",
       "tools/check-prose.mjs",
-      "skills/gh/SKILL.md",
+      "skills/project-guide/SKILL.md",
       "policy/models.md#goals",
       "policy/antigravity.md#会话空间与只读边界",
     ])

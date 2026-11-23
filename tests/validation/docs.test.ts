@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   mkdtempSync,
-  cpSync,
-  mkdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -65,24 +63,11 @@ test("empty and linked Markdown selections fail instead of reducing coverage", (
   assert.throws(() => listMarkdown(directory), /symlink/);
 });
 
-test("only verified upstream originals retain upstream style while local guidance stays checked", (t) => {
+test("editableMarkdown returns all Markdown source files in a candidate checkout", (t) => {
   const directory = fixture(t);
-  const vendor = "delivery/skills/modern-web-guidance/upstream";
-  const lock = "config/modern-web-guidance-source.json";
-  mkdirSync(path.join(directory, "config"));
-  cpSync(path.join(root, vendor), path.join(directory, vendor), {
-    recursive: true,
-  });
-  cpSync(path.join(root, lock), path.join(directory, lock));
   writeFileSync(path.join(directory, "local.md"), "# Local guidance\n");
+  writeFileSync(path.join(directory, "notes.txt"), "not markdown\n");
   assert.deepEqual(editableMarkdown(directory), ["local.md"]);
-  writeFileSync(
-    path.join(directory, vendor, "SKILL.upstream.md"),
-    "# Changed original\n",
-  );
-  assert.throws(() => editableMarkdown(directory), /Upstream bytes differ/);
-  rmSync(path.join(directory, lock));
-  assert.throws(() => editableMarkdown(directory));
 });
 
 test("machine-specific paths fail with a location and without disclosing the line", (t) => {

@@ -9,7 +9,6 @@
 // This executor binds fixed argv, required tools, source identity and complete results.
 // - Read [contract](../delivery/policy/tool-contracts.md). Use tool `git`.
 // - Read [contract](../delivery/policy/tool-contracts.md). Use tool `jq`.
-// - Read [invocation contract](../delivery/skills/gh/SKILL.md). Use tool `gh`.
 // - Read [validator](skill-validator.py). Use tool `python`.
 // - Read [adapter](check-skills.ts). Use tool `skill-validation`.
 // - Read [executor](check-docs.ts). Use tool `lychee`.
@@ -528,8 +527,6 @@ async function runChecks(specs: CheckSpec[]): Promise<CheckResult[]> {
     "Repository regression: tests/installation/plan.test.ts",
     "Repository regression: tests/validation/pre-commit.test.ts",
     "Repository regression: tests/validation/tool-contracts.test.ts",
-    "Repository regression: delivery/skills/alibabacloud-sms-send-short-message/tests/send-sms.test.mjs",
-    "Repository regression: delivery/skills/wechatide/tests/call.test.mjs",
     "Repository regression: tests/check-prose.test.mjs",
   ]);
   for (let index = 0; index < specs.length;) {

@@ -21,29 +21,15 @@ const skill = (name: string) =>
 
 test("delivered skills scope macOS-only entries and reach all three products", () => {
   const entries = readSkillEntries(repositoryRoot);
-  assert.equal(entries.length, 28);
+  assert.equal(entries.length, 2);
   assert.equal(
     entries.find((entry) => entry.path === "project-guide")?.target,
     "codex,dsh,antigravity",
   );
-  assert.ok(
-    entries.every((entry) => entry.target === "codex,dsh,antigravity"),
-  );
+  assert.ok(entries.every((entry) => entry.target === "codex,dsh,antigravity"));
   assert.deepEqual(selectSkillEntries(entries, "codex"), entries);
   assert.deepEqual(selectSkillEntries(entries, "antigravity"), entries);
   assert.deepEqual(selectSkillEntries(entries, "dsh"), entries);
-  assert.deepEqual(
-    publicMembers(entries, undefined, "darwin")
-      .filter((member) => member.source === "delivery/skills/wechatide")
-      .map((member) => member.product),
-    ["codex", "dsh", "antigravity"],
-  );
-  assert.deepEqual(
-    publicMembers(entries, undefined, "linux").filter(
-      (member) => member.source === "delivery/skills/wechatide",
-    ),
-    [],
-  );
   assert.deepEqual(
     publicMembers(entries, undefined, "darwin")
       .filter((member) => member.source === "delivery/skills/sketch-native")
@@ -58,7 +44,9 @@ test("delivered skills scope macOS-only entries and reach all three products", (
   );
   assert.deepEqual(
     publicMembers(entries, undefined, "darwin")
-      .filter((member) => member.source === "delivery/capability/sketch.mcp.json")
+      .filter(
+        (member) => member.source === "delivery/capability/sketch.mcp.json",
+      )
       .map((member) => member.product),
     ["codex", "dsh", "antigravity"],
   );
@@ -78,10 +66,10 @@ test("delivered skills scope macOS-only entries and reach all three products", (
     ["codex", "dsh", "antigravity"],
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 28, DeepSeek Harness 28, Antigravity 28",
-    "Codex skill validation: 28 entries",
-    "DeepSeek Harness skill validation: 28 entries",
-    "Antigravity skill validation: 28 entries",
+    "Skill membership: DELIVERED; Codex 2, DeepSeek Harness 2, Antigravity 2",
+    "Codex skill validation: 2 entries",
+    "DeepSeek Harness skill validation: 2 entries",
+    "Antigravity skill validation: 2 entries",
   ]);
 });
 
@@ -135,18 +123,18 @@ test("nested members belong to their top-level skill and do not add install targ
     entries.find((entry) => entry.path === "suite/skills/child")?.topLevel,
     "suite",
   );
-  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 13);
-  assert.equal(selectSkillEntries(entries, "dsh").length, 30);
+  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 4);
+  assert.equal(selectSkillEntries(entries, "dsh").length, 4);
   assert.ok(
     !selectSkillEntries(entries, "dsh").some(
       (entry) => entry.path === "private",
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 31, DeepSeek Harness 30, Antigravity 28",
-    "Codex skill validation: 31 entries",
-    "DeepSeek Harness skill validation: 30 entries",
-    "Antigravity skill validation: 28 entries",
+    "Skill membership: DELIVERED; Codex 5, DeepSeek Harness 4, Antigravity 2",
+    "Codex skill validation: 5 entries",
+    "DeepSeek Harness skill validation: 4 entries",
+    "Antigravity skill validation: 2 entries",
   ]);
 });
 
@@ -211,7 +199,7 @@ test("dsh-only members stay in their product; malformed rows and nested mismatch
 
 test("missing required skills and unlisted or linked assets fail closed", (t) => {
   const f = fixtureRepository(t);
-  f.put("config/personal-skills.txt", "gh\tshared\n");
+  f.put("config/personal-skills.txt", "probe\tshared\n");
   assert.throws(
     () => readSkillEntries(f.directory),
     /Required skill is missing/,

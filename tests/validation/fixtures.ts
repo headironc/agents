@@ -170,21 +170,8 @@ export function fixtureRepository(t: TestContext) {
   const putSkillManifest = (additional: string) =>
     put(
       "config/personal-skills.txt",
-      "sketch-native\tcodex,dsh,antigravity\n" +
-        "gh\tcodex,dsh,antigravity\nalibabacloud-find-skills\tcodex,dsh,antigravity\nalibabacloud-sms-send-short-message\tcodex,dsh,antigravity\nwechatide\tcodex,dsh,antigravity\nwechatide/skills/automator\tcodex,dsh,antigravity\nwechatide/skills/cloudbase-operator\tcodex,dsh,antigravity\nwechatide/skills/compiler\tcodex,dsh,antigravity\nwechatide/skills/debugger\tcodex,dsh,antigravity\nwechatide/skills/initializer\tcodex,dsh,antigravity\nwechatide/skills/installer\tcodex,dsh,antigravity\nwechatide/skills/previewer\tcodex,dsh,antigravity\nwechatide/skills/project-config\tcodex,dsh,antigravity\nwechatide/skills/project-manager\tcodex,dsh,antigravity\nwechatide/skills/simulator\tcodex,dsh,antigravity\n" +
-        "project-guide\tcodex,dsh,antigravity\n" +
-        "modern-web-guidance\tcodex,dsh,antigravity\n" +
-        "property-based-testing\tcodex,dsh,antigravity\n" +
-        "rust-risk-review\tcodex,dsh,antigravity\n" +
-        "web-quality-audit\tcodex,dsh,antigravity\n" +
-        "google-cloud\tcodex,dsh,antigravity\n" +
-        "google-cloud/skills/cloud-sql-postgresql\tcodex,dsh,antigravity\n" +
-        "google-cloud/skills/finding-google-skills\tcodex,dsh,antigravity\n" +
-        "google-cloud/skills/gcloud\tcodex,dsh,antigravity\n" +
-        "google-cloud/skills/google-cloud-auth\tcodex,dsh,antigravity\n" +
-        "google-cloud/skills/google-cloud-onboarding\tcodex,dsh,antigravity\n" +
-        "google-cloud/skills/google-cloud-storage\tcodex,dsh,antigravity\n" +
-        "google-cloud/skills/retrieving-developer-knowledge\tcodex,dsh,antigravity\n" +
+      "project-guide\tcodex,dsh,antigravity\n" +
+        "sketch-native\tcodex,dsh,antigravity\n" +
         additional,
     );
   function commitBaseline() {

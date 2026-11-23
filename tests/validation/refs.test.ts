@@ -160,27 +160,27 @@ test("a link inside inline code is not a link, and a heading's spaces are not co
 
 test("an untracked skill member is checked in its published position", (t) => {
   const f = repository(t);
-  f.put("delivery/skills/gh/SKILL.md", "# gh\n");
+  f.put("delivery/skills/probe/SKILL.md", "# probe\n");
   f.add();
   f.put(
-    "delivery/skills/gh/scratch.md",
+    "delivery/skills/probe/scratch.md",
     "# scratch\n\n[escape](../../../outside.md)\n",
   );
   const members: Member[] = [
     {
       category: "skill",
       product: "codex",
-      relative: "skills/gh",
-      source: "delivery/skills/gh",
+      relative: "skills/probe",
+      source: "delivery/skills/probe",
     },
   ];
   assert.deepEqual(f.laidOut(members).laid, [
-    "skills/gh/SKILL.md",
-    "skills/gh/scratch.md",
+    "skills/probe/SKILL.md",
+    "skills/probe/scratch.md",
   ]);
   const findings = f.check(members);
   assert.equal(findings.length, 1, JSON.stringify(findings));
-  assert.equal(findings[0]?.file, "skills/gh/scratch.md");
+  assert.equal(findings[0]?.file, "skills/probe/scratch.md");
   assert.match(findings[0]!.reason, /published root/);
 });
 
