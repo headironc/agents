@@ -142,9 +142,9 @@ test("every delivered consumer has its independently expected binding and declar
       "gcloud",
     ],
     "delivery/skills/google-cloud/skills/retrieving-developer-knowledge/SKILL.md":
-      ["curl", "gcloud"],
+      ["curl"],
     "delivery/skills/google-cloud/skills/retrieving-developer-knowledge/references/api-fallback.md":
-      ["curl", "gcloud"],
+      ["curl"],
     "delivery/skills/gh/SKILL.md": ["gh", "github-api", "gh-stack"],
     "delivery/skills/gh/references/extended-commands.md": ["gh"],
     "delivery/skills/gh/references/operations.md": ["gh", "git"],

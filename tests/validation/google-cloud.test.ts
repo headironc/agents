@@ -125,3 +125,52 @@ test("Google Cloud proposals reuse deduplication and uncertain-write boundaries"
   const uncertain = updateServer(update, "lost-pr");
   await assert.rejects(publishPrepared(update, uncertain.api), /read back/);
 });
+
+test("delivered google-cloud skills keep OAuth tokens out of tool stdout and API keys out of URLs/argv", () => {
+  const skillRoot = path.join(repositoryRoot, contract.skill);
+  const current = source.verify(repositoryRoot);
+  for (const entry of current.adaptation!.files) {
+    const content = readFileSync(path.join(skillRoot, entry.path), "utf8");
+    const lines = content.split("\n");
+    for (const [index, line] of lines.entries()) {
+      if (/\bprint-(?:access|identity)-token\b/.test(line)) {
+        assert.match(
+          line,
+          /\b(?:Never|forbid)\b/i,
+          `Unexpected runnable token-print instruction at ${entry.path}:${index + 1}`,
+        );
+      }
+      assert.doesNotMatch(
+        line,
+        /developerknowledge\.googleapis\.com[^\s"]*\?key=|--data-urlencode\s+"key=/,
+        `Forbidden URL query API key example at ${entry.path}:${index + 1}`,
+      );
+      if (/-H\s+"X-Goog-Api-Key:/.test(line)) {
+        assert.match(
+          line,
+          /\bNever\b/i,
+          `Forbidden inline argv API key header at ${entry.path}:${index + 1}`,
+        );
+      }
+      assert.doesNotMatch(
+        line,
+        /-H\s+"X-Goog-Api-Key:\s*\$/,
+        `Forbidden inline env API key header at ${entry.path}:${index + 1}`,
+      );
+    }
+  }
+  const dkSkill = readFileSync(
+    path.join(skillRoot, "skills/retrieving-developer-knowledge/SKILL.md"),
+    "utf8",
+  );
+  const dkFallback = readFileSync(
+    path.join(
+      skillRoot,
+      "skills/retrieving-developer-knowledge/references/api-fallback.md",
+    ),
+    "utf8",
+  );
+  assert.match(dkSkill, /Never.*print-access-token/i);
+  assert.match(dkFallback, /Never run.*print-access-token/i);
+  assert.match(dkFallback, /curl -fsS(?: -G)? -K -/);
+});

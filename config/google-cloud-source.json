@@ -167,11 +167,11 @@
       },
       {
         "path": "skills/retrieving-developer-knowledge/SKILL.md",
-        "sha256": "227d0a6858a1459daf8db8e335e48a3f78258ea0f84531f7d0eb6d34841f6e91"
+        "sha256": "2cc46d0b443861f1c14bf71f413405faa10e847838ede68390a326d8aad704ee"
       },
       {
         "path": "skills/retrieving-developer-knowledge/references/api-fallback.md",
-        "sha256": "9f963bba260d9cbb69ab111fdb2b2fc0122eb005cff81f7cc3aefb811f039eed"
+        "sha256": "15f2351068836fd3a8e42cd6362ab9dbaa95767a64e3d70e088c44b58b602ec5"
       },
       {
         "path": "skills/retrieving-developer-knowledge/references/mcp-usage.md",
@@ -226,7 +226,7 @@
       {
         "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/SKILL.md",
         "decision": "adapted",
-        "reason": "Prefer Developer Knowledge MCP with 429 fallback and route curl and gcloud for REST fallback while forbidding ?key= URL query strings in favor of X-Goog-Api-Key headers."
+        "reason": "Prefer Developer Knowledge MCP (including OAuth via google_credentials), forbid agent-run gcloud auth print-access-token commands so OAuth tokens stay out of tool stdout, route curl for DEVELOPERKNOWLEDGE_API_KEY REST fallback via stdin curl -K -, and handle 429 fallback without ?key= query strings."
       },
       {
         "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/mcp-usage.md",
@@ -236,7 +236,7 @@
       {
         "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/api-fallback.md",
         "decision": "adapted",
-        "reason": "Retain v1 REST endpoint forms with OAuth Bearer precedence and rewrite API key examples to pass X-Goog-Api-Key via HTTP headers instead of URL query parameters."
+        "reason": "Keep OAuth inside Developer Knowledge MCP by forbidding agent-run gcloud auth print-access-token commands and rewrite Developer Knowledge v1 REST examples to pass DEVELOPERKNOWLEDGE_API_KEY over stdin via curl -K - instead of ?key= query strings or inline -H argv."
       },
       {
         "source": "plugins/cloud/google-cloud-developer/skills/retrieving-developer-knowledge/references/supported-domains.md",

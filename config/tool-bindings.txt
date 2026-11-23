@@ -133,7 +133,5 @@ binding	delivery/skills/google-cloud/skills/google-cloud-auth/SKILL.md	skill	gcl
 binding	delivery/skills/google-cloud/skills/google-cloud-onboarding/SKILL.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
 binding	delivery/skills/google-cloud/skills/google-cloud-storage/SKILL.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
 binding	delivery/skills/google-cloud/skills/retrieving-developer-knowledge/SKILL.md	skill	curl	delivery/policy/tool-contracts.md	read-before-use	defined
-binding	delivery/skills/google-cloud/skills/retrieving-developer-knowledge/SKILL.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
 binding	delivery/skills/google-cloud/skills/retrieving-developer-knowledge/references/api-fallback.md	skill	curl	delivery/policy/tool-contracts.md	read-before-use	defined
-binding	delivery/skills/google-cloud/skills/retrieving-developer-knowledge/references/api-fallback.md	skill	gcloud	delivery/skills/google-cloud/skills/gcloud/SKILL.md	read-before-use	defined
 binding	scripts/check-docs.ts	script	node	scripts/check.ts	read-before-use	defined
