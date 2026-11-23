@@ -21,6 +21,8 @@ import {
   readTargetState,
 } from "../../scripts/install-state.ts";
 import { canonicalDigest } from "../../scripts/source.ts";
+import { classifyTargets } from "../../scripts/install.ts";
+import type { Gap } from "../../scripts/install-state.ts";
 import {
   expectedTargets,
   installFixture,
@@ -1085,4 +1087,68 @@ test("V10 removal target schema rejects missing backup, non-null source, non-abs
     changed.sha256 = canonicalDigest(body);
     assert.equal(InstallPlanSchema.safeParse(changed).success, false);
   }
+});
+
+test("classifyTargets drops stale skill removal and keeps dense ordering if replaced before freeze", (t) => {
+  const f = installFixture(t, { products: ["codex"] });
+  const stalePath = path.join(f.home, ".codex/skills/gh");
+  mkdirSync(stalePath, { recursive: true });
+  writeFileSync(
+    path.join(stalePath, "SKILL.md"),
+    "---\nname: gh\ndescription: Historical repo-managed skill.\n---\n",
+  );
+  const expectedInstalled = readTargetState(stalePath);
+  assert.equal(expectedInstalled.type, "directory");
+
+  // Simulate a concurrent replacement after the initial receipt ownership check.
+  writeFileSync(
+    path.join(stalePath, "SKILL.md"),
+    "---\nname: gh\ndescription: Replaced by user during planning.\n---\n",
+  );
+  const untouchedPath = path.join(f.home, ".codex/skills/stale-unmodified");
+  mkdirSync(untouchedPath, { recursive: true });
+  writeFileSync(
+    path.join(untouchedPath, "SKILL.md"),
+    "---\nname: stale-unmodified\ndescription: Unmodified stale skill.\n---\n",
+  );
+  const untouchedInstalled = readTargetState(untouchedPath);
+  assert.equal(untouchedInstalled.type, "directory");
+
+  const gaps: Gap[] = [];
+  const missing = new Set<string>();
+  const targets = classifyTargets(
+    [
+      {
+        kind: "directory",
+        category: "skill",
+        product: "codex",
+        key: "codex:gh",
+        path: stalePath,
+        source: null,
+        relativeSource: null,
+        expectedInstalled,
+      },
+      {
+        kind: "directory",
+        category: "skill",
+        product: "codex",
+        key: "codex:stale-unmodified",
+        path: untouchedPath,
+        source: null,
+        relativeSource: null,
+        expectedInstalled: untouchedInstalled,
+      },
+    ],
+    [],
+    path.join(f.home, ".local/state/agents/backup/20260101T000000Z-aaaa1111"),
+    f.checkout,
+    process.getuid!(),
+    gaps,
+    missing,
+  );
+  assert.deepEqual(gaps, []);
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0]!.key, "codex:stale-unmodified");
+  assert.equal(targets[0]!.order, 0);
+  assert.ok(targets[0]!.backup?.endsWith("/0"));
 });

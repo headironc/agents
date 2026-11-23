@@ -303,10 +303,13 @@ function verifyCheckout(
   return { directory, commit };
 }
 
-type TargetDraft = Omit<
+export type TargetDraft = Omit<
   InstallTarget,
   "order" | "before" | "action" | "adopted" | "backup" | "installed"
-> & { relativeSource: string | null; remove?: boolean };
+> & {
+  relativeSource: string | null;
+  expectedInstalled?: Extract<TargetState, { type: "directory" }>;
+};
 
 type ManagedSkill = {
   product: Product;
@@ -468,7 +471,7 @@ function inspectDirectorySources(
       visit(draft.relativeSource);
 }
 
-function classifyTargets(
+export function classifyTargets(
   drafts: TargetDraft[],
   adopt: string[],
   backupRun: string,
@@ -479,12 +482,46 @@ function classifyTargets(
 ): InstallTarget[] {
   const adoptable = new Set<string>();
   const unclassified = new Set<string>();
-  const targets = drafts.flatMap((draft, order): InstallTarget[] => {
+  const targets: InstallTarget[] = [];
+  for (const draft of drafts) {
     inspectParents(draft.path, uid, gaps, missing);
     const before = inspectTarget(draft.path, gaps);
     if (!before) {
       unclassified.add(draft.key);
-      return [];
+      continue;
+    }
+    if (draft.expectedInstalled) {
+      // Re-verify receipt ownership at the exact moment `before` is frozen so a concurrent
+      // local replacement cannot be bound as a removable target and skipped past drift checks.
+      if (
+        before.type !== "directory" ||
+        !sameState(before, draft.expectedInstalled)
+      ) {
+        continue;
+      }
+      const foreign = attempt(
+        gaps,
+        { code: "unreadable-target", path: draft.path },
+        () => foreignOwnedMember(draft.path, uid),
+      );
+      if (foreign)
+        gaps.push({ code: "backup-owner-unrestorable", path: foreign });
+      const order = targets.length;
+      targets.push({
+        order,
+        kind: "directory",
+        category: "skill",
+        product: draft.product,
+        key: draft.key,
+        path: draft.path,
+        source: null,
+        installed: { type: "absent" },
+        before,
+        action: "remove",
+        adopted: false,
+        backup: path.join(backupRun, String(order)),
+      });
+      continue;
     }
     if (before.type === "file" || before.type === "directory") {
       const foreign = attempt(
@@ -495,29 +532,6 @@ function classifyTargets(
       if (foreign)
         gaps.push({ code: "backup-owner-unrestorable", path: foreign });
     }
-    if (draft.remove) {
-      if (before.type !== "directory") {
-        gaps.push({ code: "unreadable-target", path: draft.path });
-        unclassified.add(draft.key);
-        return [];
-      }
-      return [
-        {
-          order,
-          kind: "directory",
-          category: "skill",
-          product: draft.product,
-          key: draft.key,
-          path: draft.path,
-          source: null,
-          installed: { type: "absent" },
-          before,
-          action: "remove",
-          adopted: false,
-          backup: path.join(backupRun, String(order)),
-        },
-      ];
-    }
     const source = path.join(checkout, draft.relativeSource!);
     const installed = attempt(
       gaps,
@@ -526,13 +540,14 @@ function classifyTargets(
     );
     if (!installed) {
       unclassified.add(draft.key);
-      return [];
+      continue;
     }
     if (installed.type !== draft.kind) {
       gaps.push({ code: "source-invalid-target", path: source });
       unclassified.add(draft.key);
-      return [];
+      continue;
     }
+    const order = targets.length;
     const backup =
       before.type === "file" || before.type === "directory"
         ? path.join(backupRun, String(order))
@@ -547,23 +562,21 @@ function classifyTargets(
       if (!adopt.includes(draft.key))
         gaps.push({ code: "adopt-required", path: draft.path, key: draft.key });
     }
-    return [
-      {
-        order,
-        kind: draft.kind,
-        category: draft.category,
-        product: draft.product,
-        key: draft.key,
-        path: draft.path,
-        source: draft.source,
-        installed,
-        before,
-        action,
-        adopted: needsAdoption && adopt.includes(draft.key),
-        backup,
-      },
-    ];
-  });
+    targets.push({
+      order,
+      kind: draft.kind,
+      category: draft.category,
+      product: draft.product,
+      key: draft.key,
+      path: draft.path,
+      source: draft.source,
+      installed,
+      before,
+      action,
+      adopted: needsAdoption && adopt.includes(draft.key),
+      backup,
+    });
+  }
   for (const key of adopt)
     if (!adoptable.has(key) && !unclassified.has(key))
       gaps.push({ code: "adopt-unused", key });
@@ -840,7 +853,7 @@ export function planInstallation(
           path: entry.path,
           source: null,
           relativeSource: null,
-          remove: true,
+          expectedInstalled: entry.installed,
         });
       }
     }
