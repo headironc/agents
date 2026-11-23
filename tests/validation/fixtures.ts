@@ -177,6 +177,14 @@ export function fixtureRepository(t: TestContext) {
         "property-based-testing\tcodex,dsh,antigravity\n" +
         "rust-risk-review\tcodex,dsh,antigravity\n" +
         "web-quality-audit\tcodex,dsh,antigravity\n" +
+        "google-cloud\tcodex,dsh,antigravity\n" +
+        "google-cloud/skills/cloud-sql-postgresql\tcodex,dsh,antigravity\n" +
+        "google-cloud/skills/finding-google-skills\tcodex,dsh,antigravity\n" +
+        "google-cloud/skills/gcloud\tcodex,dsh,antigravity\n" +
+        "google-cloud/skills/google-cloud-auth\tcodex,dsh,antigravity\n" +
+        "google-cloud/skills/google-cloud-onboarding\tcodex,dsh,antigravity\n" +
+        "google-cloud/skills/google-cloud-storage\tcodex,dsh,antigravity\n" +
+        "google-cloud/skills/retrieving-developer-knowledge\tcodex,dsh,antigravity\n" +
         additional,
     );
   function commitBaseline() {

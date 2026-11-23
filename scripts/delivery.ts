@@ -13,6 +13,7 @@ export const memberCategories = [
 export const products = ["codex", "dsh", "antigravity"] as const;
 export type Product = (typeof products)[number];
 export const darwinOnlySkills = new Set(["sketch-native", "wechatide"]);
+export const darwinOnlyCapabilities = new Set(["sketch.mcp.json"]);
 const sharedPolicies = [
   "writing",
   "tool-contracts",
@@ -34,15 +35,76 @@ const tools: [string, string][] = [
 // configuration that belongs to the person or the project, and nothing here writes those files.
 const capability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
+  [
+    "chrome-devtools.mcp.json",
+    "delivery/capability/chrome-devtools.mcp.json",
+  ],
   ["codex.toml", "delivery/capability/codex.toml"],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
+  [
+    "gcloud-mcp-denylist.json",
+    "delivery/capability/gcloud-mcp-denylist.json",
+  ],
+  ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
+  [
+    "google-developer-knowledge.mcp.json",
+    "delivery/capability/google-developer-knowledge.mcp.json",
+  ],
+  [
+    "google-observability.mcp.json",
+    "delivery/capability/google-observability.mcp.json",
+  ],
+  ["google-storage.mcp.json", "delivery/capability/google-storage.mcp.json"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ["sketch.mcp.json", "delivery/capability/sketch.mcp.json"],
   ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 const dshCapability: [string, string][] = [
   ["README.md", "delivery/capability/README.md"],
+  [
+    "chrome-devtools.mcp.json",
+    "delivery/capability/chrome-devtools.mcp.json",
+  ],
   ["dsh-headless.patch.yml", "delivery/capability/dsh-headless.patch.yml"],
+  [
+    "gcloud-mcp-denylist.json",
+    "delivery/capability/gcloud-mcp-denylist.json",
+  ],
+  ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
+  [
+    "google-developer-knowledge.mcp.json",
+    "delivery/capability/google-developer-knowledge.mcp.json",
+  ],
+  [
+    "google-observability.mcp.json",
+    "delivery/capability/google-observability.mcp.json",
+  ],
+  ["google-storage.mcp.json", "delivery/capability/google-storage.mcp.json"],
   ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ["sketch.mcp.json", "delivery/capability/sketch.mcp.json"],
+  ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
+];
+const antigravityCapability: [string, string][] = [
+  [
+    "chrome-devtools.mcp.json",
+    "delivery/capability/chrome-devtools.mcp.json",
+  ],
+  [
+    "gcloud-mcp-denylist.json",
+    "delivery/capability/gcloud-mcp-denylist.json",
+  ],
+  ["gcloud.mcp.json", "delivery/capability/gcloud.mcp.json"],
+  [
+    "google-developer-knowledge.mcp.json",
+    "delivery/capability/google-developer-knowledge.mcp.json",
+  ],
+  [
+    "google-observability.mcp.json",
+    "delivery/capability/google-observability.mcp.json",
+  ],
+  ["google-storage.mcp.json", "delivery/capability/google-storage.mcp.json"],
+  ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
+  ["sketch.mcp.json", "delivery/capability/sketch.mcp.json"],
   ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
 ];
 
@@ -113,30 +175,34 @@ export function publicMembers(
         source,
       });
   }
+  const includeCapability = (name: string) =>
+    platform === undefined ||
+    platform === "darwin" ||
+    !darwinOnlyCapabilities.has(name);
   for (const [name, source] of capability)
-    members.push({
-      category: "capability",
-      product: "codex",
-      relative: `capability/${name}`,
-      source,
-    });
+    if (includeCapability(name))
+      members.push({
+        category: "capability",
+        product: "codex",
+        relative: `capability/${name}`,
+        source,
+      });
   for (const [name, source] of dshCapability)
-    members.push({
-      category: "capability",
-      product: "dsh",
-      relative: `capability/${name}`,
-      source,
-    });
-  for (const [name, source] of [
-    ["rust-lints.toml", "delivery/capability/rust-lints.toml"],
-    ["wx-docs.mcp.json", "delivery/capability/wx-docs.mcp.json"],
-  ] as const)
-    members.push({
-      category: "capability",
-      product: "antigravity",
-      relative: `capability/${name}`,
-      source,
-    });
+    if (includeCapability(name))
+      members.push({
+        category: "capability",
+        product: "dsh",
+        relative: `capability/${name}`,
+        source,
+      });
+  for (const [name, source] of antigravityCapability)
+    if (includeCapability(name))
+      members.push({
+        category: "capability",
+        product: "antigravity",
+        relative: `capability/${name}`,
+        source,
+      });
   for (const product of products)
     members.push({
       category: "instructions",

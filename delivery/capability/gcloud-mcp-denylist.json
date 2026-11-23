@@ -1,0 +1,25 @@
+{
+  "deny": [
+    "auth",
+    "billing",
+    "components install",
+    "components remove",
+    "components update",
+    "compute instances delete",
+    "container clusters delete",
+    "iam",
+    "infra-manager deployments apply",
+    "infra-manager deployments delete",
+    "kms",
+    "organizations",
+    "projects delete",
+    "run services delete",
+    "secrets delete",
+    "secrets versions destroy",
+    "services disable",
+    "services enable",
+    "sql instances delete",
+    "storage buckets delete",
+    "storage rm"
+  ]
+}

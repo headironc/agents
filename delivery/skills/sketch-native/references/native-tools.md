@@ -14,6 +14,8 @@ The native MCP tools in Sketch 2026.4 fall into three boundary groups:
 - Script execution: `run_code`.
 - External Workspace collaboration writes: `save_comment` (starts, replies to, edits, resolves, or reopens annotations, visible to collaborators and triggering notifications) and `delete_comment` (permanently deletes a reply or an entire annotation thread including other people's replies, with no Undo). Require explicit authorization before calling `save_comment` or `delete_comment`; never call these two write tools during read-only review or ordinary design edits.
 
+If the `sketch` MCP server is absent in the current session, do not fall back to offline `.sketch` archive access or write client MCP configs yourself; direct the user to enable Sketch 2026.4+'s built-in MCP Server (`http://localhost:31126/mcp`, non-App-Store build) and merge [sketch.mcp.json](../../../capability/sketch.mcp.json) or uncomment `[mcp_servers.sketch]` in `capability/codex.toml`.
+
 ### Resolve the Document and Inspect Before Editing
 
 - On first contact with a Sketch session, probe and cache `sketch.version` via `run_code`.

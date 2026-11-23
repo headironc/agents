@@ -17,6 +17,7 @@ test("core inventory has the independently expected delivered subjects and valid
     "ref-check",
     "task-temp",
     "aliyun-sms",
+    "gcloud",
     "modern-web-guidance",
     "upstream-pr",
     "wechatide",
@@ -122,6 +123,28 @@ test("every delivered consumer has its independently expected binding and declar
       ["curl"],
     "delivery/skills/alibabacloud-find-skills/references/verification-method.md":
       ["jq"],
+    "delivery/skills/google-cloud/skills/finding-google-skills/SKILL.md": [
+      "curl",
+      "jq",
+      "task-temp",
+    ],
+    "delivery/skills/google-cloud/skills/cloud-sql-postgresql/SKILL.md": [
+      "gcloud",
+    ],
+    "delivery/skills/google-cloud/skills/gcloud/references/cli-usage.md": [
+      "gcloud",
+    ],
+    "delivery/skills/google-cloud/skills/google-cloud-auth/SKILL.md": ["gcloud"],
+    "delivery/skills/google-cloud/skills/google-cloud-onboarding/SKILL.md": [
+      "gcloud",
+    ],
+    "delivery/skills/google-cloud/skills/google-cloud-storage/SKILL.md": [
+      "gcloud",
+    ],
+    "delivery/skills/google-cloud/skills/retrieving-developer-knowledge/SKILL.md":
+      ["curl", "gcloud"],
+    "delivery/skills/google-cloud/skills/retrieving-developer-knowledge/references/api-fallback.md":
+      ["curl", "gcloud"],
     "delivery/skills/gh/SKILL.md": ["gh", "github-api", "gh-stack"],
     "delivery/skills/gh/references/extended-commands.md": ["gh"],
     "delivery/skills/gh/references/operations.md": ["gh", "git"],
@@ -256,6 +279,16 @@ test("every delivered consumer has its independently expected binding and declar
       "wechatide-install-check",
     ],
     ["delivery/skills/gh/references/operations.md", "skill", "git"],
+    [
+      "delivery/skills/google-cloud/skills/gcloud/references/cli-usage.md",
+      "skill",
+      "gcloud",
+    ],
+    [
+      "delivery/skills/google-cloud/skills/finding-google-skills/SKILL.md",
+      "skill",
+      "curl",
+    ],
     ["delivery/skills/project-guide/SKILL.md", "skill", "git"],
     ["delivery/skills/project-guide/SKILL.md", "skill", "rg"],
     ["scripts/check-docs.ts", "script", "node"],

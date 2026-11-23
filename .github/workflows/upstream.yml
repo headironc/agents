@@ -28,6 +28,7 @@ jobs:
             microsoft-rust-guidelines,
             rust-risk-review,
             web-quality-audit,
+            google-cloud,
           ]
     permissions:
       contents: write

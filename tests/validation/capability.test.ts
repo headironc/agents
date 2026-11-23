@@ -108,19 +108,134 @@ test("delivery/capability/codex.toml's commented recommendations parse once unco
   assert.equal(fullParsed.status, 0, fullParsed.stderr.trim());
   assert.deepEqual(JSON.parse(fullParsed.stdout.trim()), {
     "wx-docs": { url: "https://developers.weixin.qq.com/doc/mcp" },
+    sketch: {
+      url: "http://localhost:31126/mcp",
+      tools: {
+        run_code: { approval_mode: "prompt" },
+        save_comment: { approval_mode: "prompt" },
+        delete_comment: { approval_mode: "prompt" },
+      },
+    },
+    "chrome-devtools": {
+      command: "npx",
+      args: [
+        "-y",
+        "chrome-devtools-mcp@1.13.0",
+        "--no-usage-statistics",
+        "--no-performance-crux",
+      ],
+    },
+    gcloud: {
+      command: "npx",
+      args: ["-y", "@google-cloud/gcloud-mcp@0.5.3"],
+      tools: {
+        run_gcloud_command: { approval_mode: "prompt" },
+      },
+    },
+    "google-observability": {
+      command: "npx",
+      args: ["-y", "@google-cloud/observability-mcp@0.2.3"],
+    },
+    "google-storage": {
+      command: "npx",
+      args: ["-y", "@google-cloud/storage-mcp@0.6.0"],
+      tools: {
+        create_bucket: { approval_mode: "prompt" },
+        write_object_new: { approval_mode: "prompt" },
+        upload_object_new: { approval_mode: "prompt" },
+        copy_object_new: { approval_mode: "prompt" },
+      },
+    },
+    "developer-knowledge": {
+      url: "https://developerknowledge.googleapis.com/mcp",
+      env_http_headers: {
+        "X-Goog-Api-Key": "DEVELOPERKNOWLEDGE_API_KEY",
+      },
+    },
   });
 });
 
-test("delivery/capability/wx-docs.mcp.json parses as a valid MCP server fragment", () => {
-  const body = readFileSync(
-    path.join(root, "delivery/capability/wx-docs.mcp.json"),
-    "utf8",
-  );
-  assert.deepEqual(JSON.parse(body), {
+test("delivery/capability MCP JSON fragments parse with expected zero-secret definitions", () => {
+  const readJson = (name: string) =>
+    JSON.parse(
+      readFileSync(path.join(root, "delivery/capability", name), "utf8"),
+    );
+  assert.deepEqual(readJson("wx-docs.mcp.json"), {
     mcpServers: {
       "wx-docs": { url: "https://developers.weixin.qq.com/doc/mcp" },
     },
   });
+  assert.deepEqual(readJson("sketch.mcp.json"), {
+    mcpServers: {
+      sketch: { url: "http://localhost:31126/mcp" },
+    },
+  });
+  assert.deepEqual(readJson("chrome-devtools.mcp.json"), {
+    mcpServers: {
+      "chrome-devtools": {
+        command: "npx",
+        args: [
+          "-y",
+          "chrome-devtools-mcp@1.13.0",
+          "--no-usage-statistics",
+          "--no-performance-crux",
+        ],
+      },
+    },
+  });
+  assert.deepEqual(readJson("gcloud.mcp.json"), {
+    mcpServers: {
+      gcloud: {
+        command: "npx",
+        args: ["-y", "@google-cloud/gcloud-mcp@0.5.3"],
+      },
+    },
+  });
+  assert.deepEqual(readJson("google-observability.mcp.json"), {
+    mcpServers: {
+      "google-observability": {
+        command: "npx",
+        args: ["-y", "@google-cloud/observability-mcp@0.2.3"],
+      },
+    },
+  });
+  const storageMcp = readJson("google-storage.mcp.json");
+  assert.deepEqual(storageMcp, {
+    mcpServers: {
+      "google-storage": {
+        command: "npx",
+        args: ["-y", "@google-cloud/storage-mcp@0.6.0"],
+      },
+    },
+  });
+  assert.ok(
+    !storageMcp.mcpServers["google-storage"].args.includes(
+      "--enable-destructive-tools",
+    ),
+  );
+  assert.deepEqual(readJson("google-developer-knowledge.mcp.json"), {
+    mcpServers: {
+      "developer-knowledge": {
+        url: "https://developerknowledge.googleapis.com/mcp",
+        authProviderType: "google_credentials",
+      },
+    },
+  });
+  const denylist = readJson("gcloud-mcp-denylist.json") as {
+    allow?: unknown;
+    deny: string[];
+  };
+  assert.equal(denylist.allow, undefined);
+  assert.ok(Array.isArray(denylist.deny) && denylist.deny.length > 0);
+  assert.deepEqual(
+    [...new Set(denylist.deny)].sort(),
+    denylist.deny,
+    "gcloud-mcp-denylist.json entries must be unique and sorted",
+  );
+  assert.ok(
+    denylist.deny.every((item) => !item.includes("*")),
+    "gcloud-mcp prefix matcher must not contain glob wildcards",
+  );
   assert.throws(() => JSON.parse("{invalid"), SyntaxError);
 });
 

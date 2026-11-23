@@ -208,9 +208,9 @@ bash scripts/check.sh all --report .cache/reports/check.json
 
 ## 官方内容自动更新
 
-本节描述已实现的六个来源。职责划分见[上游内容维护架构](#上游内容维护架构)。
+本节描述已实现的七个来源。职责划分见[上游内容维护架构](#上游内容维护架构)。
 
-[upstream 工作流](../.github/workflows/upstream.yml)每周一 UTC 02:17（北京时间 10:17）检查已采用来源，也支持从 `main` 手动运行。矩阵独立处理六个来源，关闭 fail-fast。一个来源失败不取消其他来源，运行仍保留失败结果。[调度入口](../scripts/upstream-pr.ts)仅接受固定来源名；准备步骤不传入发布令牌。
+[upstream 工作流](../.github/workflows/upstream.yml)每周一 UTC 02:17（北京时间 10:17）检查已采用来源，也支持从 `main` 手动运行。矩阵独立处理七个来源，关闭 fail-fast。一个来源失败不取消其他来源，运行仍保留失败结果。[调度入口](../scripts/upstream-pr.ts)仅接受固定来源名；准备步骤不传入发布令牌。
 
 Modern Web 的 npm 准备器完整更新 CLI、索引、指南和许可证。两个 Rust 参考、属性测试、Rust 专项审查与 Web 质量审查复用 [Git 获取器](../scripts/upstream-git.ts)，固定仓库身份、前向提交和已选文件，核对 Git blob 与文件摘要。下载内容不执行。[Modern Web 适配器](../scripts/upstream-modern-web.ts)、[Rust 参考适配器](../scripts/upstream-reference.ts)与[技能适配器](../scripts/upstream-adapted.ts)分别产生受限变更，再交给[公共发布器](../scripts/upstream-publish.ts)。Microsoft 的固定来源与章节由[来源模块](../scripts/microsoft-rust-source.ts)拥有。
 
@@ -242,11 +242,13 @@ Modern Web 的 npm 准备器完整更新 CLI、索引、指南和许可证。两
 
 ### 适配技能更新
 
-[共用来源校验器](../scripts/adapted-source.ts)与[更新适配器](../scripts/upstream-adapted.ts)服务属性测试、Rust 专项审查与 Web 质量审查三个实际消费者。各来源模块独立固定仓库、原件、许可、本地完整文件集和分支前缀；同一上游仓库的计划也不能互换。下述适配步骤同时适用三个技能，明确采用范围后才能扩大输入清单。
+[共用来源校验器](../scripts/adapted-source.ts)与[更新适配器](../scripts/upstream-adapted.ts)服务属性测试、Rust 专项审查、Web 质量审查与 Google Cloud 四个实际消费者。各来源模块独立固定仓库、原件、许可、本地完整文件集和分支前缀；同一上游仓库的计划也不能互换。下述适配步骤同时适用四个技能，明确采用范围后才能扩大输入清单。
 
 [Rust 专项审查来源锁](../config/rust-risk-source.json)采用七份独立检测提示及许可，交付短入口、三份引用和完整许可。未采用上游入口、命名代理、脚本或其他检测器；这不是完整 rust-review 包。逐项核对取消语义、线程与 lifetime 约束、panic/ABI、外部资源上限及路径竞态的前提，保留反例与证据缺口。新提示不会因上游新增而自动加入技能。校验命令为 `.cache/agents-tools/bin/node scripts/rust-risk-source.ts --check`。
 
 [Web 质量审查来源锁](../config/web-audit-source.json)绑定 Addy Osmani 的审查入口、测量引用及完整 MIT 许可。该社区来源不是 Google 官方产品。原件中的五个类别技能与分析脚本不在采用范围，本地入口改用实际可用的浏览器能力及已有 Modern Web Guidance；三份原件完整保留用于比较。更新时核对真实用户数据、实验室测量、渲染观察与源码假设的区别，以及私有页面、状态保持、只读边界和不适用的部署规则。校验命令为 `.cache/agents-tools/bin/node scripts/web-audit-source.ts --check`。维护记录须绑定全部四份交付文件；来源内容更新不等于测量方法已经适配。
+
+[Google Cloud 来源锁](../config/google-cloud-source.json)绑定 `google/skills` 的 Apache-2.0 许可、发现路由规则与选定子技能原件；重型外部 `data-cloud` 子模块不纳入单仓锁定，留待 `finding-google-skills` 按需发现。本地交付通过顶层路由器保持常驻 `AGENTS.md` 零膨胀，保留叶子级 `gcloud help`、`--dry-run`、高危黑名单确认门禁、不可信外部目录边界及 Header 鉴权 REST 回退，并默认移除遥测归因注入。校验命令为 `.cache/agents-tools/bin/node scripts/google-cloud-source.ts --check`。
 
 ### 属性测试技能适配
 

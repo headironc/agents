@@ -10,6 +10,7 @@ import { preparePbt, pbtUpdate } from "./upstream-property-testing.ts";
 import { microsoftRustUpdate } from "./microsoft-rust-source.ts";
 import { rustRiskUpdate } from "./rust-risk-source.ts";
 import { webAuditUpdate } from "./web-audit-source.ts";
+import { googleCloudUpdate } from "./google-cloud-source.ts";
 import {
   publishPrepared,
   repository,
@@ -32,6 +33,7 @@ export const sources = [
   "microsoft-rust-guidelines",
   "rust-risk-review",
   "web-quality-audit",
+  "google-cloud",
 ] as const;
 export function preparedUpdate(root: string, source: string, input: unknown) {
   if (source === "modern-web-guidance") return modernWebUpdate(root, input);
@@ -41,6 +43,7 @@ export function preparedUpdate(root: string, source: string, input: unknown) {
     return microsoftRustUpdate.update(root, input);
   if (source === "rust-risk-review") return rustRiskUpdate.update(root, input);
   if (source === "web-quality-audit") return webAuditUpdate.update(root, input);
+  if (source === "google-cloud") return googleCloudUpdate.update(root, input);
   throw new Error("Unknown upstream source");
 }
 
@@ -81,7 +84,9 @@ async function main(): Promise<void> {
               ? await microsoftRustUpdate.prepare(root, base)
               : source === "rust-risk-review"
                 ? await rustRiskUpdate.prepare(root, base)
-                : await webAuditUpdate.prepare(root, base);
+                : source === "web-quality-audit"
+                  ? await webAuditUpdate.prepare(root, base)
+                  : await googleCloudUpdate.prepare(root, base);
     preparedUpdate(root, source!, plan);
     writeFileSync(file, JSON.stringify(plan), { mode: 0o600, flag: "wx" });
     console.log(`Prepared verified source: ${source}`);

@@ -21,7 +21,7 @@ const skill = (name: string) =>
 
 test("delivered skills scope macOS-only entries and reach all three products", () => {
   const entries = readSkillEntries(repositoryRoot);
-  assert.equal(entries.length, 20);
+  assert.equal(entries.length, 28);
   assert.equal(
     entries.find((entry) => entry.path === "project-guide")?.target,
     "codex,dsh,antigravity",
@@ -56,11 +56,32 @@ test("delivered skills scope macOS-only entries and reach all three products", (
     ),
     [],
   );
+  assert.deepEqual(
+    publicMembers(entries, undefined, "darwin")
+      .filter((member) => member.source === "delivery/capability/sketch.mcp.json")
+      .map((member) => member.product),
+    ["codex", "dsh", "antigravity"],
+  );
+  assert.deepEqual(
+    publicMembers(entries, undefined, "linux").filter(
+      (member) => member.source === "delivery/capability/sketch.mcp.json",
+    ),
+    [],
+  );
+  assert.deepEqual(
+    publicMembers(entries, undefined, "linux")
+      .filter(
+        (member) =>
+          member.source === "delivery/capability/chrome-devtools.mcp.json",
+      )
+      .map((member) => member.product),
+    ["codex", "dsh", "antigravity"],
+  );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 20, DeepSeek Harness 20, Antigravity 20",
-    "Codex skill validation: 20 entries",
-    "DeepSeek Harness skill validation: 20 entries",
-    "Antigravity skill validation: 20 entries",
+    "Skill membership: DELIVERED; Codex 28, DeepSeek Harness 28, Antigravity 28",
+    "Codex skill validation: 28 entries",
+    "DeepSeek Harness skill validation: 28 entries",
+    "Antigravity skill validation: 28 entries",
   ]);
 });
 
@@ -114,18 +135,18 @@ test("nested members belong to their top-level skill and do not add install targ
     entries.find((entry) => entry.path === "suite/skills/child")?.topLevel,
     "suite",
   );
-  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 12);
-  assert.equal(selectSkillEntries(entries, "dsh").length, 22);
+  assert.equal(new Set(entries.map((entry) => entry.topLevel)).size, 13);
+  assert.equal(selectSkillEntries(entries, "dsh").length, 30);
   assert.ok(
     !selectSkillEntries(entries, "dsh").some(
       (entry) => entry.path === "private",
     ),
   );
   assert.deepEqual(skillCheckNames(entries), [
-    "Skill membership: DELIVERED; Codex 23, DeepSeek Harness 22, Antigravity 20",
-    "Codex skill validation: 23 entries",
-    "DeepSeek Harness skill validation: 22 entries",
-    "Antigravity skill validation: 20 entries",
+    "Skill membership: DELIVERED; Codex 31, DeepSeek Harness 30, Antigravity 28",
+    "Codex skill validation: 31 entries",
+    "DeepSeek Harness skill validation: 30 entries",
+    "Antigravity skill validation: 28 entries",
   ]);
 });
 

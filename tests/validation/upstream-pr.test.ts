@@ -221,6 +221,7 @@ test("the scheduled workflow runs only on main with bounded publishing permissio
         "microsoft-rust-guidelines",
         "rust-risk-review",
         "web-quality-audit",
+        "google-cloud",
       ],
     },
   });

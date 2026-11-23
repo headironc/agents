@@ -8,6 +8,32 @@ import { readSourceEntries } from "./source.ts";
 const requiredSkills = [
   { path: "sketch-native", target: "codex,dsh,antigravity" },
   { path: "gh", target: "codex,dsh,antigravity" },
+  { path: "google-cloud", target: "codex,dsh,antigravity" },
+  {
+    path: "google-cloud/skills/cloud-sql-postgresql",
+    target: "codex,dsh,antigravity",
+  },
+  {
+    path: "google-cloud/skills/finding-google-skills",
+    target: "codex,dsh,antigravity",
+  },
+  { path: "google-cloud/skills/gcloud", target: "codex,dsh,antigravity" },
+  {
+    path: "google-cloud/skills/google-cloud-auth",
+    target: "codex,dsh,antigravity",
+  },
+  {
+    path: "google-cloud/skills/google-cloud-onboarding",
+    target: "codex,dsh,antigravity",
+  },
+  {
+    path: "google-cloud/skills/google-cloud-storage",
+    target: "codex,dsh,antigravity",
+  },
+  {
+    path: "google-cloud/skills/retrieving-developer-knowledge",
+    target: "codex,dsh,antigravity",
+  },
   { path: "project-guide", target: "codex,dsh,antigravity" },
   { path: "modern-web-guidance", target: "codex,dsh,antigravity" },
   { path: "property-based-testing", target: "codex,dsh,antigravity" },

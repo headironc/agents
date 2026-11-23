@@ -251,23 +251,23 @@ bash scripts/install.sh status
 | 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
 | Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/*.md` | `delivery/policy/` 中适用于 Codex 的政策 |
 | 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
-| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 对应五个文件 |
+| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 中适用该平台的片段（非 macOS 自动跳过 `sketch.mcp.json`） |
 | Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
 | Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
 | DeepSeek Harness 按需参考 | `${DSH_HOME:-$HOME/.dsh}/policy/*.md` | `delivery/policy/` 中适用于 dsh 的政策 |
 | DeepSeek Harness 工具 | `${DSH_HOME:-$HOME/.dsh}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
-| DeepSeek Harness 推荐配置 | `${DSH_HOME:-$HOME/.dsh}/capability/{README.md,dsh-headless.patch.yml,rust-lints.toml,wx-docs.mcp.json}` | 同一份 `delivery/capability/` 适用配置片段 |
+| DeepSeek Harness 推荐配置 | `${DSH_HOME:-$HOME/.dsh}/capability/*` | 同一份 `delivery/capability/` 适用配置片段（不含 `codex.toml`，非 macOS 跳过 `sketch.mcp.json`） |
 | DeepSeek Harness 指令 | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` | `delivery/products/dsh/AGENTS.md` 生成物 |
 | DeepSeek Harness 技能 | `${DSH_HOME:-$HOME/.dsh}/skills/<name>` | 清单选择 `dsh` 的完整顶层目录 |
 | Antigravity 全局指令 | `$HOME/.gemini/AGENTS.md` | `delivery/products/antigravity/AGENTS.md` 生成物；CLI 与 App 共用 |
 | Antigravity 按需参考 | `$HOME/.gemini/config/policy/*.md` | 通用规则、执行、写作、工具、评审、Antigravity 运行与使用政策及采用后的 Rust/SQL 政策 |
 | Antigravity 工具 | `$HOME/.gemini/config/tools/<name>.mjs` | 同一份打包工具 |
-| Antigravity 参考配置 | `$HOME/.gemini/config/capability/{rust-lints.toml,wx-docs.mcp.json}` | 采用 Rust 偏好的项目或启用微信文档 MCP 时可合并；不自动修改项目或客户端配置 |
+| Antigravity 参考配置 | `$HOME/.gemini/config/capability/*` | 跨平台含 `rust-lints.toml`、`wx-docs.mcp.json`、`chrome-devtools.mcp.json` 与 Google Cloud 官方 MCP 片段（macOS 另含 `sketch.mcp.json`）；不自动修改项目或客户端配置 |
 | Antigravity App 与 CLI 技能 | `$HOME/.gemini/config/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
-Codex、DeepSeek Harness（`dsh`）与 Antigravity App 和 CLI 在 macOS 上均交付十个完整顶层包、二十个内容入口。非 macOS 平台自动跳过依赖 macOS 原生环境的 `sketch-native` 与 `wechatide`，三端均交付八个顶层包、八个内容入口。wechatide 的十个子入口由父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及四份配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成。
+Codex、DeepSeek Harness（`dsh`）与 Antigravity App 和 CLI 在 macOS 上均交付十一个完整顶层包、二十八个内容入口及全部平台适用配置片段。非 macOS 平台自动跳过依赖 macOS 原生环境的 `sketch-native`、`wechatide` 与 `sketch.mcp.json`，三端均交付九个顶层包、十六个内容入口。`wechatide` 与 `google-cloud` 的嵌套子入口分别由各自父入口按相对链接路由，符合 DeepSeek Harness 单层 `<root>/<name>/SKILL.md` 发现规则。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及适用配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成；`xcode`、`datagrip`、`codex_app`、`node_repl` 与个人数据库连接配置（如 `postgres`）不纳入交付。
 
-Antigravity App 与 CLI 接收与另外两端一致的通用与平台技能集合（macOS 十个顶层包，其他平台八个顶层包），配套交付本端全局规则、公共政策与本端运行政策（`policy/antigravity.md`）、三个工具和 `rust-lints.toml`、`wx-docs.mcp.json` 两份参考片段，不接收 Codex 专属模型路线或产品配置。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 保留作为 Codex 与 DeepSeek Harness 双端兼容目标，不自动扩张。
+Antigravity App 与 CLI 接收与另外两端一致的通用与平台技能集合（macOS 十一个顶层包，其他平台九个顶层包），配套交付本端全局规则、公共政策与本端运行政策（`policy/antigravity.md`）、三个工具和适用参考片段，不接收 Codex 专属模型路线或产品配置。若 macOS Antigravity 已保留官方 `chrome-devtools-plugin` 以使用其专项排障技能，切勿重复将 `chrome-devtools.mcp.json` 合入全局 `mcp_config.json`。清单支持按固定顺序列出 `codex,dsh,antigravity` 的子集；`shared` 保留作为 Codex 与 DeepSeek Harness 双端兼容目标，不自动扩张。
 
 Codex 与 DeepSeek Harness 的默认部署根分别为 `${CODEX_HOME:-$HOME/.codex}` 和 `${DSH_HOME:-$HOME/.dsh}`。Antigravity 新计划使用 `$HOME/.gemini`，V6/V7 旧记录沿用其记录的 CLI 根。备份根为 `${AGENTS_BACKUP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/agents/backups}`。计划记录选中产品的物理根、变量来源和祖先身份。任何两个选中产品根相同或互相包含时拒绝。产品根与部署记录、备份或审阅副本重叠时同样拒绝。源码只允许位于选中 Codex 根的 `worktrees/` 子目录内，或在所有选中产品根之外。源码仍须通过 Git 检出和完整报告身份核对。实际公开目标不得覆盖源码、私有候选或恢复运行副本；物理路径检查也保留这些边界。Antigravity 接管 KEY 使用 `antigravity:gh` 或 `antigravity:policy/review.md` 等产品限定名称。
 
