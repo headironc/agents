@@ -86,7 +86,7 @@
     "featuresUsed": [
       "Translator"
     ],
-    "tokenCount": 1884,
+    "tokenCount": 1938,
     "volatileFeatures": [
       {
         "reason": "built-in-ai",
@@ -190,7 +190,7 @@
       "aspect-ratio",
       "Logical properties"
     ],
-    "tokenCount": 5676
+    "tokenCount": 5718
   },
   {
     "id": "design-token-reactivity",
@@ -449,7 +449,7 @@
       "attr()",
       ":dir()"
     ],
-    "tokenCount": 1948
+    "tokenCount": 1992
   },
   {
     "id": "sms-otp-form",
@@ -471,7 +471,7 @@
       "<input type=\"checkbox\" switch>",
       "accent-color"
     ],
-    "tokenCount": 648
+    "tokenCount": 673
   },
   {
     "id": "validate-input-after-interaction",
@@ -499,7 +499,7 @@
     "featuresUsed": [
       "Autonomous custom elements"
     ],
-    "tokenCount": 2192
+    "tokenCount": 2889
   },
   {
     "id": "form-associated-custom-elements",
@@ -588,6 +588,26 @@
     "tokenCount": 971
   },
   {
+    "id": "js",
+    "description": "Action-oriented guidelines for modern JavaScript and Web APIs, covering immutable data operations, deep cloning, collection grouping, asynchronous coordination, URL query parsing, binary text encoding, and DOM manipulation. Use this guide when authoring or refactoring client- or server-side JavaScript.",
+    "category": "js",
+    "featuresUsed": [
+      "structuredClone()",
+      "URL",
+      "DOM",
+      "Array grouping",
+      "Promise.withResolvers()",
+      "Events",
+      "Array by copy",
+      "Array findLast() and findLastIndex()",
+      "AbortSignal.timeout()",
+      "AbortSignal.any()",
+      "Error cause",
+      "Text encoding and decoding"
+    ],
+    "tokenCount": 8219
+  },
+  {
     "id": "sort-high-precision-timestamps",
     "description": "Parse, sort, and measure intervals between sub-millisecond or nanosecond ISO 8601 timestamps without Date truncation collisions using Temporal.Instant.",
     "category": "js",
@@ -603,7 +623,7 @@
     "featuresUsed": [
       "Temporal"
     ],
-    "tokenCount": 1345
+    "tokenCount": 1348
   },
   {
     "id": "batch-analytics-events",
@@ -622,7 +642,7 @@
     "featuresUsed": [
       "Scheduler API"
     ],
-    "tokenCount": 504
+    "tokenCount": 724
   },
   {
     "id": "calculate-total-foreground-time",
@@ -658,7 +678,7 @@
     "featuresUsed": [
       "scrollend"
     ],
-    "tokenCount": 740
+    "tokenCount": 738
   },
   {
     "id": "deliver-optimized-decorative-images",
@@ -784,7 +804,7 @@
       "<audio>",
       "Intersection observer"
     ],
-    "tokenCount": 2347
+    "tokenCount": 2398
   },
   {
     "id": "optimize-image-priority",
@@ -825,7 +845,7 @@
       "HTML streaming setters",
       "HTML processing instructions"
     ],
-    "tokenCount": 2878,
+    "tokenCount": 2899,
     "volatileFeatures": [
       {
         "reason": "recent-single-engine",
@@ -842,7 +862,7 @@
     "description": "Actionable guidelines for optimizing modern web applications. Use this guide when auditing performance, optimizing loading metrics, fixing slow interactions and optimizing Core Web Vitals (LCP, INP, CLS)",
     "category": "performance",
     "featuresUsed": [],
-    "tokenCount": 5220
+    "tokenCount": 5219
   },
   {
     "id": "resolution-optimized-pseudo-elements",
@@ -855,12 +875,12 @@
   },
   {
     "id": "schedule-tasks-by-priority",
-    "description": "Schedule tasks with different priorities to ensure critical work runs first while background work is deferred.",
+    "description": "Schedule, reprioritize, or abort queued tasks across priority levels so critical user input runs ahead of background work.",
     "category": "performance",
     "featuresUsed": [
       "Scheduler API"
     ],
-    "tokenCount": 534
+    "tokenCount": 888
   },
   {
     "id": "privacy",
@@ -1135,7 +1155,7 @@
       "scroll-initial-target",
       "Scroll snap"
     ],
-    "tokenCount": 1215
+    "tokenCount": 1213
   },
   {
     "id": "responsive-table",
@@ -1154,7 +1174,7 @@
     "featuresUsed": [
       "Container scroll-state queries"
     ],
-    "tokenCount": 868
+    "tokenCount": 994
   },
   {
     "id": "scroll-progress-indicator",
@@ -1218,7 +1238,7 @@
       "Anchor positioning",
       "Popover"
     ],
-    "tokenCount": 2518
+    "tokenCount": 2528
   },
   {
     "id": "2d-panning",
@@ -1244,7 +1264,7 @@
       "Anchor positioning",
       "prefers-reduced-motion media query"
     ],
-    "tokenCount": 804
+    "tokenCount": 814
   },
   {
     "id": "animate-element-entry-exit",
@@ -1319,7 +1339,7 @@
       "Popover",
       "<dialog>"
     ],
-    "tokenCount": 1849
+    "tokenCount": 2032
   },
   {
     "id": "directional-navigation-transitions",
@@ -1340,7 +1360,7 @@
       "touch-action",
       "user-select"
     ],
-    "tokenCount": 1616
+    "tokenCount": 1630
   },
   {
     "id": "drag-and-drop",
@@ -1352,7 +1372,7 @@
       "user-select",
       "reading-flow"
     ],
-    "tokenCount": 3814
+    "tokenCount": 3884
   },
   {
     "id": "dynamic-sibling-animations",
@@ -1361,7 +1381,7 @@
     "featuresUsed": [
       "sibling-count() and sibling-index()"
     ],
-    "tokenCount": 718
+    "tokenCount": 1332
   },
   {
     "id": "dynamic-sort",
@@ -1372,7 +1392,7 @@
       "Element-scoped view transitions",
       "moveBefore()"
     ],
-    "tokenCount": 1649
+    "tokenCount": 1670
   },
   {
     "id": "group-element-transitions",
@@ -1410,7 +1430,7 @@
     "featuresUsed": [
       "Interest invokers"
     ],
-    "tokenCount": 1170
+    "tokenCount": 1244
   },
   {
     "id": "interest-triggered-tooltips",
@@ -1422,7 +1442,7 @@
       "popover=\"hint\"",
       "Anchor positioning"
     ],
-    "tokenCount": 4994
+    "tokenCount": 5078
   },
   {
     "id": "light-dismiss-a-dialog",
@@ -1461,7 +1481,7 @@
     "featuresUsed": [
       "moveBefore()"
     ],
-    "tokenCount": 796
+    "tokenCount": 795
   },
   {
     "id": "parallax-scroll-effects",
@@ -1567,7 +1587,7 @@
       "Scroll snap events",
       "Scroll snap"
     ],
-    "tokenCount": 1123
+    "tokenCount": 1265
   },
   {
     "id": "scroll-target-on-load",
@@ -1676,7 +1696,7 @@
       "focusgroup",
       ":has()"
     ],
-    "tokenCount": 4106
+    "tokenCount": 4148
   },
   {
     "id": "breadcrumbs",
@@ -1711,12 +1731,13 @@
     "featuresUsed": [
       "Scroll snap",
       "scroll-behavior",
+      "overscroll-behavior",
       "scrollend",
       "Scroll snap events",
       "Scroll-driven animations",
       "sibling-count() and sibling-index()"
     ],
-    "tokenCount": 3598
+    "tokenCount": 4614
   },
   {
     "id": "checkbox",
@@ -1783,7 +1804,7 @@
       "blocking=\"render\"",
       "<link rel=\"expect\">"
     ],
-    "tokenCount": 5286
+    "tokenCount": 5414
   },
   {
     "id": "menu",
@@ -1797,7 +1818,7 @@
       ":has()",
       "abs() and sign()"
     ],
-    "tokenCount": 8083
+    "tokenCount": 8093
   },
   {
     "id": "navbar",
@@ -1816,7 +1837,7 @@
       "interpolate-size",
       "content-visibility"
     ],
-    "tokenCount": 4514
+    "tokenCount": 4524
   },
   {
     "id": "navigation-drawer",
@@ -1842,7 +1863,7 @@
       "Popover",
       "Anchor positioning"
     ],
-    "tokenCount": 2735
+    "tokenCount": 2745
   },
   {
     "id": "persistent-toast-notifications",
@@ -1855,7 +1876,7 @@
       "sibling-count() and sibling-index()",
       "transition-behavior"
     ],
-    "tokenCount": 3284
+    "tokenCount": 3294
   },
   {
     "id": "progress",
@@ -1945,7 +1966,7 @@
       "Logical properties",
       "focusgroup"
     ],
-    "tokenCount": 5524
+    "tokenCount": 5571
   },
   {
     "id": "content-first-noise-reduction",
@@ -1971,7 +1992,7 @@
       "Interaction media queries",
       ":has()"
     ],
-    "tokenCount": 1660
+    "tokenCount": 2055
   },
   {
     "id": "natural-interactions",
@@ -1994,7 +2015,7 @@
       "scrollbar-color",
       "prefers-contrast media query"
     ],
-    "tokenCount": 840
+    "tokenCount": 910
   },
   {
     "id": "apply-webgl-shaders",
@@ -2003,10 +2024,10 @@
     "featuresUsed": [
       "HTML-in-canvas"
     ],
-    "tokenCount": 3105,
-    "originTrials": [
+    "tokenCount": 3109,
+    "volatileFeatures": [
       {
-        "chromestatus_url": "https://chromestatus.com/feature/5172548013916160",
+        "reason": "recent-single-engine",
         "id": "canvas-html"
       }
     ]
@@ -2049,7 +2070,7 @@
       "Lab and LCH",
       "Relative colors"
     ],
-    "tokenCount": 1108
+    "tokenCount": 1192
   },
   {
     "id": "complex-shapes",
@@ -2100,7 +2121,7 @@
       "scrollbar-color",
       "scrollbar-width"
     ],
-    "tokenCount": 668
+    "tokenCount": 796
   },
   {
     "id": "dark-mode",
@@ -2114,7 +2135,7 @@
       "image()",
       "accent-color"
     ],
-    "tokenCount": 4381
+    "tokenCount": 4463
   },
   {
     "id": "equal-width-text-lines",
@@ -2134,10 +2155,10 @@
     "featuresUsed": [
       "HTML-in-canvas"
     ],
-    "tokenCount": 3976,
-    "originTrials": [
+    "tokenCount": 3980,
+    "volatileFeatures": [
       {
-        "chromestatus_url": "https://chromestatus.com/feature/5172548013916160",
+        "reason": "recent-single-engine",
         "id": "canvas-html"
       }
     ]
@@ -2149,10 +2170,10 @@
     "featuresUsed": [
       "HTML-in-canvas"
     ],
-    "tokenCount": 4684,
-    "originTrials": [
+    "tokenCount": 4688,
+    "volatileFeatures": [
       {
-        "chromestatus_url": "https://chromestatus.com/feature/5172548013916160",
+        "reason": "recent-single-engine",
         "id": "canvas-html"
       }
     ]
@@ -2174,10 +2195,10 @@
     "featuresUsed": [
       "HTML-in-canvas"
     ],
-    "tokenCount": 4565,
-    "originTrials": [
+    "tokenCount": 4552,
+    "volatileFeatures": [
       {
-        "chromestatus_url": "https://chromestatus.com/feature/5172548013916160",
+        "reason": "recent-single-engine",
         "id": "canvas-html"
       }
     ]
@@ -2249,7 +2270,7 @@
       "Custom properties",
       "aspect-ratio"
     ],
-    "tokenCount": 1020
+    "tokenCount": 1158
   },
   {
     "id": "visually-stable-font-fallbacks",
