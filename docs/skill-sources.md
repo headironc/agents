@@ -99,7 +99,7 @@ Weekly changes preserve the previous adaptation and create a draft requiring [co
 
 ## modern-web-guidance
 
-The [delivered skill](../delivery/skills/modern-web-guidance/SKILL.md) uses the official Google Chrome [npm package](https://registry.npmjs.org/modern-web-guidance/1.0.0). Release `1.0.0` records source revision `544c250575f7811d87fef8b1c064bc9571cbfb80` in [modern-web-guidance-src](https://github.com/GoogleChrome/modern-web-guidance-src/tree/544c250575f7811d87fef8b1c064bc9571cbfb80). The machine-readable [source lock](../config/modern-web-guidance-source.json) owns package integrity and per-file digests.
+The [delivered skill](../delivery/skills/modern-web-guidance/SKILL.md) uses the official Google Chrome [npm package](https://registry.npmjs.org/modern-web-guidance). Initial adoption pinned release `1.0.0` (source revision `544c250575f7811d87fef8b1c064bc9571cbfb80` in [modern-web-guidance-src](https://github.com/GoogleChrome/modern-web-guidance-src/tree/544c250575f7811d87fef8b1c064bc9571cbfb80)); the machine-readable [source lock](../config/modern-web-guidance-source.json) owns the current adopted release, source revision, package integrity, and per-file digests.
 
 The complete npm skill directory is retained under `upstream/`, including its CLI, search index, guides, runtime metadata, and watchdog. Its original entry is named `SKILL.upstream.md` to keep one discoverable skill entry. The package-root LICENSE, THIRD_PARTY_NOTICES, and README are retained as well; the README is named `README.upstream.txt`. These filename changes do not alter file bytes. Unrelated npm plugin registrations and the separate Chrome Extensions skill are not adopted.
 

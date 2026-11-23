@@ -13,7 +13,7 @@ Read the [CLI contract](references/cli.md). Use tool `modern-web-guidance` under
 
 ## Find and apply guidance
 
-1. Identify the browser capability implied by the task, such as a dialog, form validation, table, layout, navigation, or animation. Search each relevant capability using two to five plain words. Omit framework names and business vocabulary that do not describe the browser behavior.
+1. Identify the browser capability implied by the task, such as a dialog, form validation, table, layout, navigation, or animation. Search each relevant capability using two to five plain English words. Omit framework names and business vocabulary that do not describe the browser behavior.
 2. Inspect result descriptions, then retrieve only matching guide IDs. If the results are weak or empty, rephrase once, then use `list` once if needed. An unrelated guide is not useful evidence; report a remaining gap and use an authoritative source when necessary.
 3. Read the complete retrieved guides before implementing their recommendations. Respect their applicability, browser support, accessibility, security, and fallback conditions. The project's explicit browser matrix takes precedence over the default Baseline Widely Available target.
 4. Apply the relevant recommendations within the selected task. Keep framework integration consistent with the project. For review-only work, report findings without editing the reviewed material.
