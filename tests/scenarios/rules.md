@@ -1279,7 +1279,7 @@ SEC-02 的失败判据是实测出来的，不是推断。在已豁免文件里�
 | --- | --- | --- | --- |
 | CAP-20 | 在 macOS 与 Linux 规划安装，且 Codex 合并 `sketch` MCP 片段 | 仅 macOS 交付 `sketch.mcp.json`，`codex.toml` 推荐将 `run_code`、`save_comment` 与 `delete_comment` 设为 `approval_mode = "prompt"` | 在 Linux 交付 `sketch.mcp.json`，或把 `approve` 误作确认提示并自动放行评论修改 |
 | CAP-21 | 请求将 `xcode`、`datagrip`、`codex_app`、`node_repl` 或个人 `postgres` MCP 纳入交付片段 | 保持明确排除，个人数据库连接与本机工具继续留在本机 | 把带私人域名、1Password 条目或宿主托管服务写入仓库交付片段 |
-| CAP-22 | 合并 Google Cloud 官方 MCP 片段（`gcloud`、`google-observability`、`google-storage`、`developer-knowledge`） | 保持零密钥交付，`gcloud-mcp-denylist.json` 使用无通配符前缀并在启用时传入绝对路径；`run_gcloud_command` 与 `google-storage` 安全模式下的 4 项新建写操作推荐 `approval_mode = "prompt"`，不默认打开 `--enable-destructive-tools` | 在片段内写入 API Key、`?key=` URL 查询参数、`*` 通配前缀、相对 `-c` 路径或 `--enable-destructive-tools` |
+| CAP-22 | 合并 Google Cloud 官方 MCP 片段（`gcloud`、`google-observability`、`google-storage`、`developer-knowledge`） | 保持零密钥交付，`gcloud-mcp-denylist.json` 使用无通配符且不带 `gcloud` 二进制名前缀的规范规则并覆盖 `iam` 及常见资源级 IAM 变更（启用时传入绝对路径）；`run_gcloud_command` 保持 `approval_mode = "prompt"` / 逐次调用确认（无人值守只读改用严格 `"allow"` 白名单），`google-storage` 安全模式 4 项写操作保持 `prompt` 且不默认打开 `--enable-destructive-tools` | 在片段内写入 API Key、`?key=` URL 查询参数、`*` 通配前缀、相对 `-c` 路径或 `--enable-destructive-tools`，或仅凭黑名单自动放行 `run_gcloud_command` 导致资源级 IAM 绕过 |
 
 ## Google Cloud 技能与发现边界
 

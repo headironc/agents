@@ -33,8 +33,11 @@
 # args = ["-y", "chrome-devtools-mcp@1.13.0", "--no-usage-statistics", "--no-performance-crux"]
 
 # Optional Google Cloud CLI MCP server (Preview, requires Node >=20 and authenticated local gcloud/ADC).
-# Upstream default_deny only blocks interactive/SSH commands; optionally pass `-c` with the absolute path
-# to `gcloud-mcp-denylist.json` and keep `run_gcloud_command` on "prompt" approval.
+# Upstream default_deny only blocks interactive/SSH commands; pass `-c` with the absolute path to
+# `gcloud-mcp-denylist.json` to block top-level and common resource-scoped IAM/delete/billing groups.
+# Because prefix denylists cannot exhaustively cover every GCP service group, keep
+# `run_gcloud_command` on "prompt" approval; unattended read-only clients must use an explicit
+# read-only `"allow"` allowlist config instead (mutually exclusive with `"deny"` in `-c`).
 # [mcp_servers.gcloud]
 # command = "npx"
 # args = ["-y", "@google-cloud/gcloud-mcp@0.5.3"]

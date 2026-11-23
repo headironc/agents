@@ -236,6 +236,65 @@ test("delivery/capability MCP JSON fragments parse with expected zero-secret def
     denylist.deny.every((item) => !item.includes("*")),
     "gcloud-mcp prefix matcher must not contain glob wildcards",
   );
+  assert.ok(
+    denylist.deny.every((item) => !/^gcloud\b/i.test(item.trim())),
+    "gcloud-mcp lints command strings without the leading gcloud binary name",
+  );
+
+  // Mirror @google-cloud/gcloud-mcp denyCommands prefix normalization and release-track matching.
+  const normalizeGcloud = (value: string) =>
+    `${value.toLowerCase().trim()} `;
+  const isDenied = (parsedCommand: string) => {
+    const cmd = normalizeGcloud(parsedCommand);
+    return denylist.deny.some((entry) =>
+      ["", "alpha", "beta", "preview"].some((track) =>
+        cmd.startsWith(normalizeGcloud(`${track} ${entry}`)),
+      ),
+    );
+  };
+  for (const blocked of [
+    "projects add-iam-policy-binding my-proj",
+    "beta projects add-iam-policy-binding my-proj",
+    "alpha projects set-iam-policy my-proj policy.json",
+    "projects remove-iam-policy-binding my-proj",
+    "resource-manager folders add-iam-policy-binding 123",
+    "resource-manager folders set-iam-policy 123 policy.json",
+    "storage buckets add-iam-policy-binding gs://b",
+    "storage buckets set-iam-policy gs://b p.json",
+    "secrets add-iam-policy-binding s",
+    "secrets set-iam-policy s p.json",
+    "run services add-iam-policy-binding svc",
+    "run jobs set-iam-policy job p.json",
+    "functions add-iam-policy-binding fn",
+    "functions add-invoker-policy-binding fn",
+    "pubsub topics add-iam-policy-binding t",
+    "pubsub subscriptions set-iam-policy s p.json",
+    "artifacts repositories add-iam-policy-binding r",
+    "compute instances set-iam-policy vm p.json",
+    "iap web add-iam-policy-binding",
+    "org-policies set-policy p.yaml",
+    "services api-keys create",
+    "iam service-accounts keys create k.json",
+    "preview iam roles update r",
+  ]) {
+    assert.equal(isDenied(blocked), true, `Expected denylist to block: ${blocked}`);
+  }
+  for (const permitted of [
+    "projects list",
+    "projects describe my-proj",
+    "projects get-iam-policy my-proj",
+    "storage buckets describe gs://b",
+    "storage buckets get-iam-policy gs://b",
+    "secrets describe s",
+    "run services describe svc",
+    "compute instances list",
+  ]) {
+    assert.equal(
+      isDenied(permitted),
+      false,
+      `Expected read-only command not to match denylist: ${permitted}`,
+    );
+  }
   assert.throws(() => JSON.parse("{invalid"), SyntaxError);
 });
 
