@@ -6,23 +6,23 @@
 
 ## 阅读与采用
 
-| 读者与任务                                                  | 当前入口                                                                                                                                                                                                                   | 适用范围                                                                                                                                                              |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 在本仓库工作                                                | [AGENTS.md](../AGENTS.md) → [Codex 规则](../delivery/AGENTS.md)                                                                                                                                                            | 先加载 Codex 规则，再读相关使用与维护合同                                                                                                                             |
-| 维护或审查通用规则                                          | [通用规则](../delivery/policy/common.md)、[行为场景](../tests/scenarios/rules.md)                                                                                                                                          | 核对归属、例外和独立推导的预期；场景不是第二份运行规则                                                                                                                |
-| 维护产品指令                                                | [架构与手工源](../README.md#规则与交付架构)、[交付目录](#交付目录)、[产品场景](../tests/scenarios/adapters.md)                                                                                                             | 修改通用源或产品适配，再生成入口；不手改生成物                                                                                                                        |
-| 在 Antigravity（CLI 与 App）工作或排查会话行为              | [Antigravity 适配](../delivery/rules/antigravity.md)、[运行与使用政策](../delivery/policy/antigravity.md)、[运行场景](../tests/scenarios/rules.md#antigravity-运行时会话空间与子代理回传)                                  | 常驻入口保持凝练并受 `24,000` 字节门禁约束；`config/policy/antigravity.md` 维护会话 `brain/`、只读边界、子代理 `send_message` 回传及 CLI 参考                         |
-| 组织执行、选择模型路线、安排会话与 Goal，或协作、接续和收尾 | [任务起点](../delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](../delivery/policy/models.md)、[模型场景](../tests/scenarios/rules.md#模型选择与接续)                                                | 由 Codex 规则入口按需加载；衔接需求与授权、工作区选择与绑定、Goal、自主执行、结果接纳及收尾，实际经验见[验证边界](#验证能说明什么)                                    |
-| 按任务选用 DeepSeek Harness (`dsh`)                         | [分工与授权](../delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](../delivery/policy/deepseek-harness.md)                                                                                                 | 仅使用本合同定义的 OpenCode Go 或 DeepSeek 官方路由；按能力适配交付完整工作，保留任务边界及验收，不设调用比例                                                         |
-| 项目明确采用 Rust 偏好                                      | [Rust 偏好](../delivery/policy/rust.md)与[代码偏好](../delivery/policy/common.md#code-preferences)                                                                                                                         | 依项目明确采用的范围读取                                                                                                                                              |
-| 项目明确采用 SQL 偏好                                       | [SQL 偏好](../delivery/policy/sql.md)与[代码偏好](../delivery/policy/common.md#code-preferences)                                                                                                                           | 按项目采用范围加载 SQL correctness 及其错误处理引用；PostgreSQL 约定仅适用于该数据库，表名遵循[表与模式命名偏好](../delivery/policy/sql.md#tables-and-schemas)        |
-| 协同设计数据模型                                            | [代码偏好](../delivery/policy/common.md#code-preferences)、[SQL 建模偏好](../delivery/policy/sql.md#data-modeling)                                                                                                         | 先恢复整体流程与已定职责，再围绕实际未决选择细化；不设固定逐表审批，具体拆分、应用 ID 和类型取值由所属项目记录                                                        |
-| 撰写中文或英文文档                                          | [写作参考](../delivery/policy/writing.md)、[检查脚本](../scripts/check-prose.mjs)                                                                                                                                          | 脚本阻塞中西文空格错误，句长只给出提示；其余由作者判断                                                                                                                |
-| 维护按编号引用的表格                                        | [标识符检查](../scripts/check-ids.mjs)                                                                                                                                                                                     | 同一前缀按出现顺序递增、不重复；跳号允许                                                                                                                              |
-| 采用能力配置推荐值                                          | [能力配置](../delivery/capability/README.md)、[Codex 片段](../delivery/capability/codex.toml)、[DeepSeek Harness 片段](../delivery/capability/dsh-headless.patch.yml)、[Rust lint](../delivery/capability/rust-lints.toml) | 全是推荐文本，合并由本人做一次。安装后位于 `${CODEX_HOME:-$HOME/.codex}/capability/` 或 `${DSH_HOME:-$HOME/.dsh}/capability/`。本仓库不写任何产品或消费项目的配置文件 |
-| 准备或验证本仓库工具                                        | [工具说明](tooling.md)                                                                                                                                                                                                     | 使用仓库固定工具和锁定依赖；不安装个人配置                                                                                                                            |
-| 发现项目资料或执行项目检查                                  | [project-guide](../delivery/skills/project-guide/SKILL.md)                                                                                                                                                                 | 共享技能；按目标版本发现权威来源与原生检查，报告实际覆盖及缺口；来源与演练边界见[登记](skill-sources.md#project-guide)                                                |
-| 维护规则与工具绑定                                          | [登记维护](tooling.md#仓库登记维护)、[工具调用](../delivery/policy/tool-contracts.md)                                                                                                                                      | inventory、owner 索引和 consumer bindings 各自承担不同职责；只登记已交付能力                                                                                          |
+| 读者与任务 | 当前入口 | 适用范围 |
+| --- | --- | --- |
+| 在本仓库工作 | [AGENTS.md](../AGENTS.md) → [Codex 规则](../delivery/AGENTS.md) | 先加载 Codex 规则，再读相关使用与维护合同 |
+| 维护或审查通用规则 | [通用规则](../delivery/policy/common.md)、[行为场景](../tests/scenarios/rules.md) | 核对归属、例外和独立推导的预期；场景不是第二份运行规则 |
+| 维护产品指令 | [架构与手工源](../README.md#规则与交付架构)、[交付目录](#交付目录)、[产品场景](../tests/scenarios/adapters.md) | 修改通用源或产品适配，再生成入口；不手改生成物 |
+| 在 Antigravity（CLI 与 App）工作或排查会话行为 | [Antigravity 适配](../delivery/rules/antigravity.md)、[运行与使用政策](../delivery/policy/antigravity.md)、[运行场景](../tests/scenarios/rules.md#antigravity-运行时会话空间与子代理回传) | 常驻入口保持凝练并受 `24,000` 字节门禁约束；`config/policy/antigravity.md` 维护会话 `brain/`、只读边界、子代理 `send_message` 回传及 CLI 参考 |
+| 组织执行、选择模型路线、安排会话与 Goal，或协作、接续和收尾 | [任务起点](../delivery/policy/models.md#task-start-and-execution-routing)、[模型政策](../delivery/policy/models.md)、[模型场景](../tests/scenarios/rules.md#模型选择与接续) | 由 Codex 规则入口按需加载；衔接需求与授权、工作区选择与绑定、Goal、自主执行、结果接纳及收尾，实际经验见[验证边界](#验证能说明什么) |
+| 按任务选用 DeepSeek Harness (`dsh`) | [分工与授权](../delivery/policy/models.md#deepseek-harness-delegation)、[调用合同](../delivery/policy/deepseek-harness.md) | 仅使用本合同定义的 OpenCode Go 或 DeepSeek 官方路由；按能力适配交付完整工作，保留任务边界及验收，不设调用比例 |
+| 项目明确采用 Rust 偏好 | [Rust 偏好](../delivery/policy/rust.md)与[代码偏好](../delivery/policy/common.md#code-preferences) | 依项目明确采用的范围读取 |
+| 项目明确采用 SQL 偏好 | [SQL 偏好](../delivery/policy/sql.md)与[代码偏好](../delivery/policy/common.md#code-preferences) | 按项目采用范围加载 SQL correctness 及其错误处理引用；PostgreSQL 约定仅适用于该数据库，表名遵循[表与模式命名偏好](../delivery/policy/sql.md#tables-and-schemas) |
+| 协同设计数据模型 | [代码偏好](../delivery/policy/common.md#code-preferences)、[SQL 建模偏好](../delivery/policy/sql.md#data-modeling) | 先恢复整体流程与已定职责，再围绕实际未决选择细化；不设固定逐表审批，具体拆分、应用 ID 和类型取值由所属项目记录 |
+| 撰写中文或英文文档 | [写作参考](../delivery/policy/writing.md)、[检查脚本](../scripts/check-prose.mjs) | 脚本阻塞中西文空格错误，句长只给出提示；其余由作者判断 |
+| 维护按编号引用的表格 | [标识符检查](../scripts/check-ids.mjs) | 同一前缀按出现顺序递增、不重复；跳号允许 |
+| 采用能力配置推荐值 | [能力配置](../delivery/capability/README.md)、[Codex 片段](../delivery/capability/codex.toml)、[DeepSeek Harness 片段](../delivery/capability/dsh-headless.patch.yml)、[Rust lint](../delivery/capability/rust-lints.toml) | 全是推荐文本，合并由本人做一次。安装后位于 `${CODEX_HOME:-$HOME/.codex}/capability/` 或 `${DSH_HOME:-$HOME/.dsh}/capability/`。本仓库不写任何产品或消费项目的配置文件 |
+| 准备或验证本仓库工具 | [工具说明](tooling.md) | 使用仓库固定工具和锁定依赖；不安装个人配置 |
+| 发现项目资料或执行项目检查 | [project-guide](../delivery/skills/project-guide/SKILL.md) | 共享技能；按目标版本发现权威来源与原生检查，报告实际覆盖及缺口；来源与演练边界见[登记](skill-sources.md#project-guide) |
+| 维护规则与工具绑定 | [登记维护](tooling.md#仓库登记维护)、[工具调用](../delivery/policy/tool-contracts.md) | inventory、owner 索引和 consumer bindings 各自承担不同职责；只登记已交付能力 |
 
 其他仓库使用这些源码时，项目指令必须明确引用实际位置。复制一个路径名不会使文件自动加载。当前检查保留工具归属和消费者绑定验证。两平台 CI 结果见 [README](../README.md)。安装器提供[计划、应用与恢复](#产品选择与安装)。实际替换个人配置仍必须逐次授权。交付目录只是可检查的候选，不切换个人配置。
 
@@ -30,7 +30,7 @@
 
 ### 规则放置与实施范围
 
-[实施切片规则](../delivery/policy/common.md#implementation-slices)规定单次实施边界。整体架构的认可不授权实施全部阶段。默认“开始”与“继续”指向当前明确提出的切片。后续选片按[持续交付边界](../delivery/policy/common.md#continuing-delivery)核对原授权：有效批次内继续，未覆盖时等待选择。每片仍独立完整交付，发布、合并和部署各自核权。验收预期见[小切片场景](../tests/scenarios/rules.md#小切片实施)。
+[实施切片规则](../delivery/policy/common.md#implementation-slices)规定单次实施边界。整体架构的认可不授权实施全部阶段。默认“开始”与“继续”指向当前明确提出的切片。后续选片按[持续交付边界](../delivery/policy/common.md#continuing-delivery)核对原授权：有效批次内继续，未覆盖时等待选择。每片仍独立完整交付，发布、合并和部署各自核权。编码前拆解与单 PR 体量门禁见[切片拆解与可审查体量](../delivery/policy/execution.md#slice-decomposition-and-reviewability-budget)。验收预期见[小切片场景](../tests/scenarios/rules.md#小切片实施)。
 
 [代码偏好](../delivery/policy/common.md#code-preferences)区分个人偏好与项目规范。复用的个人 Rust、SQL 偏好保留在交付 `policy/`。项目按需明确采用，入口不复制全文。团队强制规则、业务不变量和验证命令由消费仓库拥有。团队、CI 或托管审查必需的规范必须纳入项目版本控制。项目 AGENTS.md 明确适用范围和权威文件位置，避免依赖作者的个人主目录。
 
@@ -56,14 +56,14 @@
 
 开发沿所选设备上项目支持的原生环境，不以 VM 或容器为前提。分别验证源码、依赖和实际检查；安装规则不证明 Linux 兼容。macOS 专属客户端及原生或像素验收仍由有相应能力的获准设备完成。[共用执行合同](../delivery/policy/tool-contracts.md#不可信输入的执行)区分已授权可信输入与来源尚未可信的代码。后者先静态读取，只在已验证边界的环境执行。所选设备缺少该边界时沿已有且适用的隔离 CI，保留准确候选、实际运行及未运行项。worktree 或 `workspace-write` 不单独证明敏感文件读取已隔离。
 
-| 能力                   | 选择路径                                               | 核对要点                                                                                             |
-| ---------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| 源码、构建、调试和测试 | 所选设备的命令入口或集成终端，使用项目原生命令         | 实际宿主和目录、固定工具链、候选、原运行句柄及实际输出                                               |
-| 项目与隔离写区         | 实际客户端可用的项目或工作区入口                       | 实际宿主、项目、附件、工作树依赖与唯一写者                                                           |
-| 会话协作               | 实际客户端和宿主可用的发送入口，或已验证的结果读取路径 | 双方 host/thread、原始授权、唯一写者、结果位置、主动取回者与接纳                                     |
-| 浏览器和桌面验证       | Desktop 浏览器、桌面操作或适任专用工具                 | 真实运行的本机页面、可读画面、同版候选及已获准目标                                                   |
-| 连接器与专业能力       | 先用适任连接器或 API，再按技能选择本机工具             | 实际执行者的入口、连接状态、必要材料及允许操作                                                       |
-| 平台专属验收           | 项目支持的本机原生环境、已有且适用的 CI 或对应客户端   | 实际开发设备、执行边界、准确候选和运行，保留未覆盖的平台与业务行为；其他环境只沿已核实能力与授权选择 |
+| 能力 | 选择路径 | 核对要点 |
+| --- | --- | --- |
+| 源码、构建、调试和测试 | 所选设备的命令入口或集成终端，使用项目原生命令 | 实际宿主和目录、固定工具链、候选、原运行句柄及实际输出 |
+| 项目与隔离写区 | 实际客户端可用的项目或工作区入口 | 实际宿主、项目、附件、工作树依赖与唯一写者 |
+| 会话协作 | 实际客户端和宿主可用的发送入口，或已验证的结果读取路径 | 双方 host/thread、原始授权、唯一写者、结果位置、主动取回者与接纳 |
+| 浏览器和桌面验证 | Desktop 浏览器、桌面操作或适任专用工具 | 真实运行的本机页面、可读画面、同版候选及已获准目标 |
+| 连接器与专业能力 | 先用适任连接器或 API，再按技能选择本机工具 | 实际执行者的入口、连接状态、必要材料及允许操作 |
+| 平台专属验收 | 项目支持的本机原生环境、已有且适用的 CI 或对应客户端 | 实际开发设备、执行边界、准确候选和运行，保留未覆盖的平台与业务行为；其他环境只沿已核实能力与授权选择 |
 
 [官方本地环境说明](https://learn.chatgpt.com/docs/environments/local-environment)提醒，工作树可能缺少未提交到 Git 的依赖和文件。[浏览器文档](https://learn.chatgpt.com/docs/browser)区分 Desktop 与 CLI 的入口。[插件文档](https://learn.chatgpt.com/docs/plugins)另列适用客户端、连接和权限条件。某执行者缺少入口时，按政策安排对应阶段，不判定整个本机缺能力。上表用于选择路径，不是已安装、已登录或行为验收的快照。
 
@@ -79,11 +79,11 @@
 
 要求 Mac 和 iPhone 都能接任或继续时，使用 dev 官方 app-server 上的官方交互会话。可从支持显式端点的交互 CLI 连接原 Unix socket；实际端点、权限及沙箱审批按本机核对。用同一会话 ID 在要求的客户端打开并验证继续入口。`codex exec` 适合后台任务。即使能按 ID 接续，也不能据此保证会话进入手机普通列表。
 
-| 方向               | 入口与读回                                                                                                                                                                                                                                                                                                 |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dev 派单，Mac 领取 | 用双方可达的既有任务或 PR 记录安排；Mac 本地负责人读原任务并确认领取。dev CLI 不以 Remote Control 设备标识直发 Mac 本地会话。                                                                                                                                                                              |
-| Mac 回报 dev       | 若 App 提供已验证的发送入口，Mac 本地会话向现任协调者的实际 host 与会话 ID 主动报告。核原目标实际收到，负责人再读证据并接纳。                                                                                                                                                                              |
-| dev 工作会话回报   | 在同一 server 使用已授权且已核对目标的原生队列或既有结果路径。[官方 CLI 说明](https://learn.chatgpt.com/docs/cli/reference)列出 `codex queue` 与 `--remote`；[开发命令说明](https://learn.chatgpt.com/docs/developer-commands?surface=cli)说明 `--resume` 失败可能仅警告。入队、接续、送达和接纳分别确认。 |
+| 方向 | 入口与读回 |
+| --- | --- |
+| dev 派单，Mac 领取 | 用双方可达的既有任务或 PR 记录安排；Mac 本地负责人读原任务并确认领取。dev CLI 不以 Remote Control 设备标识直发 Mac 本地会话。 |
+| Mac 回报 dev | 若 App 提供已验证的发送入口，Mac 本地会话向现任协调者的实际 host 与会话 ID 主动报告。核原目标实际收到，负责人再读证据并接纳。 |
+| dev 工作会话回报 | 在同一 server 使用已授权且已核对目标的原生队列或既有结果路径。[官方 CLI 说明](https://learn.chatgpt.com/docs/cli/reference)列出 `codex queue` 与 `--remote`；[开发命令说明](https://learn.chatgpt.com/docs/developer-commands?surface=cli)说明 `--resume` 失败可能仅警告。入队、接续、送达和接纳分别确认。 |
 
 离线时在约定入口保留就绪或阻塞结果。恢复后先读最新有效指令、候选与原句柄，再补报；未知发送先回读原目标。正式接任经两方确认后，更新约定入口中的现任 host 和会话 ID。在途操作保留原目标与观察者。会话打开、CLI 退出或 daemon 在线不证明模型继续推进。
 
@@ -195,24 +195,24 @@ bash scripts/install.sh status
 
 所有公开目标直接保存内容。技能安装完整顶层目录，内部引用从该目录解析。固定类别与技能清单共同决定目标，不按历史数量验收。
 
-| 目标类别                    | 安装位置                                        | 候选来源                                                                                                                                                             |
-| --------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 指南                        | `${CODEX_HOME:-$HOME/.codex}/README.md`         | `delivery/README.md`                                                                                                                                                 |
-| Codex 按需参考              | `${CODEX_HOME:-$HOME/.codex}/policy/*.md`       | `delivery/policy/` 中适用于 Codex 的政策                                                                                                                             |
-| 工具                        | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs`  | `delivery/tools/` 打包产物                                                                                                                                           |
-| 推荐配置                    | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 中适用该平台的片段（非 macOS 自动跳过 `sketch.mcp.json`）                                                                                     |
-| Codex 指令                  | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md`         | `delivery/AGENTS.md`                                                                                                                                                 |
-| Codex 技能                  | `${CODEX_HOME:-$HOME/.codex}/skills/<name>`     | `delivery/skills/` 清单选出的顶层技能目录                                                                                                                            |
-| DeepSeek Harness 按需参考   | `${DSH_HOME:-$HOME/.dsh}/policy/*.md`           | `delivery/policy/` 中适用于 dsh 的政策                                                                                                                               |
-| DeepSeek Harness 工具       | `${DSH_HOME:-$HOME/.dsh}/tools/<name>.mjs`      | 同一份 `delivery/tools/` 打包产物                                                                                                                                    |
-| DeepSeek Harness 推荐配置   | `${DSH_HOME:-$HOME/.dsh}/capability/*`          | 同一份 `delivery/capability/` 适用配置片段（不含 `codex.toml`，非 macOS 跳过 `sketch.mcp.json`）                                                                     |
-| DeepSeek Harness 指令       | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md`             | `delivery/products/dsh/AGENTS.md` 生成物                                                                                                                             |
-| DeepSeek Harness 技能       | `${DSH_HOME:-$HOME/.dsh}/skills/<name>`         | 清单选择 `dsh` 的完整顶层目录                                                                                                                                        |
-| Antigravity 全局指令        | `$HOME/.gemini/AGENTS.md`                       | `delivery/products/antigravity/AGENTS.md` 生成物；CLI 与 App 共用                                                                                                    |
-| Antigravity 按需参考        | `$HOME/.gemini/config/policy/*.md`              | 通用规则、执行、写作、工具、评审、Antigravity 运行与使用政策及采用后的 Rust/SQL 政策                                                                                 |
-| Antigravity 工具            | `$HOME/.gemini/config/tools/<name>.mjs`         | 同一份打包工具                                                                                                                                                       |
-| Antigravity 参考配置        | `$HOME/.gemini/config/capability/*`             | 跨平台含 `rust-lints.toml`、`wx-docs.mcp.json`、`chrome-devtools.mcp.json` 与 Google Cloud 官方 MCP 片段（macOS 另含 `sketch.mcp.json`）；不自动修改项目或客户端配置 |
-| Antigravity App 与 CLI 技能 | `$HOME/.gemini/config/skills/<name>`            | 清单明确选择 Antigravity 的完整顶层目录                                                                                                                              |
+| 目标类别 | 安装位置 | 候选来源 |
+| --- | --- | --- |
+| 指南 | `${CODEX_HOME:-$HOME/.codex}/README.md` | `delivery/README.md` |
+| Codex 按需参考 | `${CODEX_HOME:-$HOME/.codex}/policy/*.md` | `delivery/policy/` 中适用于 Codex 的政策 |
+| 工具 | `${CODEX_HOME:-$HOME/.codex}/tools/<name>.mjs` | `delivery/tools/` 打包产物 |
+| 推荐配置 | `${CODEX_HOME:-$HOME/.codex}/capability/<name>` | `delivery/capability/` 中适用该平台的片段（非 macOS 自动跳过 `sketch.mcp.json`） |
+| Codex 指令 | `${CODEX_HOME:-$HOME/.codex}/AGENTS.md` | `delivery/AGENTS.md` |
+| Codex 技能 | `${CODEX_HOME:-$HOME/.codex}/skills/<name>` | `delivery/skills/` 清单选出的顶层技能目录 |
+| DeepSeek Harness 按需参考 | `${DSH_HOME:-$HOME/.dsh}/policy/*.md` | `delivery/policy/` 中适用于 dsh 的政策 |
+| DeepSeek Harness 工具 | `${DSH_HOME:-$HOME/.dsh}/tools/<name>.mjs` | 同一份 `delivery/tools/` 打包产物 |
+| DeepSeek Harness 推荐配置 | `${DSH_HOME:-$HOME/.dsh}/capability/*` | 同一份 `delivery/capability/` 适用配置片段（不含 `codex.toml`，非 macOS 跳过 `sketch.mcp.json`） |
+| DeepSeek Harness 指令 | `${DSH_HOME:-$HOME/.dsh}/AGENTS.md` | `delivery/products/dsh/AGENTS.md` 生成物 |
+| DeepSeek Harness 技能 | `${DSH_HOME:-$HOME/.dsh}/skills/<name>` | 清单选择 `dsh` 的完整顶层目录 |
+| Antigravity 全局指令 | `$HOME/.gemini/AGENTS.md` | `delivery/products/antigravity/AGENTS.md` 生成物；CLI 与 App 共用 |
+| Antigravity 按需参考 | `$HOME/.gemini/config/policy/*.md` | 通用规则、执行、写作、工具、评审、Antigravity 运行与使用政策及采用后的 Rust/SQL 政策 |
+| Antigravity 工具 | `$HOME/.gemini/config/tools/<name>.mjs` | 同一份打包工具 |
+| Antigravity 参考配置 | `$HOME/.gemini/config/capability/*` | 跨平台含 `rust-lints.toml`、`wx-docs.mcp.json`、`chrome-devtools.mcp.json` 与 Google Cloud 官方 MCP 片段（macOS 另含 `sketch.mcp.json`）；不自动修改项目或客户端配置 |
+| Antigravity App 与 CLI 技能 | `$HOME/.gemini/config/skills/<name>` | 清单明确选择 Antigravity 的完整顶层目录 |
 
 Codex、DeepSeek Harness（`dsh`）与 Antigravity App 和 CLI 在 macOS 上均交付两个完整顶层技能包（`project-guide` 与 `sketch-native`）及全部平台适用配置片段。非 macOS 平台自动跳过依赖 macOS 原生环境的 `sketch-native` 与 `sketch.mcp.json`，三端均交付一个顶层技能包（`project-guide`）。DeepSeek Harness 同时接收本端 `AGENTS.md`、适用政策、三个打包工具及适用配置片段（不含 Codex 专属的 `README.md`、`policy/antigravity.md` 和 `capability/codex.toml`）。配置片段合并到产品配置由本人完成；`xcode`、`datagrip`、`codex_app`、`node_repl` 与个人数据库连接配置（如 `postgres`）不纳入交付。
 
